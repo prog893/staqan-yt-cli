@@ -4,6 +4,34 @@
 
 A command-line interface for managing YouTube videos and metadata using the YouTube Data API v3. Built with Node.js and designed for programmatic YouTube channel management.
 
+## 🤖 Subagent Development Workflow
+
+**When a subagent is spawned to work on this tool:**
+
+1. **Read this CLAUDE.md first** - Understand architecture and conventions
+2. **Make changes** following AWS naming conventions and best practices
+3. **Test changes** manually with example commands
+4. **Commit all changes**:
+   ```bash
+   git add -A
+   git commit -m "Description
+
+   🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+   Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+   ```
+5. **Push to GitHub**:
+   ```bash
+   git push
+   ```
+6. **Verify clean state**:
+   ```bash
+   git status  # Should show "working tree clean"
+   ```
+7. **Return to parent** only after everything is committed and pushed
+
+**Do NOT return from subagent execution with uncommitted changes.**
+
 ## Architecture Principles
 
 ### 1. Clean Separation of Concerns
