@@ -97,6 +97,42 @@ staqan-yt <command> [options]
 
 ### Commands
 
+### Command Reference
+
+#### get-video (singular)
+Get metadata for a single video:
+```bash
+staqan-yt get-video dQw4w9WgXcQ --json
+```
+
+#### get-videos (plural - batch operation)
+Get metadata for multiple videos:
+```bash
+staqan-yt get-videos dQw4w9WgXcQ abc123xyz def456uvw --json
+```
+
+#### list-videos
+List all videos from a channel:
+```bash
+staqan-yt list-videos @channelname --limit 50 --json
+```
+
+#### search-videos
+Search for videos within a channel:
+```bash
+staqan-yt search-videos @channelname "keyword" --json
+```
+
+#### update-video (singular)
+Update a single video's metadata:
+```bash
+staqan-yt update-video dQw4w9WgXcQ --title "New Title" --description "New Desc" --dry-run
+```
+
+---
+
+## Commands
+
 #### 1. Authentication
 
 ```bash

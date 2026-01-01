@@ -27,10 +27,17 @@ program
   .option('-l, --limit <number>', 'Limit number of results', '50')
   .action(channelVideosCommand);
 
-// Get video command
+// Get single video command
 program
-  .command('get-video <videoIds...>')
-  .description('Get detailed metadata for one or more videos')
+  .command('get-video <videoId>')
+  .description('Get detailed metadata for a single video')
+  .option('-j, --json', 'Output in JSON format')
+  .action((videoId, options) => videoInfoCommand([videoId], options));
+
+// Get multiple videos command (batch operation)
+program
+  .command('get-videos <videoIds...>')
+  .description('Get detailed metadata for multiple videos')
   .option('-j, --json', 'Output in JSON format')
   .action(videoInfoCommand);
 
