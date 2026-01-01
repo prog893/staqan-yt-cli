@@ -2,6 +2,8 @@
 
 A powerful command-line interface for managing YouTube videos and metadata using the YouTube Data API v3.
 
+> **For developers:** See [CLAUDE.md](CLAUDE.md) for development guidelines, architecture principles, and AWS naming conventions.
+
 ## Features
 
 - **OAuth 2.0 Authentication** - Secure authentication with Google
