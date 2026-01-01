@@ -10,6 +10,7 @@ A powerful command-line interface for managing YouTube videos and metadata using
 - **Channel Video Listing** - List all videos from any YouTube channel
 - **Video Metadata Retrieval** - Get detailed information about videos
 - **Metadata Updates** - Update video titles and descriptions
+- **Video Localizations** - Manage multilingual titles and descriptions (English, Japanese, Russian)
 - **Channel Search** - Search for specific videos within a channel
 - **JSON Output** - Machine-readable output for automation
 - **User-Friendly Interface** - Colorful output with loading spinners
@@ -360,6 +361,217 @@ staqan-yt search-channel @mkbhd "tutorial" --json
 
 ---
 
+#### 6. Get All Video Localizations
+
+```bash
+staqan-yt get-video-localizations <videoId> [options]
+```
+
+Get all video localizations including the main metadata language.
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--languages <langs>` - Comma-separated list of languages to filter (e.g., "en,ja,ru")
+- `-j, --json` - Output in JSON format
+
+**Examples:**
+
+```bash
+# Get all localizations
+staqan-yt get-video-localizations dQw4w9WgXcQ
+
+# Filter specific languages
+staqan-yt get-video-localizations dQw4w9WgXcQ --languages "ja,ru"
+
+# JSON output
+staqan-yt get-video-localizations dQw4w9WgXcQ --json
+```
+
+**Sample Output:**
+```
+✓ Retrieved 2 localization(s)
+
+Localizations for video: dQw4w9WgXcQ
+
+[MAIN] English (en)
+  Title:      Original Video Title
+  Description: Original video description...
+
+[LOCALIZATION] Japanese (ja)
+  Title:      日本語タイトル
+  Description: 日本語の説明...
+```
+
+---
+
+#### 7. Get Single Video Localization
+
+```bash
+staqan-yt get-video-localization <videoId> [options]
+```
+
+Get a specific language localization. Defaults to main metadata language if not specified.
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--language <lang>` - Language code (en, ja, ru) or name (English, Japanese, Russian)
+- `-j, --json` - Output in JSON format
+
+**Examples:**
+
+```bash
+# Get main metadata language (default)
+staqan-yt get-video-localization dQw4w9WgXcQ
+
+# Get Japanese localization
+staqan-yt get-video-localization dQw4w9WgXcQ --language ja
+
+# Case-insensitive language names
+staqan-yt get-video-localization dQw4w9WgXcQ --language JAPANESE
+
+# JSON output
+staqan-yt get-video-localization dQw4w9WgXcQ --language ja --json
+```
+
+**Sample Output:**
+```
+✓ Localization retrieved successfully
+
+[LOCALIZATION] Japanese (ja)
+
+Title:
+日本語タイトル
+
+Description:
+日本語の説明文がここに表示されます...
+```
+
+---
+
+#### 8. Create Video Localization
+
+```bash
+staqan-yt put-video-localization <videoId> --language <lang> --title <title> --description <desc>
+```
+
+Create a new localization for a video. Fails if localization already exists.
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options (all required):**
+- `--language <lang>` - Language code or name (en/English, ja/Japanese, ru/Russian)
+- `--title <title>` - Localized title
+- `--description <desc>` - Localized description
+
+**Examples:**
+
+```bash
+# Create Japanese localization
+staqan-yt put-video-localization dQw4w9WgXcQ \
+  --language Japanese \
+  --title "日本語タイトル" \
+  --description "日本語の説明"
+
+# Using ISO code
+staqan-yt put-video-localization dQw4w9WgXcQ \
+  --language ja \
+  --title "タイトル" \
+  --description "説明文"
+```
+
+**Sample Output:**
+```
+✓ Successfully created Japanese (ja) localization
+
+Video ID: dQw4w9WgXcQ
+Title: 日本語タイトル
+```
+
+**Validation:**
+- Cannot create localization for main metadata language (use `update-video` instead)
+- Fails if localization already exists (use `update-video-localization` instead)
+- Main video must have title and description
+
+---
+
+#### 9. Update Video Localization
+
+```bash
+staqan-yt update-video-localization <videoId> --language <lang> [--title <title>] [--description <desc>]
+```
+
+Update an existing localization or main metadata. Fails if localization doesn't exist.
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--language <lang>` (required) - Language code or name
+- `--title <title>` (optional) - New localized title
+- `--description <desc>` (optional) - New localized description
+
+**Examples:**
+
+```bash
+# Update title only
+staqan-yt update-video-localization dQw4w9WgXcQ \
+  --language ja \
+  --title "新しいタイトル"
+
+# Update description only
+staqan-yt update-video-localization dQw4w9WgXcQ \
+  --language Japanese \
+  --description "新しい説明"
+
+# Update both
+staqan-yt update-video-localization dQw4w9WgXcQ \
+  --language ja \
+  --title "新タイトル" \
+  --description "新説明"
+
+# Update main metadata (if language matches main)
+staqan-yt update-video-localization dQw4w9WgXcQ \
+  --language en \
+  --title "Updated English Title"
+```
+
+**Sample Output:**
+```
+✓ Successfully updated Japanese (ja) localization
+
+Video ID: dQw4w9WgXcQ
+New title: 新しいタイトル
+Description updated
+```
+
+**Note:** If the language matches the video's main metadata language, updates the main snippet instead of localizations.
+
+---
+
+### Localization Features
+
+**Supported Languages:**
+- English (en, English, english, eng)
+- Japanese (ja, Japanese, japanese, jpn, jp)
+- Russian (ru, Russian, russian, rus)
+
+**Language Input:**
+- Case-insensitive: `Japanese`, `JAPANESE`, `japanese` all work
+- Accepts ISO codes: `ja`, `en`, `ru`
+- Accepts full names: `Japanese`, `English`, `Russian`
+
+**Main Metadata vs Localizations:**
+- Main metadata: The video's primary title/description (stored in `snippet`)
+- Localizations: Additional language versions (stored in `localizations`)
+- The main metadata language is detected automatically from `snippet.defaultLanguage`
+
+---
+
 ### Global Options
 
 All commands support:
@@ -457,17 +669,22 @@ staqan-yt <command>
 ```
 staqan-yt-cli/
 ├── bin/
-│   └── staqan-yt.js          # CLI entry point
+│   └── staqan-yt.js                    # CLI entry point
 ├── lib/
-│   ├── auth.js               # OAuth authentication
-│   ├── youtube.js            # YouTube API wrapper
-│   └── utils.js              # Helper functions
+│   ├── auth.js                         # OAuth authentication
+│   ├── youtube.js                      # YouTube API wrapper
+│   ├── language.js                     # Language mapping utility
+│   └── utils.js                        # Helper functions
 ├── commands/
-│   ├── auth.js               # Auth command
-│   ├── channel-videos.js     # Channel videos command
-│   ├── video-info.js         # Video info command
-│   ├── update-metadata.js    # Update metadata command
-│   └── search-channel.js     # Search channel command
+│   ├── auth.js                         # Auth command
+│   ├── channel-videos.js               # Channel videos command
+│   ├── video-info.js                   # Video info command
+│   ├── update-metadata.js              # Update metadata command
+│   ├── search-channel.js               # Search channel command
+│   ├── get-video-localizations.js      # Get all localizations command
+│   ├── get-video-localization.js       # Get single localization command
+│   ├── put-video-localization.js       # Create localization command
+│   └── update-video-localization.js    # Update localization command
 ├── package.json
 └── README.md
 ```

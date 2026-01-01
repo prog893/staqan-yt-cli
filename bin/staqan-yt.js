@@ -7,6 +7,10 @@ const channelVideosCommand = require('../commands/channel-videos');
 const videoInfoCommand = require('../commands/video-info');
 const updateMetadataCommand = require('../commands/update-metadata');
 const searchChannelCommand = require('../commands/search-channel');
+const getVideoLocalizations = require('../commands/get-video-localizations');
+const getVideoLocalization = require('../commands/get-video-localization');
+const putVideoLocalization = require('../commands/put-video-localization');
+const updateVideoLocalization = require('../commands/update-video-localization');
 
 program
   .name('staqan-yt')
@@ -58,6 +62,40 @@ program
   .option('-j, --json', 'Output in JSON format')
   .option('-l, --limit <number>', 'Limit number of results', '25')
   .action(searchChannelCommand);
+
+// Get all video localizations (plural - returns multiple)
+program
+  .command('get-video-localizations <videoId>')
+  .description('Get all video localizations including main metadata language')
+  .option('--languages <langs>', 'Comma-separated list of languages (e.g., "en,ja,ru")')
+  .option('-j, --json', 'Output in JSON format')
+  .action(getVideoLocalizations);
+
+// Get single video localization (singular - returns one)
+program
+  .command('get-video-localization <videoId>')
+  .description('Get specific video localization (defaults to main metadata language)')
+  .option('--language <lang>', 'Language code or name (e.g., "ja", "Japanese")')
+  .option('-j, --json', 'Output in JSON format')
+  .action(getVideoLocalization);
+
+// Create new localization (PUT - fail if exists)
+program
+  .command('put-video-localization <videoId>')
+  .description('Create new video localization (fails if already exists)')
+  .requiredOption('--language <lang>', 'Language code or name (e.g., "ja", "Japanese")')
+  .requiredOption('--title <title>', 'Localized title')
+  .requiredOption('--description <desc>', 'Localized description')
+  .action(putVideoLocalization);
+
+// Update existing localization (UPDATE - fail if doesn't exist)
+program
+  .command('update-video-localization <videoId>')
+  .description('Update existing video localization (fails if does not exist)')
+  .requiredOption('--language <lang>', 'Language code or name (e.g., "ja", "Japanese")')
+  .option('--title <title>', 'New localized title')
+  .option('--description <desc>', 'New localized description')
+  .action(updateVideoLocalization);
 
 // Error handling
 program.exitOverride();
