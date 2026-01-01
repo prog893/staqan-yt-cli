@@ -62,6 +62,9 @@ try {
     console.error(chalk.red(`Error: ${err.message}`));
     console.log(chalk.yellow('\nUse --help for usage information'));
     process.exit(1);
+  } else if (err.code === 'commander.helpDisplayed') {
+    // Help was displayed, exit normally
+    process.exit(0);
   }
   throw err;
 }
