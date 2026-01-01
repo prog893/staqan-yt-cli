@@ -1,0 +1,34 @@
+{
+  "name": "staqan-yt-cli",
+  "version": "1.0.0",
+  "description": "A powerful CLI tool for managing YouTube videos and metadata using the YouTube Data API v3",
+  "main": "bin/staqan-yt.js",
+  "bin": {
+    "staqan-yt": "./bin/staqan-yt.js"
+  },
+  "scripts": {
+    "start": "node bin/staqan-yt.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "youtube",
+    "cli",
+    "youtube-api",
+    "video-management",
+    "metadata"
+  ],
+  "author": "STAQAN",
+  "license": "MIT",
+  "dependencies": {
+    "@googleapis/youtube": "^17.0.0",
+    "chalk": "^4.1.2",
+    "commander": "^12.0.0",
+    "google-auth-library": "^9.0.0",
+    "googleapis": "^134.0.0",
+    "open": "^8.4.2",
+    "ora": "^5.4.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
