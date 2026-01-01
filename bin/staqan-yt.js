@@ -19,24 +19,24 @@ program
   .description('Authenticate with YouTube API using OAuth 2.0')
   .action(authCommand);
 
-// Channel videos command
+// List videos command
 program
-  .command('channel-videos <channelHandle>')
+  .command('list-videos <channelHandle>')
   .description('List all videos from a YouTube channel')
   .option('-j, --json', 'Output in JSON format')
   .option('-l, --limit <number>', 'Limit number of results', '50')
   .action(channelVideosCommand);
 
-// Video info command
+// Get video command
 program
-  .command('video-info <videoIds...>')
+  .command('get-video <videoIds...>')
   .description('Get detailed metadata for one or more videos')
   .option('-j, --json', 'Output in JSON format')
   .action(videoInfoCommand);
 
-// Update metadata command
+// Update video command
 program
-  .command('update-metadata <videoId>')
+  .command('update-video <videoId>')
   .description('Update video title and/or description')
   .option('-t, --title <title>', 'New video title')
   .option('-d, --description <description>', 'New video description')
@@ -44,9 +44,9 @@ program
   .option('-y, --yes', 'Skip confirmation prompt')
   .action(updateMetadataCommand);
 
-// Search channel command
+// Search videos command
 program
-  .command('search-channel <channelHandle> <query>')
+  .command('search-videos <channelHandle> <query>')
   .description('Search for videos in a channel by keyword')
   .option('-j, --json', 'Output in JSON format')
   .option('-l, --limit <number>', 'Limit number of results', '25')
