@@ -130,6 +130,9 @@ try {
   } else if (error.code === 'commander.help' || error.code === 'commander.helpDisplayed') {
     // Help was displayed, exit normally
     process.exit(0);
+  } else if (error.code === 'commander.version') {
+    // Version was displayed, exit normally
+    process.exit(0);
   }
   throw err;
 }
