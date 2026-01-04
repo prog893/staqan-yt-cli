@@ -94,20 +94,145 @@ search-videos <ch> <query> # Search multiple videos
 ```
 staqan-yt-cli/
 ├── bin/
-│   └── staqan-yt.js          # Main CLI entry point, command routing
+│   └── staqan-yt.ts          # Main CLI entry point, command routing
 ├── lib/
-│   ├── auth.js               # OAuth 2.0 authentication logic
-│   ├── youtube.js            # YouTube Data API wrapper
-│   └── utils.js              # Helper utilities (chalk, ora, paths)
+│   ├── auth.ts               # OAuth 2.0 authentication logic
+│   ├── youtube.ts            # YouTube Data API wrapper
+│   ├── language.ts           # Language mapping utilities
+│   └── utils.ts              # Helper utilities (chalk, ora, paths)
 ├── commands/
-│   ├── auth.js               # Authentication command
-│   ├── channel-videos.js     # List videos command
-│   ├── video-info.js         # Get video(s) command
-│   ├── update-metadata.js    # Update video command
-│   └── search-channel.js     # Search videos command
+│   ├── auth.ts               # Authentication command
+│   ├── channel-videos.ts     # List videos command
+│   ├── video-info.ts         # Get video(s) command
+│   ├── update-metadata.ts    # Update video command
+│   ├── search-channel.ts     # Search videos command
+│   ├── get-video-localizations.ts   # Get all localizations
+│   ├── get-video-localization.ts    # Get single localization
+│   ├── put-video-localization.ts    # Create localization
+│   └── update-video-localization.ts # Update localization
+├── types/
+│   └── index.ts              # Shared TypeScript type definitions
+├── dist/                     # Compiled JavaScript output (gitignored)
+├── tsconfig.json             # TypeScript configuration
+├── eslint.config.mjs         # ESLint configuration
 ├── package.json
 ├── README.md                 # User-facing documentation
 └── CLAUDE.md                 # This file - development guide
+```
+
+## TypeScript Development
+
+### TypeScript Configuration
+
+This project uses TypeScript with strict type checking enabled. Key configuration:
+
+**tsconfig.json:**
+- Target: ES2020 (Node.js appropriate)
+- Module: CommonJS (for CLI compatibility)
+- Strict mode: enabled
+- Output directory: `dist/`
+- Source maps and declaration files enabled
+
+**Build Process:**
+```bash
+npm run build         # Compile TypeScript to dist/
+npm run type-check    # Type checking without emit
+npm run lint          # Run ESLint
+npm run dev           # Development mode with tsx
+```
+
+### Type Safety Guidelines
+
+**1. Use strict types everywhere:**
+```typescript
+// Good - explicit types
+async function getVideoInfo(videoIds: string[]): Promise<VideoInfo[]> {
+  // ...
+}
+
+// Avoid - implicit any
+async function getVideoInfo(videoIds) {
+  // ...
+}
+```
+
+**2. Leverage shared types from `types/index.ts`:**
+```typescript
+import { VideoInfo, VideoLocalization, JsonOption } from '../types';
+
+async function videoInfoCommand(videoIds: string[], options: JsonOption): Promise<void> {
+  const videos: VideoInfo[] = await getVideoInfo(videoIds);
+  // ...
+}
+```
+
+**3. Use non-null assertions sparingly:**
+```typescript
+// Prefer optional chaining and nullish coalescing
+const title = video.snippet?.title || 'Untitled';
+
+// Only use ! when you're absolutely certain
+const channelId = response.data.items![0].id!;
+```
+
+**4. Type API responses properly:**
+```typescript
+import { youtube_v3 } from 'googleapis';
+
+async function getVideoWithLocalizations(videoId: string): Promise<youtube_v3.Schema$Video> {
+  // Uses googleapis type definitions
+}
+```
+
+### ESLint Configuration
+
+ESLint is configured with TypeScript support (flat config format):
+- Parser: `@typescript-eslint/parser`
+- Plugin: `@typescript-eslint/eslint-plugin`
+- Rules optimized for Node.js CLI development
+
+**Running linter:**
+```bash
+npm run lint          # Check all files
+```
+
+### Common TypeScript Patterns for CLI
+
+**Command modules use `export =` for CommonJS:**
+```typescript
+import ora from 'ora';
+import { getVideoInfo } from '../lib/youtube';
+import { JsonOption } from '../types';
+
+async function videoInfoCommand(videoIds: string[], options: JsonOption): Promise<void> {
+  // Command logic
+}
+
+export = videoInfoCommand;
+```
+
+**Type error handling:**
+```typescript
+try {
+  // ...
+} catch (err) {
+  error((err as Error).message);
+  process.exit(1);
+}
+```
+
+**Type Commander.js options:**
+```typescript
+interface UpdateVideoOptions {
+  title?: string;
+  description?: string;
+  dryRun?: boolean;
+  yes?: boolean;
+}
+
+async function updateMetadataCommand(videoId: string, options: UpdateVideoOptions): Promise<void> {
+  // ...
+}
 ```
 
 ## Adding New Commands
@@ -120,34 +245,44 @@ Follow AWS conventions:
 
 ### Step 2: Create Command File
 
-Create `commands/your-command.js`:
+Create `commands/your-command.ts`:
 
-```javascript
-const { success, error, info } = require('../lib/utils');
-const { getAuthenticatedClient } = require('../lib/auth');
-const { google } = require('googleapis');
+```typescript
+import ora from 'ora';
+import { success, error, info } from '../lib/utils';
+import { getAuthenticatedClient } from '../lib/auth';
+import { google } from 'googleapis';
+import { JsonOption } from '../types';
 
-async function yourCommand(args, options) {
+interface YourCommandOptions extends JsonOption {
+  // Add your option types here
+}
+
+async function yourCommand(args: string, options: YourCommandOptions): Promise<void> {
+  const spinner = ora('Processing...').start();
+
   try {
     const auth = await getAuthenticatedClient();
     const youtube = google.youtube({ version: 'v3', auth });
 
     // Your logic here
 
-    success('Operation completed!');
+    spinner.succeed('Operation completed!');
+    success('Done!');
   } catch (err) {
-    error(err.message);
+    spinner.fail('Operation failed');
+    error((err as Error).message);
     process.exit(1);
   }
 }
 
-module.exports = yourCommand;
+export = yourCommand;
 ```
 
-### Step 3: Register in bin/staqan-yt.js
+### Step 3: Register in bin/staqan-yt.ts
 
-```javascript
-const yourCommand = require('../commands/your-command');
+```typescript
+import yourCommand = require('../commands/your-command');
 
 program
   .command('your-command <arg>')
@@ -156,10 +291,67 @@ program
   .action(yourCommand);
 ```
 
-### Step 4: Update Documentation
+### Step 4: Add Types (if needed)
+
+Update `types/index.ts` if you have new shared types:
+
+```typescript
+export interface YourNewType {
+  field: string;
+  // ...
+}
+```
+
+### Step 5: Build and Test
+
+```bash
+npm run type-check    # Ensure no type errors
+npm run lint          # Ensure no linting errors
+npm run build         # Compile to dist/
+npm link              # Test globally
+```
+
+### Step 6: Update Documentation
 
 - Add to README.md (user docs)
 - Add examples to QUICK_START.md if applicable
+
+### Troubleshooting TypeScript Errors
+
+**"Cannot find module" errors:**
+```bash
+# Solution: Check imports use correct paths
+import { getVideoInfo } from '../lib/youtube';  # Correct
+import { getVideoInfo } from '../lib/youtube.ts';  # Wrong - no .ts extension
+```
+
+**Type errors with googleapis:**
+```typescript
+// Use optional chaining and non-null assertions carefully
+const channelId = response.data.items?.[0]?.snippet?.channelId;
+if (!channelId) {
+  throw new Error('Channel not found');
+}
+```
+
+**ESLint errors:**
+```bash
+npm run lint          # See all errors
+# Fix common issues:
+# - Unused imports: Remove them
+# - Unused variables: Prefix with _ if intentional
+# - any type: Add proper types
+```
+
+**Build errors:**
+```bash
+# Clean build and try again
+rm -rf dist/
+npm run build
+
+# Check for syntax errors in .ts files
+npm run type-check
+```
 
 ## YouTube Data API v3 Guidelines
 

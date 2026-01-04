@@ -2,12 +2,17 @@
   "name": "staqan-yt-cli",
   "version": "1.0.0",
   "description": "A powerful CLI tool for managing YouTube videos and metadata using the YouTube Data API v3",
-  "main": "bin/staqan-yt.js",
+  "main": "dist/bin/staqan-yt.js",
   "bin": {
-    "staqan-yt": "./bin/staqan-yt.js"
+    "staqan-yt": "./dist/bin/staqan-yt.js"
   },
   "scripts": {
-    "start": "node bin/staqan-yt.js",
+    "build": "tsc",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint .",
+    "dev": "tsx bin/staqan-yt.ts",
+    "prepublishOnly": "npm run build",
+    "start": "node dist/bin/staqan-yt.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -30,5 +35,17 @@
   },
   "engines": {
     "node": ">=14.0.0"
+  },
+  "devDependencies": {
+    "@types/chalk": "^0.4.31",
+    "@types/commander": "^2.12.0",
+    "@types/node": "^25.0.3",
+    "@types/open": "^6.1.0",
+    "@types/ora": "^3.1.0",
+    "@typescript-eslint/eslint-plugin": "^8.51.0",
+    "@typescript-eslint/parser": "^8.51.0",
+    "eslint": "^9.39.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

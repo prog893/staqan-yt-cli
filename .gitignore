@@ -34,6 +34,7 @@ coverage/
 # Build files
 dist/
 build/
+*.tsbuildinfo
 
 # Logs
 logs/
