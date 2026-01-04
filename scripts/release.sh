@@ -93,7 +93,7 @@ git commit -m "Update Homebrew formula SHA256 for v${VERSION}
 
 Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>" || true
 
-echo -e "${GREEN}Step 7/7: Creating GitHub release v${VERSION}...${NC}"
+echo -e "${GREEN}Step 7/9: Creating GitHub release v${VERSION}...${NC}"
 
 # Create git tag
 git tag -a "v${VERSION}" -m "Release v${VERSION}"
@@ -108,15 +108,58 @@ gh release create "v${VERSION}" \
     --title "v${VERSION}" \
     --generate-notes
 
+echo -e "${GREEN}Step 8/9: Extracting GitHub release asset IDs...${NC}"
+
+# Wait a moment for GitHub to process the release
+sleep 3
+
+# Get release data and extract asset IDs
+RELEASE_JSON=$(gh api repos/prog893/staqan-yt-cli/releases/tags/v${VERSION})
+ASSET_ID_ARM64=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name == "staqan-yt-macos-arm64.tar.gz") | .id')
+ASSET_ID_X64=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name == "staqan-yt-macos-x64.tar.gz") | .id')
+
+echo "  arm64 asset ID: ${ASSET_ID_ARM64}"
+echo "  x64 asset ID:   ${ASSET_ID_X64}"
+
+if [[ -z "$ASSET_ID_ARM64" || -z "$ASSET_ID_X64" ]]; then
+    echo -e "${RED}Error: Failed to extract asset IDs from GitHub release${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Step 9/9: Updating Homebrew formula with asset IDs...${NC}"
+
+# Update the formula with asset IDs
+sed -i.bak "s|releases/assets/ASSET_ID_ARM64|releases/assets/${ASSET_ID_ARM64}|" Formula/staqan-yt.rb
+sed -i.bak "s|releases/assets/ASSET_ID_X64|releases/assets/${ASSET_ID_X64}|" Formula/staqan-yt.rb
+rm Formula/staqan-yt.rb.bak
+
+# Commit the formula update with asset IDs
+git add Formula/staqan-yt.rb
+git commit -m "Update Homebrew formula with asset IDs for v${VERSION}
+
+Asset IDs:
+- arm64: ${ASSET_ID_ARM64}
+- x64:   ${ASSET_ID_X64}
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>" || true
+
+# Push the asset ID update
+git push origin main
+
 echo ""
 echo -e "${GREEN}=== Release Complete ===${NC}"
 echo -e "Version:    ${GREEN}v${VERSION}${NC}"
 echo -e "Release:    ${GREEN}https://github.com/prog893/staqan-yt-cli/releases/tag/v${VERSION}${NC}"
 echo ""
-echo -e "${YELLOW}Next steps:${NC}"
-echo "1. Users can install with: brew install staqan-yt (if tap is set up)"
-echo "2. Or download binaries directly from the release page"
+echo -e "${YELLOW}Formula details:${NC}"
+echo "  SHA256 arm64: ${SHA256_ARM64}"
+echo "  SHA256 x64:   ${SHA256_X64}"
+echo "  Asset ID arm64: ${ASSET_ID_ARM64}"
+echo "  Asset ID x64:   ${ASSET_ID_X64}"
 echo ""
-echo -e "${YELLOW}Formula SHA256 checksums:${NC}"
-echo "  arm64: ${SHA256_ARM64}"
-echo "  x64:   ${SHA256_X64}"
+echo -e "${YELLOW}Next steps:${NC}"
+echo "1. Run: brew update"
+echo "2. Run: brew reinstall staqan-yt"
+echo "3. Ensure HOMEBREW_GITHUB_API_TOKEN is set for private repo access"
