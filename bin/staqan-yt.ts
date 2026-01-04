@@ -13,13 +13,19 @@ import getVideoLocalization = require('../commands/get-video-localization');
 import putVideoLocalization = require('../commands/put-video-localization');
 import updateVideoLocalization = require('../commands/update-video-localization');
 
-// Read version from package.json (adjust path for compiled output in dist/)
-const packageJson = require(path.join(__dirname, '../../package.json'));
+// Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
+let version = '1.1.0'; // Fallback version for compiled binaries
+try {
+  const packageJson = require(path.join(__dirname, '../../package.json'));
+  version = packageJson.version;
+} catch (err) {
+  // Running as compiled binary - use hardcoded version
+}
 
 program
   .name('staqan-yt')
   .description('CLI tool for managing YouTube videos and metadata')
-  .version(packageJson.version);
+  .version(version);
 
 // Auth command
 program

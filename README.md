@@ -17,22 +17,55 @@ A powerful command-line interface for managing YouTube videos and metadata using
 
 ## Installation
 
-### Prerequisites
+### Option 1: Homebrew (Recommended for macOS)
 
+Install from the staqan-yt-cli tap:
+
+```bash
+brew tap prog893/staqan-yt https://github.com/prog893/staqan-yt-cli.git
+brew install staqan-yt
+```
+
+Or install directly from the formula URL:
+
+```bash
+brew install https://raw.githubusercontent.com/prog893/staqan-yt-cli/main/Formula/staqan-yt.rb
+```
+
+### Option 2: Download Pre-built Binary
+
+Download the latest release for your platform from [Releases](https://github.com/prog893/staqan-yt-cli/releases).
+
+**macOS Apple Silicon (arm64):**
+```bash
+curl -L https://github.com/prog893/staqan-yt-cli/releases/latest/download/staqan-yt-macos-arm64.tar.gz | tar xz
+sudo mv staqan-yt-macos-arm64 /usr/local/bin/staqan-yt
+chmod +x /usr/local/bin/staqan-yt
+```
+
+**macOS Intel (x64):**
+```bash
+curl -L https://github.com/prog893/staqan-yt-cli/releases/latest/download/staqan-yt-macos-x64.tar.gz | tar xz
+sudo mv staqan-yt-macos-x64 /usr/local/bin/staqan-yt
+chmod +x /usr/local/bin/staqan-yt
+```
+
+### Option 3: Install from Source (Development)
+
+**Prerequisites:**
 - Node.js 14.0.0 or higher
 - npm or yarn
-- Google Cloud Project with YouTube Data API v3 enabled
-
-### Install from Source
+- Bun (for building binaries)
 
 ```bash
 # Clone the repository
-cd /Users/prog893/Desktop/staqan-yt-cli
+git clone https://github.com/prog893/staqan-yt-cli.git
+cd staqan-yt-cli
 
 # Install dependencies
 npm install
 
-# Link the CLI globally (optional)
+# Link the CLI globally
 npm link
 ```
 
@@ -656,36 +689,81 @@ YouTube Data API has daily quotas. If exceeded:
 # Install dependencies
 npm install
 
-# Run CLI
-node bin/staqan-yt.js <command>
+# Run CLI in development mode
+npm run dev -- <command>
 
-# Or link globally
+# Or build and link globally
+npm run build
 npm link
 staqan-yt <command>
 ```
+
+### Building Binaries
+
+The project uses Bun to compile single-file executables:
+
+```bash
+# Build both macOS binaries
+npm run build:bun:all
+
+# Or build individually
+npm run build:bun:macos-arm64  # Apple Silicon
+npm run build:bun:macos-x64    # Intel
+
+# Test the binary
+./dist-bin/staqan-yt-macos-arm64 --version
+```
+
+### Creating a Release
+
+**For maintainers:** To create a new release with binaries:
+
+1. Update version in `package.json` and `bin/staqan-yt.ts`
+2. Run the release script:
+
+```bash
+./scripts/release.sh
+```
+
+This script will:
+- Build both macOS binaries (arm64 and x64)
+- Create tar.gz archives
+- Calculate SHA256 checksums
+- Update the Homebrew formula
+- Create a GitHub release with binaries
+- Push everything to GitHub
+
+See the script source for details.
 
 ### Project Structure
 
 ```
 staqan-yt-cli/
 ├── bin/
-│   └── staqan-yt.js                    # CLI entry point
+│   └── staqan-yt.ts                    # CLI entry point
 ├── lib/
-│   ├── auth.js                         # OAuth authentication
-│   ├── youtube.js                      # YouTube API wrapper
-│   ├── language.js                     # Language mapping utility
-│   └── utils.js                        # Helper functions
+│   ├── auth.ts                         # OAuth authentication
+│   ├── youtube.ts                      # YouTube API wrapper
+│   ├── language.ts                     # Language mapping utility
+│   └── utils.ts                        # Helper functions
 ├── commands/
-│   ├── auth.js                         # Auth command
-│   ├── channel-videos.js               # Channel videos command
-│   ├── video-info.js                   # Video info command
-│   ├── update-metadata.js              # Update metadata command
-│   ├── search-channel.js               # Search channel command
-│   ├── get-video-localizations.js      # Get all localizations command
-│   ├── get-video-localization.js       # Get single localization command
-│   ├── put-video-localization.js       # Create localization command
-│   └── update-video-localization.js    # Update localization command
+│   ├── auth.ts                         # Auth command
+│   ├── channel-videos.ts               # Channel videos command
+│   ├── video-info.ts                   # Video info command
+│   ├── update-metadata.ts              # Update metadata command
+│   ├── search-channel.ts               # Search channel command
+│   ├── get-video-localizations.ts      # Get all localizations command
+│   ├── get-video-localization.ts       # Get single localization command
+│   ├── put-video-localization.ts       # Create localization command
+│   └── update-video-localization.ts    # Update localization command
+├── Formula/
+│   └── staqan-yt.rb                    # Homebrew formula
+├── scripts/
+│   └── release.sh                      # Automated release script
+├── dist-bin/                           # Compiled binaries (gitignored)
+├── release/                            # Release archives (gitignored)
 ├── package.json
+├── CLAUDE.md                           # Development guidelines
 └── README.md
 ```
 
