@@ -97,6 +97,12 @@ program
   .option('--description <desc>', 'New localized description')
   .action(updateVideoLocalization);
 
+// Show help if no command provided
+if (!process.argv.slice(2).length) {
+  program.outputHelp();
+  process.exit(0);
+}
+
 // Error handling
 program.exitOverride();
 
@@ -107,14 +113,9 @@ try {
     console.error(chalk.red(`Error: ${err.message}`));
     console.log(chalk.yellow('\nUse --help for usage information'));
     process.exit(1);
-  } else if (err.code === 'commander.helpDisplayed') {
+  } else if (err.code === 'commander.help' || err.code === 'commander.helpDisplayed') {
     // Help was displayed, exit normally
     process.exit(0);
   }
   throw err;
-}
-
-// Show help if no command provided
-if (!process.argv.slice(2).length) {
-  program.outputHelp();
 }
