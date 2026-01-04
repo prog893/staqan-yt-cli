@@ -2,6 +2,7 @@ import { google, youtube_v3 } from 'googleapis';
 import { getAuthenticatedClient } from './auth';
 import { normalizeLanguage, getLanguageName } from './language';
 import { VideoInfo, VideoListItem, VideoLocalization } from '../types';
+import { debug } from './utils';
 
 /**
  * Get YouTube API client
@@ -15,10 +16,12 @@ async function getYouTubeClient(): Promise<youtube_v3.Youtube> {
  * Get channel ID from handle or username
  */
 async function getChannelId(handleOrId: string): Promise<string> {
+  debug(`Getting channel ID for: ${handleOrId}`);
   const youtube = await getYouTubeClient();
 
   // If it starts with @, search by handle
   if (handleOrId.startsWith('@')) {
+    debug('Searching by handle using search endpoint');
     // Try searching by handle using search endpoint
     const searchResponse = await youtube.search.list({
       part: ['snippet'],
@@ -28,7 +31,9 @@ async function getChannelId(handleOrId: string): Promise<string> {
     });
 
     if (searchResponse.data.items && searchResponse.data.items.length > 0) {
-      return searchResponse.data.items[0].snippet!.channelId!;
+      const channelId = searchResponse.data.items[0].snippet!.channelId!;
+      debug(`Found channel ID: ${channelId}`);
+      return channelId;
     }
 
     throw new Error(`Channel not found: ${handleOrId}`);
@@ -113,6 +118,7 @@ async function getChannelVideos(channelHandle: string, maxResults = 50): Promise
  * Get detailed video information
  */
 async function getVideoInfo(videoIds: string[]): Promise<VideoInfo[]> {
+  debug(`Fetching info for ${videoIds.length} video(s)`, videoIds);
   const youtube = await getYouTubeClient();
 
   const response = await youtube.videos.list({
@@ -121,6 +127,7 @@ async function getVideoInfo(videoIds: string[]): Promise<VideoInfo[]> {
   });
 
   const items = response.data.items || [];
+  debug(`Retrieved ${items.length} video(s) from API`);
   return items.map(item => ({
     id: item.id!,
     title: item.snippet!.title!,
@@ -144,9 +151,11 @@ async function getVideoInfo(videoIds: string[]): Promise<VideoInfo[]> {
  * Update video metadata
  */
 async function updateVideoMetadata(videoId: string, updates: { title?: string; description?: string }): Promise<youtube_v3.Schema$Video> {
+  debug(`Updating metadata for video: ${videoId}`, updates);
   const youtube = await getYouTubeClient();
 
   // First get current video data
+  debug('Fetching current video data');
   const currentData = await youtube.videos.list({
     part: ['snippet'],
     id: [videoId],
@@ -157,16 +166,20 @@ async function updateVideoMetadata(videoId: string, updates: { title?: string; d
   }
 
   const snippet = currentData.data.items[0].snippet!;
+  debug('Current snippet retrieved');
 
   // Apply updates
   if (updates.title !== undefined) {
+    debug(`Updating title: ${snippet.title} -> ${updates.title}`);
     snippet.title = updates.title;
   }
   if (updates.description !== undefined) {
+    debug(`Updating description (${snippet.description?.length || 0} -> ${updates.description.length} chars)`);
     snippet.description = updates.description;
   }
 
   // Update video
+  debug('Sending update request to YouTube API');
   const response = await youtube.videos.update({
     part: ['snippet'],
     requestBody: {
@@ -175,6 +188,7 @@ async function updateVideoMetadata(videoId: string, updates: { title?: string; d
     },
   });
 
+  debug('Video metadata updated successfully');
   return response.data;
 }
 
@@ -210,6 +224,7 @@ async function searchChannelVideos(channelHandle: string, query: string, maxResu
  * @returns Video resource with snippet and localizations
  */
 async function getVideoWithLocalizations(videoId: string): Promise<youtube_v3.Schema$Video> {
+  debug(`Fetching video with localizations: ${videoId}`);
   const youtube = await getYouTubeClient();
 
   try {
@@ -222,7 +237,10 @@ async function getVideoWithLocalizations(videoId: string): Promise<youtube_v3.Sc
       throw new Error(`Video not found: ${videoId}`);
     }
 
-    return response.data.items[0];
+    const video = response.data.items[0];
+    const localizationCount = Object.keys(video.localizations || {}).length;
+    debug(`Retrieved video with ${localizationCount} localization(s)`);
+    return video;
   } catch (error) {
     throw new Error(`Failed to fetch video with localizations: ${(error as Error).message}`);
   }
@@ -343,6 +361,7 @@ async function getAllVideoLocalizations(videoId: string, languageFilter: string[
  * @returns Updated video resource
  */
 async function putVideoLocalization(videoId: string, language: string, title: string, description: string): Promise<youtube_v3.Schema$Video> {
+  debug(`Creating new localization for video: ${videoId}, language: ${language}`);
   const youtube = await getYouTubeClient();
   const video = await getVideoWithLocalizations(videoId);
   const langCode = normalizeLanguage(language);
@@ -351,7 +370,9 @@ async function putVideoLocalization(videoId: string, language: string, title: st
     throw new Error(`Invalid language: ${language}`);
   }
 
+  debug(`Normalized language code: ${langCode}`);
   const defaultLanguage = video.snippet!.defaultLanguage || 'en';
+  debug(`Video default language: ${defaultLanguage}`);
 
   // Validation: Check main metadata has title/description (allow empty strings, but not null/undefined)
   if (video.snippet!.title == null || video.snippet!.description == null) {
@@ -368,11 +389,13 @@ async function putVideoLocalization(videoId: string, language: string, title: st
     throw new Error(`Localization already exists for ${getLanguageName(langCode)} (${langCode}). Use update-video-localization to modify.`);
   }
 
+  debug('Validations passed, building localization object');
   // Build new localizations object
   const newLocalizations = video.localizations || {};
   newLocalizations[langCode] = { title, description };
 
   try {
+    debug('Sending create localization request to YouTube API');
     // Always update both snippet and localizations to ensure defaultLanguage is set
     const response = await youtube.videos.update({
       part: ['snippet', 'localizations'],
@@ -387,6 +410,7 @@ async function putVideoLocalization(videoId: string, language: string, title: st
       },
     });
 
+    debug('Localization created successfully');
     return response.data;
   } catch (error) {
     throw new Error(`Failed to create localization: ${(error as Error).message}`);
@@ -402,6 +426,7 @@ async function putVideoLocalization(videoId: string, language: string, title: st
  * @returns Updated video resource
  */
 async function updateVideoLocalization(videoId: string, language: string, title: string | null = null, description: string | null = null): Promise<youtube_v3.Schema$Video> {
+  debug(`Updating localization for video: ${videoId}, language: ${language}`);
   const youtube = await getYouTubeClient();
   const video = await getVideoWithLocalizations(videoId);
   const langCode = normalizeLanguage(language);
@@ -410,10 +435,13 @@ async function updateVideoLocalization(videoId: string, language: string, title:
     throw new Error(`Invalid language: ${language}`);
   }
 
+  debug(`Normalized language code: ${langCode}`);
   const defaultLanguage = video.snippet!.defaultLanguage || 'en';
+  debug(`Video default language: ${defaultLanguage}`);
 
   // If updating main language, use snippet update
   if (langCode === defaultLanguage) {
+    debug('Updating main metadata language via snippet');
     const updateData = {
       id: videoId,
       snippet: {
@@ -425,11 +453,13 @@ async function updateVideoLocalization(videoId: string, language: string, title:
     };
 
     try {
+      debug('Sending main metadata update request to YouTube API');
       const response = await youtube.videos.update({
         part: ['snippet'],
         requestBody: updateData,
       });
 
+      debug('Main metadata updated successfully');
       return response.data;
     } catch (error) {
       throw new Error(`Failed to update main metadata: ${(error as Error).message}`);
@@ -437,6 +467,7 @@ async function updateVideoLocalization(videoId: string, language: string, title:
   }
 
   // Updating localization
+  debug('Updating localization (not main language)');
   // Validation: Check localization exists
   if (!video.localizations || !video.localizations[langCode]) {
     throw new Error(`Localization not found for ${getLanguageName(langCode)} (${langCode}). Use put-video-localization to create.`);
@@ -448,8 +479,10 @@ async function updateVideoLocalization(videoId: string, language: string, title:
     title: title !== null ? title : existingLocalization.title!,
     description: description !== null ? description : existingLocalization.description!,
   };
+  debug('Built updated localizations object');
 
   try {
+    debug('Sending localization update request to YouTube API');
     const response = await youtube.videos.update({
       part: ['localizations'],
       requestBody: {
@@ -458,6 +491,7 @@ async function updateVideoLocalization(videoId: string, language: string, title:
       },
     });
 
+    debug('Localization updated successfully');
     return response.data;
   } catch (error) {
     throw new Error(`Failed to update localization: ${(error as Error).message}`);

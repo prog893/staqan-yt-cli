@@ -1,11 +1,17 @@
 import ora from 'ora';
 import chalk from 'chalk';
 import { updateVideoLocalization } from '../lib/youtube';
-import { parseVideoId, error } from '../lib/utils';
+import { parseVideoId, error, setVerbose, debug } from '../lib/utils';
 import { normalizeLanguage, getLanguageName } from '../lib/language';
 import { UpdateLocalizationOptions } from '../types';
 
 async function updateVideoLocalizationCommand(videoId: string, options: UpdateLocalizationOptions): Promise<void> {
+  // Enable verbose mode if requested
+  if (options.verbose) {
+    setVerbose(true);
+    debug('Verbose mode enabled');
+  }
+
   const { language, title, description } = options;
 
   // Validation: Required language
@@ -22,10 +28,17 @@ async function updateVideoLocalizationCommand(videoId: string, options: UpdateLo
 
   const langCode = normalizeLanguage(language);
   const langName = getLanguageName(langCode || '') || language;
+  debug(`Language: ${language} -> normalized: ${langCode} (${langName})`);
+  if (title) debug(`New title length: ${title.length} chars`);
+  if (description) debug(`New description length: ${description.length} chars`);
+
   const spinner = ora(`Updating ${langName} localization...`).start();
 
   try {
+    debug(`Video ID input: ${videoId}`);
     const parsedId = parseVideoId(videoId);
+    debug(`Parsed video ID: ${parsedId}`);
+
     await updateVideoLocalization(parsedId, language, title || null, description || null);
 
     spinner.succeed(chalk.green(`Successfully updated ${langName} (${langCode}) localization`));

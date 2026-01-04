@@ -1,19 +1,28 @@
 import ora from 'ora';
 import chalk from 'chalk';
 import { getAllVideoLocalizations } from '../lib/youtube';
-import { parseVideoId, error } from '../lib/utils';
+import { parseVideoId, error, setVerbose, debug } from '../lib/utils';
 import { LocalizationOptions } from '../types';
 
 async function getVideoLocalizations(videoId: string, options: LocalizationOptions): Promise<void> {
+  // Enable verbose mode if requested
+  if (options.verbose) {
+    setVerbose(true);
+    debug('Verbose mode enabled');
+  }
+
   const spinner = ora('Fetching video localizations...').start();
 
   try {
+    debug(`Video ID input: ${videoId}`);
     const parsedId = parseVideoId(videoId);
+    debug(`Parsed video ID: ${parsedId}`);
 
     // Parse language filter if provided
     let languageFilter: string[] | null = null;
     if (options.languages) {
       languageFilter = options.languages.split(',').map(lang => lang.trim());
+      debug('Language filter', languageFilter);
     }
 
     const localizations = await getAllVideoLocalizations(parsedId, languageFilter);

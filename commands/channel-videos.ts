@@ -1,14 +1,22 @@
 import ora from 'ora';
 import chalk from 'chalk';
 import { getChannelVideos } from '../lib/youtube';
-import { formatDate, error } from '../lib/utils';
-import { JsonOption, LimitOption } from '../types';
+import { formatDate, error, setVerbose, debug } from '../lib/utils';
+import { JsonOption, LimitOption, VerboseOption } from '../types';
 
-async function channelVideosCommand(channelHandle: string, options: JsonOption & LimitOption): Promise<void> {
+async function channelVideosCommand(channelHandle: string, options: JsonOption & LimitOption & VerboseOption): Promise<void> {
+  // Enable verbose mode if requested
+  if (options.verbose) {
+    setVerbose(true);
+    debug('Verbose mode enabled');
+  }
+
   const spinner = ora('Fetching channel videos...').start();
 
   try {
     const limit = parseInt(options.limit || '50');
+    debug(`Channel handle: ${channelHandle}, limit: ${limit}`);
+
     const videos = await getChannelVideos(channelHandle, limit);
 
     spinner.succeed(`Found ${videos.length} video(s)`);

@@ -53,6 +53,10 @@ export interface LanguageMap {
 }
 
 // Command option types
+export interface VerboseOption {
+  verbose?: boolean;
+}
+
 export interface JsonOption {
   json?: boolean;
 }
@@ -61,26 +65,26 @@ export interface LimitOption {
   limit?: string;
 }
 
-export interface UpdateVideoOptions {
+export interface UpdateVideoOptions extends VerboseOption {
   title?: string;
   description?: string;
   dryRun?: boolean;
   yes?: boolean;
 }
 
-export interface LocalizationOptions {
+export interface LocalizationOptions extends VerboseOption {
   language?: string;
   languages?: string;
   json?: boolean;
 }
 
-export interface PutLocalizationOptions {
+export interface PutLocalizationOptions extends VerboseOption {
   language: string;
   title: string;
   description: string;
 }
 
-export interface UpdateLocalizationOptions {
+export interface UpdateLocalizationOptions extends VerboseOption {
   language: string;
   title?: string;
   description?: string;

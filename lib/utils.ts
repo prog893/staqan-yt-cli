@@ -9,6 +9,9 @@ const CONFIG_DIR = path.join(os.homedir(), '.staqan-yt-cli');
 const CREDENTIALS_PATH = path.join(CONFIG_DIR, 'credentials.json');
 const TOKEN_PATH = path.join(CONFIG_DIR, 'token.json');
 
+// Global verbose flag
+let isVerboseEnabled = false;
+
 /**
  * Ensure config directory exists
  */
@@ -137,6 +140,32 @@ async function confirm(message: string): Promise<boolean> {
   });
 }
 
+/**
+ * Set verbose mode
+ */
+function setVerbose(enabled: boolean): void {
+  isVerboseEnabled = enabled;
+}
+
+/**
+ * Get verbose mode status
+ */
+function isVerbose(): boolean {
+  return isVerboseEnabled;
+}
+
+/**
+ * Print debug/verbose message (only if verbose mode is enabled)
+ */
+function debug(message: string, data?: unknown): void {
+  if (isVerboseEnabled) {
+    console.log(chalk.gray('[DEBUG] ') + chalk.dim(message));
+    if (data !== undefined) {
+      console.log(chalk.gray(JSON.stringify(data, null, 2)));
+    }
+  }
+}
+
 export {
   CONFIG_DIR,
   CREDENTIALS_PATH,
@@ -151,4 +180,7 @@ export {
   warning,
   info,
   confirm,
+  setVerbose,
+  isVerbose,
+  debug,
 };

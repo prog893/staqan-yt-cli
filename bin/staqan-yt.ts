@@ -33,6 +33,7 @@ program
   .description('List all videos from a YouTube channel')
   .option('-j, --json', 'Output in JSON format')
   .option('-l, --limit <number>', 'Limit number of results', '50')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(channelVideosCommand);
 
 // Get single video command
@@ -40,13 +41,15 @@ program
   .command('get-video <videoId>')
   .description('Get detailed metadata for a single video')
   .option('-j, --json', 'Output in JSON format')
-  .action((videoId: string, options: { json?: boolean }) => videoInfoCommand([videoId], options));
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action((videoId: string, options: { json?: boolean; verbose?: boolean }) => videoInfoCommand([videoId], options));
 
 // Get multiple videos command (batch operation)
 program
   .command('get-videos <videoIds...>')
   .description('Get detailed metadata for multiple videos')
   .option('-j, --json', 'Output in JSON format')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(videoInfoCommand);
 
 // Update video command
@@ -57,6 +60,7 @@ program
   .option('-d, --description <description>', 'New video description')
   .option('--dry-run', 'Preview changes without applying them')
   .option('-y, --yes', 'Skip confirmation prompt')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(updateMetadataCommand);
 
 // Search videos command
@@ -65,6 +69,7 @@ program
   .description('Search for videos in a channel by keyword')
   .option('-j, --json', 'Output in JSON format')
   .option('-l, --limit <number>', 'Limit number of results', '25')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(searchChannelCommand);
 
 // Get all video localizations (plural - returns multiple)
@@ -73,6 +78,7 @@ program
   .description('Get all video localizations including main metadata language')
   .option('--languages <langs>', 'Comma-separated list of languages (e.g., "en,ja,ru")')
   .option('-j, --json', 'Output in JSON format')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getVideoLocalizations);
 
 // Get single video localization (singular - returns one)
@@ -81,6 +87,7 @@ program
   .description('Get specific video localization (defaults to main metadata language)')
   .option('--language <lang>', 'Language code or name (e.g., "ja", "Japanese")')
   .option('-j, --json', 'Output in JSON format')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getVideoLocalization);
 
 // Create new localization (PUT - fail if exists)
@@ -90,6 +97,7 @@ program
   .requiredOption('--language <lang>', 'Language code or name (e.g., "ja", "Japanese")')
   .requiredOption('--title <title>', 'Localized title')
   .requiredOption('--description <desc>', 'Localized description')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(putVideoLocalization);
 
 // Update existing localization (UPDATE - fail if doesn't exist)
@@ -99,6 +107,7 @@ program
   .requiredOption('--language <lang>', 'Language code or name (e.g., "ja", "Japanese")')
   .option('--title <title>', 'New localized title')
   .option('--description <desc>', 'New localized description')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(updateVideoLocalization);
 
 // Show help if no command provided

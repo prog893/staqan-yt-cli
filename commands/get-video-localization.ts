@@ -1,16 +1,27 @@
 import ora from 'ora';
 import chalk from 'chalk';
 import { getVideoLocalization } from '../lib/youtube';
-import { parseVideoId, error } from '../lib/utils';
+import { parseVideoId, error, setVerbose, debug } from '../lib/utils';
 import { LocalizationOptions } from '../types';
 
 async function getVideoLocalizationCommand(videoId: string, options: LocalizationOptions): Promise<void> {
+  // Enable verbose mode if requested
+  if (options.verbose) {
+    setVerbose(true);
+    debug('Verbose mode enabled');
+  }
+
   const language = options.language; // Can be undefined, will default to main metadata language
   const langDisplay = language || 'main metadata language';
+  debug(`Requested language: ${langDisplay}`);
+
   const spinner = ora(`Fetching ${langDisplay} localization...`).start();
 
   try {
+    debug(`Video ID input: ${videoId}`);
     const parsedId = parseVideoId(videoId);
+    debug(`Parsed video ID: ${parsedId}`);
+
     const localization = await getVideoLocalization(parsedId, language);
 
     spinner.succeed('Localization retrieved successfully');
