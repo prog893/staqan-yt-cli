@@ -74,8 +74,8 @@ program
 
 // Get all video localizations (plural - returns multiple)
 program
-  .command('get-video-localizations <videoId>')
-  .description('Get all video localizations including main metadata language')
+  .command('get-video-localizations <videoIds...>')
+  .description('Get all video localizations including main metadata language (supports multiple videos)')
   .option('--languages <langs>', 'Comma-separated list of languages (e.g., "en,ja,ru")')
   .option('-j, --json', 'Output in JSON format')
   .option('-v, --verbose', 'Enable verbose output with debug information')
