@@ -2,6 +2,7 @@
 
 import { program } from 'commander';
 import chalk from 'chalk';
+import * as path from 'path';
 import authCommand = require('../commands/auth');
 import channelVideosCommand = require('../commands/channel-videos');
 import videoInfoCommand = require('../commands/video-info');
@@ -12,10 +13,13 @@ import getVideoLocalization = require('../commands/get-video-localization');
 import putVideoLocalization = require('../commands/put-video-localization');
 import updateVideoLocalization = require('../commands/update-video-localization');
 
+// Read version from package.json (adjust path for compiled output in dist/)
+const packageJson = require(path.join(__dirname, '../../package.json'));
+
 program
   .name('staqan-yt')
   .description('CLI tool for managing YouTube videos and metadata')
-  .version('1.0.0');
+  .version(packageJson.version);
 
 // Auth command
 program
