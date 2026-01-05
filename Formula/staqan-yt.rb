@@ -10,13 +10,11 @@ class StaqanYt < Formula
       tag:      "v#{version}"
 
   def install
-    # Find bun executable (check common installation locations)
-    bun_path = which("bun") ||
-               which("/usr/local/bin/bun") ||
-               which("#{Dir.home}/.bun/bin/bun") ||
-               "/opt/homebrew/bin/bun"
+    # Get the real user's home directory (Homebrew sanitizes ENV["HOME"])
+    real_home = "/Users/#{ENV.fetch("USER", "")}"
+    bun_path = "#{real_home}/.bun/bin/bun"
 
-    odie "Bun is required. Install from https://bun.sh" unless File.exist?(bun_path) || system("which", "bun")
+    odie "Bun is required at #{bun_path}. Install from https://bun.sh" unless File.exist?(bun_path)
 
     # Install dependencies
     system bun_path, "install"
