@@ -7,8 +7,7 @@ class StaqanYt < Formula
   # Source-based installation from GitHub repo
   # Works with private repos since Homebrew can use git credentials
   url "https://github.com/prog893/staqan-yt-cli.git",
-      tag:      "v1.1.0",
-      revision: "HEAD"
+      tag:      "v#{version}"
 
   def install
     # Check if bun is available
