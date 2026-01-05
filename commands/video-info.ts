@@ -2,6 +2,7 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { getVideoInfo } from '../lib/youtube';
 import { parseVideoId, formatDate, formatNumber, error, setVerbose, debug } from '../lib/utils';
+import { shouldUseJson } from '../lib/config';
 import { JsonOption, VerboseOption } from '../types';
 
 async function videoInfoCommand(videoIds: string[], options: JsonOption & VerboseOption): Promise<void> {
@@ -23,7 +24,8 @@ async function videoInfoCommand(videoIds: string[], options: JsonOption & Verbos
     spinner.succeed(`Retrieved information for ${videos.length} video(s)`);
     console.log('');
 
-    if (options.json) {
+    const useJson = await shouldUseJson(options.json);
+    if (useJson) {
       console.log(JSON.stringify(videos, null, 2));
     } else {
       videos.forEach((video, index) => {

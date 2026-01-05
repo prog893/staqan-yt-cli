@@ -2,6 +2,7 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { getVideoLocalization } from '../lib/youtube';
 import { parseVideoId, error, setVerbose, debug } from '../lib/utils';
+import { shouldUseJson } from '../lib/config';
 import { LocalizationOptions } from '../types';
 
 async function getVideoLocalizationCommand(videoId: string, options: LocalizationOptions): Promise<void> {
@@ -27,7 +28,8 @@ async function getVideoLocalizationCommand(videoId: string, options: Localizatio
     spinner.succeed('Localization retrieved successfully');
     console.log('');
 
-    if (options.json) {
+    const useJson = await shouldUseJson(options.json);
+    if (useJson) {
       console.log(JSON.stringify(localization, null, 2));
     } else {
       const badge = localization.isMainLanguage ? chalk.yellow('[MAIN METADATA]') : chalk.gray('[LOCALIZATION]');

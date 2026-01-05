@@ -172,16 +172,72 @@ Starting authentication process...
 
 ---
 
-#### 2. List Channel Videos
+#### 2. Configuration Management
 
 ```bash
-staqan-yt channel-videos <channelHandle> [options]
+staqan-yt config [action] [key] [value]
+```
+
+Manage CLI configuration settings (set default channel, output format).
+
+**Actions:**
+- `list` - Show all configuration settings (default if no action provided)
+- `set <key> <value>` - Set a configuration value
+- `get <key>` - Get a specific configuration value
+
+**Available Configuration Keys:**
+- `default.channel` - Default channel handle or ID (e.g., @staqan)
+- `default.output` - Default output format: `text` or `json` (default: `text`)
+
+**Examples:**
+
+```bash
+# View current configuration
+staqan-yt config list
+# or simply
+staqan-yt config
+
+# Set default channel
+staqan-yt config set default.channel @staqan
+
+# Set default output format to JSON
+staqan-yt config set default.output json
+
+# Get specific config value
+staqan-yt config get default.channel
+```
+
+**How Defaults Work:**
+- When `default.channel` is set, you can omit the channel argument from `list-videos` and `search-videos` commands
+- When `default.output` is set to `json`, commands will output JSON by default (you can still override with `--json` flag)
+- CLI flags always take precedence over config defaults
+
+**Example Workflow:**
+```bash
+# Set up your defaults once
+staqan-yt config set default.channel @staqan
+staqan-yt config set default.output json
+
+# Now these commands work without extra arguments
+staqan-yt list-videos --limit 5        # Uses @staqan from config, outputs JSON
+staqan-yt search-videos "craft beer"   # Uses @staqan from config, outputs JSON
+
+# Override defaults when needed
+staqan-yt list-videos @otherChannel --limit 5  # Uses different channel
+```
+
+---
+
+#### 3. List Channel Videos
+
+```bash
+staqan-yt list-videos [channelHandle] [options]
 ```
 
 List all videos from a YouTube channel.
 
 **Arguments:**
-- `channelHandle` - Channel @handle, username, or URL
+- `channelHandle` - (Optional) Channel @handle, username, or URL. Uses `default.channel` from config if not provided.
 
 **Options:**
 - `-j, --json` - Output in JSON format
@@ -336,13 +392,13 @@ Apply these changes? (y/N): y
 #### 5. Search Channel Videos
 
 ```bash
-staqan-yt search-channel <channelHandle> <query> [options]
+staqan-yt search-videos [channelHandle] <query> [options]
 ```
 
 Search for videos within a channel by keyword.
 
 **Arguments:**
-- `channelHandle` - Channel @handle, username, or URL
+- `channelHandle` - (Optional) Channel @handle, username, or URL. Uses `default.channel` from config if not provided.
 - `query` - Search query
 
 **Options:**
@@ -352,14 +408,17 @@ Search for videos within a channel by keyword.
 **Examples:**
 
 ```bash
-# Search by keyword
-staqan-yt search-channel @mkbhd "smartphone review"
+# Search by keyword (with explicit channel)
+staqan-yt search-videos @mkbhd "smartphone review"
+
+# Search using default channel from config
+staqan-yt search-videos "smartphone review"
 
 # Limit results
-staqan-yt search-channel @mkbhd "2024" --limit 10
+staqan-yt search-videos @mkbhd "2024" --limit 10
 
 # JSON output
-staqan-yt search-channel @mkbhd "tutorial" --json
+staqan-yt search-videos @mkbhd "tutorial" --json
 ```
 
 **Sample Output:**

@@ -89,6 +89,46 @@ search-videos <ch> <query> # Search multiple videos
 - In project directories
 - In environment variables (use the centralized location)
 
+### 4. Configuration Management
+
+**Configuration file location**: `~/.staqan-yt-cli/config.json`
+
+**Available configuration options:**
+- `default.channel` - Default channel handle/ID for list-videos and search-videos
+- `default.output` - Default output format (`text` or `json`, defaults to `text`)
+
+**How configuration works:**
+- Config values are loaded when commands execute
+- CLI flags always override config defaults
+- Optional parameters use config values when not provided
+- Configuration is managed via the `config` command
+
+**Example workflow:**
+```bash
+# Set defaults
+staqan-yt config set default.channel @staqan
+staqan-yt config set default.output json
+
+# Commands now use these defaults
+staqan-yt list-videos --limit 5        # Uses @staqan, outputs JSON
+staqan-yt search-videos "craft beer"   # Uses @staqan, outputs JSON
+
+# Override when needed
+staqan-yt list-videos @otherChannel    # Explicit channel overrides config
+```
+
+**Implementation pattern:**
+```typescript
+// In command files
+import { getConfigValue, shouldUseJson } from '../lib/config';
+
+// Load default channel if not provided
+let channel = channelHandle || await getConfigValue('default.channel');
+
+// Determine output format (flag takes precedence)
+const useJson = await shouldUseJson(options.json);
+```
+
 ## Code Structure
 
 ```
@@ -99,9 +139,11 @@ staqan-yt-cli/
 │   ├── auth.ts               # OAuth 2.0 authentication logic
 │   ├── youtube.ts            # YouTube Data API wrapper
 │   ├── language.ts           # Language mapping utilities
+│   ├── config.ts             # Configuration management utilities
 │   └── utils.ts              # Helper utilities (chalk, ora, paths)
 ├── commands/
 │   ├── auth.ts               # Authentication command
+│   ├── config.ts             # Configuration management command
 │   ├── channel-videos.ts     # List videos command
 │   ├── video-info.ts         # Get video(s) command
 │   ├── update-metadata.ts    # Update video command
@@ -482,14 +524,21 @@ spinner.succeed('Videos fetched!');
 # Test authentication
 staqan-yt auth
 
+# Test configuration
+staqan-yt config list
+staqan-yt config set default.channel @staqan
+staqan-yt config set default.output json
+staqan-yt config get default.channel
+
 # Test get single video
 staqan-yt get-video dQw4w9WgXcQ --json
 
 # Test get multiple videos
 staqan-yt get-videos dQw4w9WgXcQ abc123xyz --json
 
-# Test list videos
+# Test list videos (with and without channel argument)
 staqan-yt list-videos @mkbhd --limit 5 --json
+staqan-yt list-videos --limit 5  # Uses default channel from config
 
 # Test update (dry run)
 staqan-yt update-video dQw4w9WgXcQ --title "Test" --dry-run

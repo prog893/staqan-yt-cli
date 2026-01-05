@@ -118,5 +118,15 @@ export interface ChannelHandle {
   value: string;
 }
 
+// Config types
+export interface Config {
+  default?: {
+    channel?: string;
+    output?: 'text' | 'json';
+  };
+}
+
+export type ConfigKey = 'default.channel' | 'default.output';
+
 // Re-export googleapis types for convenience
 export type { youtube_v3 } from 'googleapis';

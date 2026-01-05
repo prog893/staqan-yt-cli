@@ -12,6 +12,7 @@ import getVideoLocalizations = require('../commands/get-video-localizations');
 import getVideoLocalization = require('../commands/get-video-localization');
 import putVideoLocalization = require('../commands/put-video-localization');
 import updateVideoLocalization = require('../commands/update-video-localization');
+import configCommand = require('../commands/config');
 
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
 let version = '1.1.0'; // Fallback version for compiled binaries
@@ -33,9 +34,16 @@ program
   .description('Authenticate with YouTube API using OAuth 2.0')
   .action(authCommand);
 
+// Config command
+program
+  .command('config [action] [key] [value]')
+  .description('Manage CLI configuration (set defaults, view settings)')
+  .option('--show', 'Show all configuration settings')
+  .action(configCommand);
+
 // List videos command
 program
-  .command('list-videos <channelHandle>')
+  .command('list-videos [channelHandle]')
   .description('List all videos from a YouTube channel')
   .option('-j, --json', 'Output in JSON format')
   .option('-l, --limit <number>', 'Limit number of results', '50')
@@ -71,7 +79,7 @@ program
 
 // Search videos command
 program
-  .command('search-videos <channelHandle> <query>')
+  .command('search-videos [channelHandle] <query>')
   .description('Search for videos in a channel by keyword')
   .option('-j, --json', 'Output in JSON format')
   .option('-l, --limit <number>', 'Limit number of results', '25')

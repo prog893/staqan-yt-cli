@@ -2,6 +2,7 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { getAllVideoLocalizations } from '../lib/youtube';
 import { parseVideoId, error, setVerbose, debug } from '../lib/utils';
+import { shouldUseJson } from '../lib/config';
 import { LocalizationOptions, VideoLocalization } from '../types';
 
 async function getVideoLocalizations(videoIds: string[], options: LocalizationOptions): Promise<void> {
@@ -39,7 +40,8 @@ async function getVideoLocalizations(videoIds: string[], options: LocalizationOp
     spinner.succeed(`Retrieved ${totalLocalizations} localization(s) from ${results.length} video(s)`);
     console.log('');
 
-    if (options.json) {
+    const useJson = await shouldUseJson(options.json);
+    if (useJson) {
       // For JSON output, format as object with videoId as key
       const jsonOutput: { [videoId: string]: VideoLocalization[] } = {};
       results.forEach(result => {

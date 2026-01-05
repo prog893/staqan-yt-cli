@@ -2,11 +2,28 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { searchChannelVideos } from '../lib/youtube';
 import { formatDate, error, setVerbose, debug } from '../lib/utils';
+import { getConfigValue, shouldUseJson } from '../lib/config';
 import { JsonOption, LimitOption, VerboseOption } from '../types';
 
-async function searchChannelCommand(channelHandle: string, query: string, options: JsonOption & LimitOption & VerboseOption): Promise<void> {
+async function searchChannelCommand(channelHandleOrQuery: string, queryOrOptions?: string | (JsonOption & LimitOption & VerboseOption), options?: JsonOption & LimitOption & VerboseOption): Promise<void> {
+  // Determine if first argument is channel or query based on whether second argument is a string
+  let channelHandle: string | undefined;
+  let query: string;
+  let opts: JsonOption & LimitOption & VerboseOption;
+
+  if (typeof queryOrOptions === 'string') {
+    // Two arguments provided: channel and query
+    channelHandle = channelHandleOrQuery;
+    query = queryOrOptions;
+    opts = options || {};
+  } else {
+    // One argument provided: query only, need to load channel from config
+    query = channelHandleOrQuery;
+    opts = queryOrOptions || {};
+  }
+
   // Enable verbose mode if requested
-  if (options.verbose) {
+  if (opts.verbose) {
     setVerbose(true);
     debug('Verbose mode enabled');
   }
@@ -14,10 +31,23 @@ async function searchChannelCommand(channelHandle: string, query: string, option
   const spinner = ora(`Searching for "${query}" in channel...`).start();
 
   try {
-    const limit = parseInt(options.limit || '25');
-    debug(`Searching channel: ${channelHandle}, query: "${query}", limit: ${limit}`);
+    // Use provided channelHandle or load from config
+    let channel = channelHandle;
+    if (!channel) {
+      channel = await getConfigValue('default.channel');
+      if (!channel) {
+        spinner.fail('No channel specified');
+        console.log('');
+        error('Please provide a channel handle or set a default: staqan-yt config set default.channel @yourChannel');
+        process.exit(1);
+      }
+      debug(`Using default channel from config: ${channel}`);
+    }
 
-    const videos = await searchChannelVideos(channelHandle, query, limit);
+    const limit = parseInt(opts.limit || '25');
+    debug(`Searching channel: ${channel}, query: "${query}", limit: ${limit}`);
+
+    const videos = await searchChannelVideos(channel, query, limit);
 
     spinner.succeed(`Found ${videos.length} matching video(s)`);
     console.log('');
@@ -27,7 +57,8 @@ async function searchChannelCommand(channelHandle: string, query: string, option
       return;
     }
 
-    if (options.json) {
+    const useJson = await shouldUseJson(opts.json);
+    if (useJson) {
       console.log(JSON.stringify(videos, null, 2));
     } else {
       videos.forEach((video, index) => {

@@ -2,9 +2,10 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { getChannelVideos } from '../lib/youtube';
 import { formatDate, error, setVerbose, debug } from '../lib/utils';
+import { getConfigValue, shouldUseJson } from '../lib/config';
 import { JsonOption, LimitOption, VerboseOption } from '../types';
 
-async function channelVideosCommand(channelHandle: string, options: JsonOption & LimitOption & VerboseOption): Promise<void> {
+async function channelVideosCommand(channelHandle: string | undefined, options: JsonOption & LimitOption & VerboseOption): Promise<void> {
   // Enable verbose mode if requested
   if (options.verbose) {
     setVerbose(true);
@@ -14,15 +15,29 @@ async function channelVideosCommand(channelHandle: string, options: JsonOption &
   const spinner = ora('Fetching channel videos...').start();
 
   try {
-    const limit = parseInt(options.limit || '50');
-    debug(`Channel handle: ${channelHandle}, limit: ${limit}`);
+    // Use provided channelHandle or load from config
+    let channel = channelHandle;
+    if (!channel) {
+      channel = await getConfigValue('default.channel');
+      if (!channel) {
+        spinner.fail('No channel specified');
+        console.log('');
+        error('Please provide a channel handle or set a default: staqan-yt config set default.channel @yourChannel');
+        process.exit(1);
+      }
+      debug(`Using default channel from config: ${channel}`);
+    }
 
-    const videos = await getChannelVideos(channelHandle, limit);
+    const limit = parseInt(options.limit || '50');
+    debug(`Channel handle: ${channel}, limit: ${limit}`);
+
+    const videos = await getChannelVideos(channel, limit);
 
     spinner.succeed(`Found ${videos.length} video(s)`);
     console.log('');
 
-    if (options.json) {
+    const useJson = await shouldUseJson(options.json);
+    if (useJson) {
       console.log(JSON.stringify(videos, null, 2));
     } else {
       videos.forEach((video, index) => {
