@@ -4,51 +4,31 @@ class StaqanYt < Formula
   version "1.1.0"
   license "MIT"
 
-  # For private GitHub repos, we use direct GitHub API asset URLs with authentication
-  # Asset IDs and SHA256 checksums are automatically updated by scripts/release.sh
-  on_macos do
-    on_arm do
-      # GitHub API endpoint for release asset (not browser_download_url)
-      # Asset ID is automatically updated by release script
-      url "https://api.github.com/repos/prog893/staqan-yt-cli/releases/assets/336193257",
-          headers: [
-            "Accept: application/octet-stream",
-            "X-GitHub-Api-Version: 2022-11-28",
-            "Authorization: bearer #{ENV.fetch("HOMEBREW_GITHUB_API_TOKEN", nil)}"
-          ]
-      sha256 "9a1197f182e25178655f939654aa51a9362aa90fc81e43de7ce1c9b943b3593e" # arm64
-    end
+  # Source-based installation from GitHub repo
+  # Works with private repos since Homebrew can use git credentials
+  url "https://github.com/prog893/staqan-yt-cli.git",
+      tag:      "v1.1.0",
+      revision: "HEAD"
 
-    on_intel do
-      # GitHub API endpoint for release asset (not browser_download_url)
-      # Asset ID is automatically updated by release script
-      url "https://api.github.com/repos/prog893/staqan-yt-cli/releases/assets/336193256",
-          headers: [
-            "Accept: application/octet-stream",
-            "X-GitHub-Api-Version: 2022-11-28",
-            "Authorization: bearer #{ENV.fetch("HOMEBREW_GITHUB_API_TOKEN", nil)}"
-          ]
-      sha256 "51bc2faa04ffa26ad458644d4866e1233e26dc9d671bb7423e4e1554b0889cb2" # x64
-    end
-  end
+  depends_on "bun" => :build
 
   def install
+    # Install dependencies
+    system "bun", "install"
+
+    # Build the binary using Bun's compile feature
     if Hardware::CPU.arm?
-      bin.install "staqan-yt-macos-arm64" => "staqan-yt"
+      system "bun", "build", "./bin/staqan-yt.ts", "--compile", "--target=bun-darwin-arm64", "--outfile", "staqan-yt"
     else
-      bin.install "staqan-yt-macos-x64" => "staqan-yt"
+      system "bun", "build", "./bin/staqan-yt.ts", "--compile", "--target=bun-darwin-x64", "--outfile", "staqan-yt"
     end
+
+    # Install the compiled binary
+    bin.install "staqan-yt"
   end
 
   def caveats
     <<~EOS
-      This formula downloads from a private GitHub repository.
-      Homebrew will automatically use credentials from:
-      - gh CLI (GitHub CLI): Run 'gh auth login' if not authenticated
-      - HOMEBREW_GITHUB_API_TOKEN environment variable
-      - ~/.config/gh/hosts.yml
-      - macOS Keychain
-
       Before using staqan-yt, you need to set up OAuth credentials:
 
       1. Create credentials at: https://console.cloud.google.com/apis/credentials

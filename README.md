@@ -32,30 +32,12 @@ Or install directly from the formula URL:
 brew install https://raw.githubusercontent.com/prog893/staqan-yt-cli/main/Formula/staqan-yt.rb
 ```
 
-### Option 2: Download Pre-built Binary
+**Note:** Homebrew will automatically install Bun as a build dependency and compile the tool from source. This works seamlessly with private repositories since Homebrew can use your git credentials.
 
-Download the latest release for your platform from [Releases](https://github.com/prog893/staqan-yt-cli/releases).
-
-**macOS Apple Silicon (arm64):**
-```bash
-curl -L https://github.com/prog893/staqan-yt-cli/releases/latest/download/staqan-yt-macos-arm64.tar.gz | tar xz
-sudo mv staqan-yt-macos-arm64 /usr/local/bin/staqan-yt
-chmod +x /usr/local/bin/staqan-yt
-```
-
-**macOS Intel (x64):**
-```bash
-curl -L https://github.com/prog893/staqan-yt-cli/releases/latest/download/staqan-yt-macos-x64.tar.gz | tar xz
-sudo mv staqan-yt-macos-x64 /usr/local/bin/staqan-yt
-chmod +x /usr/local/bin/staqan-yt
-```
-
-### Option 3: Install from Source (Development)
+### Option 2: Install from Source (Development)
 
 **Prerequisites:**
-- Node.js 14.0.0 or higher
-- npm or yarn
-- Bun (for building binaries)
+- Bun runtime ([Install Bun](https://bun.sh))
 
 ```bash
 # Clone the repository
@@ -63,10 +45,13 @@ git clone https://github.com/prog893/staqan-yt-cli.git
 cd staqan-yt-cli
 
 # Install dependencies
-npm install
+bun install
 
-# Link the CLI globally
-npm link
+# Build a single-file executable
+bun build ./bin/staqan-yt.ts --compile --outfile staqan-yt
+
+# Move to a directory in your PATH
+sudo mv staqan-yt /usr/local/bin/
 ```
 
 ## OAuth Setup
@@ -687,53 +672,15 @@ YouTube Data API has daily quotas. If exceeded:
 
 ```bash
 # Install dependencies
-npm install
+bun install
 
 # Run CLI in development mode
-npm run dev -- <command>
+bun run dev <command>
 
-# Or build and link globally
-npm run build
-npm link
-staqan-yt <command>
+# Or build a single-file executable
+bun build ./bin/staqan-yt.ts --compile --outfile staqan-yt
+./staqan-yt <command>
 ```
-
-### Building Binaries
-
-The project uses Bun to compile single-file executables:
-
-```bash
-# Build both macOS binaries
-npm run build:bun:all
-
-# Or build individually
-npm run build:bun:macos-arm64  # Apple Silicon
-npm run build:bun:macos-x64    # Intel
-
-# Test the binary
-./dist-bin/staqan-yt-macos-arm64 --version
-```
-
-### Creating a Release
-
-**For maintainers:** To create a new release with binaries:
-
-1. Update version in `package.json` and `bin/staqan-yt.ts`
-2. Run the release script:
-
-```bash
-./scripts/release.sh
-```
-
-This script will:
-- Build both macOS binaries (arm64 and x64)
-- Create tar.gz archives
-- Calculate SHA256 checksums
-- Update the Homebrew formula
-- Create a GitHub release with binaries
-- Push everything to GitHub
-
-See the script source for details.
 
 ### Project Structure
 
@@ -756,13 +703,12 @@ staqan-yt-cli/
 │   ├── get-video-localization.ts       # Get single localization command
 │   ├── put-video-localization.ts       # Create localization command
 │   └── update-video-localization.ts    # Update localization command
+├── types/
+│   └── index.ts                        # TypeScript type definitions
 ├── Formula/
-│   └── staqan-yt.rb                    # Homebrew formula
-├── scripts/
-│   └── release.sh                      # Automated release script
-├── dist-bin/                           # Compiled binaries (gitignored)
-├── release/                            # Release archives (gitignored)
+│   └── staqan-yt.rb                    # Homebrew formula (source-based)
 ├── package.json
+├── tsconfig.json                       # TypeScript configuration
 ├── CLAUDE.md                           # Development guidelines
 └── README.md
 ```

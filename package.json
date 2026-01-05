@@ -8,15 +8,9 @@
   },
   "scripts": {
     "build": "tsc",
-    "build:bun": "bun build ./bin/staqan-yt.ts --compile --outfile staqan-yt",
-    "build:bun:macos-arm64": "bun build ./bin/staqan-yt.ts --compile --target=bun-darwin-arm64 --outfile dist-bin/staqan-yt-macos-arm64",
-    "build:bun:macos-x64": "bun build ./bin/staqan-yt.ts --compile --target=bun-darwin-x64 --outfile dist-bin/staqan-yt-macos-x64",
-    "build:bun:all": "mkdir -p dist-bin && npm run build:bun:macos-arm64 && npm run build:bun:macos-x64",
-    "package:tarballs": "mkdir -p release && tar -czf release/staqan-yt-macos-arm64.tar.gz -C dist-bin staqan-yt-macos-arm64 && tar -czf release/staqan-yt-macos-x64.tar.gz -C dist-bin staqan-yt-macos-x64",
-    "release:prepare": "npm run build:bun:all && npm run package:tarballs",
     "type-check": "tsc --noEmit",
     "lint": "eslint .",
-    "dev": "tsx bin/staqan-yt.ts",
+    "dev": "bun run bin/staqan-yt.ts",
     "prepublishOnly": "npm run build",
     "start": "node dist/bin/staqan-yt.js",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -40,7 +34,7 @@
     "ora": "^5.4.1"
   },
   "engines": {
-    "node": ">=14.0.0"
+    "bun": ">=1.0.0"
   },
   "devDependencies": {
     "@types/chalk": "^0.4.31",
