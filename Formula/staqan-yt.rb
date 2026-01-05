@@ -10,9 +10,9 @@ class StaqanYt < Formula
       tag:      "v1.1.0",
       revision: "HEAD"
 
-  depends_on "bun" => :build
-
   def install
+    # Check if bun is available
+    odie "Bun is required. Install from https://bun.sh" unless which("bun")
     # Install dependencies
     system "bun", "install"
 
