@@ -10,18 +10,22 @@ class StaqanYt < Formula
       tag:      "v#{version}"
 
   def install
-    # Add common Bun installation paths to PATH
-    ENV.prepend_path "PATH", "#{ENV["HOME"]}/.bun/bin"
-    ENV.prepend_path "PATH", "/usr/local/bin"
+    # Find bun executable (check common installation locations)
+    bun_path = which("bun") ||
+               which("/usr/local/bin/bun") ||
+               which("#{Dir.home}/.bun/bin/bun") ||
+               "/opt/homebrew/bin/bun"
+
+    odie "Bun is required. Install from https://bun.sh" unless File.exist?(bun_path) || system("which", "bun")
 
     # Install dependencies
-    system "bun", "install" or odie "Bun is required. Install from https://bun.sh"
+    system bun_path, "install"
 
     # Build the binary using Bun's compile feature
     if Hardware::CPU.arm?
-      system "bun", "build", "./bin/staqan-yt.ts", "--compile", "--target=bun-darwin-arm64", "--outfile", "staqan-yt"
+      system bun_path, "build", "./bin/staqan-yt.ts", "--compile", "--target=bun-darwin-arm64", "--outfile", "staqan-yt"
     else
-      system "bun", "build", "./bin/staqan-yt.ts", "--compile", "--target=bun-darwin-x64", "--outfile", "staqan-yt"
+      system bun_path, "build", "./bin/staqan-yt.ts", "--compile", "--target=bun-darwin-x64", "--outfile", "staqan-yt"
     end
 
     # Install the compiled binary
