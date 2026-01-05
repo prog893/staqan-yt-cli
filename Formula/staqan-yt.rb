@@ -10,10 +10,12 @@ class StaqanYt < Formula
       tag:      "v#{version}"
 
   def install
-    # Check if bun is available
-    odie "Bun is required. Install from https://bun.sh" unless which("bun")
+    # Add common Bun installation paths to PATH
+    ENV.prepend_path "PATH", "#{ENV["HOME"]}/.bun/bin"
+    ENV.prepend_path "PATH", "/usr/local/bin"
+
     # Install dependencies
-    system "bun", "install"
+    system "bun", "install" or odie "Bun is required. Install from https://bun.sh"
 
     # Build the binary using Bun's compile feature
     if Hardware::CPU.arm?
