@@ -12,6 +12,9 @@ A powerful command-line interface for managing YouTube videos and metadata using
 - **Metadata Updates** - Update video titles and descriptions
 - **Video Localizations** - Manage multilingual titles and descriptions (English, Japanese, Russian)
 - **Channel Search** - Search for specific videos within a channel
+- **Analytics & SEO** - Performance metrics, search terms, traffic sources, and CTR analysis
+- **Tags Management** - View and update video tags for better discoverability
+- **Thumbnail Access** - Retrieve video thumbnail URLs in all available qualities
 - **JSON Output** - Machine-readable output for automation
 - **User-Friendly Interface** - Colorful output with loading spinners
 
@@ -94,6 +97,9 @@ cp ~/Downloads/client_secret_*.json ~/.staqan-yt-cli/credentials.json
 The CLI requires these scopes:
 - `https://www.googleapis.com/auth/youtube.readonly` - Read YouTube data
 - `https://www.googleapis.com/auth/youtube.force-ssl` - Manage YouTube videos
+- `https://www.googleapis.com/auth/yt-analytics.readonly` - Access YouTube Analytics data (for analytics commands)
+
+**Note:** If you've already authenticated, you'll need to re-authenticate to access analytics features: `staqan-yt auth`
 
 ## Authentication
 
@@ -627,6 +633,345 @@ Description updated
 ```
 
 **Note:** If the language matches the video's main metadata language, updates the main snippet instead of localizations.
+
+---
+
+#### 10. Get Video Tags
+
+```bash
+staqan-yt get-video-tags <videoId> [options]
+```
+
+Retrieve all tags for a video. Tags are important for YouTube SEO and discoverability.
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `-j, --json` - Output in JSON format
+
+**Examples:**
+
+```bash
+# Get tags
+staqan-yt get-video-tags dQw4w9WgXcQ
+
+# JSON output
+staqan-yt get-video-tags dQw4w9WgXcQ --json
+```
+
+**Sample Output:**
+```
+✓ Retrieved 19 tag(s)
+
+【本当にすごい！日本のクラフトビール】第一回 うちゅうブルーイング
+Video ID: moYDTCX0GO8
+
+Tags (19):
+  1. STAQAN
+  2. うちゅうブルーイング
+  3. クラフトビール
+  4. craftbeer
+  5. beer
+  ...
+```
+
+---
+
+#### 11. Update Video Tags
+
+```bash
+staqan-yt update-video-tags <videoId> [options]
+```
+
+Update video tags. You can replace all tags, add new tags, or remove specific tags.
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--tags <tags>` - Replace all tags with comma-separated list
+- `--add <tags>` - Add comma-separated tags (keeps existing)
+- `--remove <tags>` - Remove comma-separated tags
+- `--dry-run` - Preview changes without applying them
+- `-y, --yes` - Skip confirmation prompt
+
+**Examples:**
+
+```bash
+# Replace all tags
+staqan-yt update-video-tags dQw4w9WgXcQ \
+  --tags "music,video,awesome"
+
+# Add new tags (keeps existing)
+staqan-yt update-video-tags dQw4w9WgXcQ \
+  --add "tutorial,2024"
+
+# Remove specific tags
+staqan-yt update-video-tags dQw4w9WgXcQ \
+  --remove "old,deprecated"
+
+# Preview changes
+staqan-yt update-video-tags dQw4w9WgXcQ \
+  --tags "new,tags" --dry-run
+```
+
+**Sample Output:**
+```
+✓ Current tags retrieved
+
+【本当にすごい！日本のクラフトビール】第一回 うちゅうブルーイング
+Video ID: moYDTCX0GO8
+
+Current tags:
+  craftbeer
+  beer
+  japan
+
+New tags:
+  craftbeer
+  beer
+  japan
+  + tutorial
+  + 2024
+
+Apply these changes? (y/N): y
+✓ Tags updated successfully
+```
+
+---
+
+#### 12. Get Video Thumbnail
+
+```bash
+staqan-yt get-thumbnail <videoId> [options]
+```
+
+Retrieve video thumbnail URLs in all available qualities.
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--quality <quality>` - Show specific quality only (default, medium, high, standard, maxres)
+- `-j, --json` - Output in JSON format
+
+**Examples:**
+
+```bash
+# Get all thumbnail sizes
+staqan-yt get-thumbnail dQw4w9WgXcQ
+
+# Get specific quality
+staqan-yt get-thumbnail dQw4w9WgXcQ --quality maxres
+
+# JSON output
+staqan-yt get-thumbnail dQw4w9WgXcQ --json
+```
+
+**Sample Output:**
+```
+✓ Retrieved thumbnail information
+
+【本当にすごい！日本のクラフトビール】第一回 うちゅうブルーイング
+Video ID: moYDTCX0GO8
+
+Available Thumbnails:
+
+  DEFAULT:
+    URL:   https://i.ytimg.com/vi/moYDTCX0GO8/default.jpg
+    Size:  120x90
+
+  MEDIUM:
+    URL:   https://i.ytimg.com/vi/moYDTCX0GO8/mqdefault.jpg
+    Size:  320x180
+
+  HIGH:
+    URL:   https://i.ytimg.com/vi/moYDTCX0GO8/hqdefault.jpg
+    Size:  480x360
+
+  MAXRES:
+    URL:   https://i.ytimg.com/vi/moYDTCX0GO8/maxresdefault.jpg
+    Size:  1280x720
+```
+
+---
+
+#### 13. Get Video Analytics
+
+```bash
+staqan-yt get-video-analytics <videoId> [options]
+```
+
+Get comprehensive video performance analytics including views, watch time, CTR, and more.
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--start-date <date>` - Start date (YYYY-MM-DD), defaults to 30 days ago
+- `--end-date <date>` - End date (YYYY-MM-DD), defaults to today
+- `--metrics <metrics>` - Comma-separated list of metrics to fetch
+- `-j, --json` - Output in JSON format
+
+**Available Metrics:**
+- `views` - Number of views
+- `estimatedMinutesWatched` - Total watch time
+- `averageViewDuration` - Average view duration in seconds
+- `averageViewPercentage` - Average percentage watched
+- `likes`, `dislikes`, `comments`, `shares` - Engagement metrics
+
+**Examples:**
+
+```bash
+# Get last 30 days of analytics
+staqan-yt get-video-analytics dQw4w9WgXcQ
+
+# Custom date range
+staqan-yt get-video-analytics dQw4w9WgXcQ \
+  --start-date 2024-12-01 \
+  --end-date 2025-01-06
+
+# Specific metrics only
+staqan-yt get-video-analytics dQw4w9WgXcQ \
+  --metrics "views,likes,comments"
+
+# JSON output
+staqan-yt get-video-analytics dQw4w9WgXcQ --json
+```
+
+**Sample Output:**
+```
+✓ Analytics data retrieved
+
+【本当にすごい！日本のクラフトビール】第一回 うちゅうブルーイング
+Video ID: moYDTCX0GO8
+Date Range: 2024-12-07 to 2025-01-06
+
+Analytics Metrics:
+
+  Views: 51
+  Estimated Minutes Watched: 423
+  Average View Duration: 498.5
+  Average View Percentage: 52.8%
+  Likes: 12
+  Comments: 3
+```
+
+**Note:** Requires YouTube Analytics API to be enabled and re-authentication with `staqan-yt auth`
+
+---
+
+#### 14. Get Search Terms
+
+```bash
+staqan-yt get-search-terms <videoId> [options]
+```
+
+Get YouTube search terms that led viewers to your video. Critical for SEO optimization.
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `-l, --limit <number>` - Limit number of results (default: 50)
+- `-j, --json` - Output in JSON format
+
+**Examples:**
+
+```bash
+# Get top 50 search terms
+staqan-yt get-search-terms dQw4w9WgXcQ
+
+# Get top 10 search terms
+staqan-yt get-search-terms dQw4w9WgXcQ --limit 10
+
+# JSON output
+staqan-yt get-search-terms dQw4w9WgXcQ --json
+```
+
+**Sample Output:**
+```
+✓ Search terms data retrieved
+
+【本当にすごい！日本のクラフトビール】第一回 うちゅうブルーイング
+Video ID: moYDTCX0GO8
+Date Range: 2025-12-07 to 2026-01-06
+
+Top Search Terms (1):
+
+  1. 宇宙ビール
+      2 views
+
+Total views from search: 2
+```
+
+**Use Case:** Analyze which search queries are driving traffic to optimize titles, descriptions, and tags.
+
+---
+
+#### 15. Get Traffic Sources
+
+```bash
+staqan-yt get-traffic-sources <videoId> [options]
+```
+
+Get traffic source breakdown showing how viewers found your video.
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `-j, --json` - Output in JSON format
+
+**Examples:**
+
+```bash
+# Get traffic sources
+staqan-yt get-traffic-sources dQw4w9WgXcQ
+
+# JSON output
+staqan-yt get-traffic-sources dQw4w9WgXcQ --json
+```
+
+**Sample Output:**
+```
+✓ Traffic sources data retrieved
+
+【本当にすごい！日本のクラフトビール】第一回 うちゅうブルーイング
+Video ID: moYDTCX0GO8
+Date Range: 2025-12-07 to 2026-01-06
+
+Traffic Sources:
+
+  YouTube Search:
+    Views:      32
+    Percentage: 62.75%
+
+  Suggested Videos:
+    Views:      4
+    Percentage: 7.84%
+
+  Channel Page:
+    Views:      8
+    Percentage: 15.69%
+
+  Subscriber Feed:
+    Views:      5
+    Percentage: 9.80%
+
+Total Views: 51
+```
+
+**Traffic Source Types:**
+- **YouTube Search** - Found via YouTube search
+- **Suggested Videos** - Recommended alongside other videos
+- **External** - Links from external websites
+- **Browse Features** - YouTube homepage, trending, etc.
+- **Channel Page** - Direct channel visits
+- **Playlists** - Found in playlists
+- **Notifications** - Push notifications
+- **Subscriber Feed** - Subscriber home feed
 
 ---
 

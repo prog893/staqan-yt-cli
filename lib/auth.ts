@@ -17,6 +17,7 @@ import { OAuth2Credentials, OAuth2Token } from '../types';
 const SCOPES = [
   'https://www.googleapis.com/auth/youtube.readonly',
   'https://www.googleapis.com/auth/youtube.force-ssl',
+  'https://www.googleapis.com/auth/yt-analytics.readonly',
 ];
 
 /**

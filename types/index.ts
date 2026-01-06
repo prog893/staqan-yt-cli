@@ -90,6 +90,43 @@ export interface UpdateLocalizationOptions extends VerboseOption {
   description?: string;
 }
 
+// Analytics command options
+export interface AnalyticsOptions extends JsonOption, VerboseOption {
+  startDate?: string;
+  endDate?: string;
+  metrics?: string;
+}
+
+export interface SearchTermsOptions extends JsonOption, VerboseOption {
+  limit?: string;
+}
+
+export interface TrafficSourcesOptions extends JsonOption, VerboseOption {}
+
+export interface RetentionOptions extends JsonOption, VerboseOption {}
+
+// Tags command options
+export interface GetTagsOptions extends JsonOption, VerboseOption {}
+
+export interface UpdateTagsOptions extends VerboseOption {
+  tags?: string;
+  add?: string;
+  remove?: string;
+  dryRun?: boolean;
+  yes?: boolean;
+}
+
+// Thumbnail command options
+export interface GetThumbnailOptions extends JsonOption, VerboseOption {
+  quality?: string;
+}
+
+export interface UpdateThumbnailOptions extends VerboseOption {
+  file: string;
+  dryRun?: boolean;
+  yes?: boolean;
+}
+
 // OAuth types
 export interface OAuth2Credentials {
   installed?: {

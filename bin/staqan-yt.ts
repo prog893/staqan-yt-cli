@@ -13,6 +13,12 @@ import getVideoLocalization = require('../commands/get-video-localization');
 import putVideoLocalization = require('../commands/put-video-localization');
 import updateVideoLocalization = require('../commands/update-video-localization');
 import configCommand = require('../commands/config');
+import getVideoAnalytics = require('../commands/get-video-analytics');
+import getSearchTerms = require('../commands/get-search-terms');
+import getTrafficSources = require('../commands/get-traffic-sources');
+import getVideoTags = require('../commands/get-video-tags');
+import updateVideoTags = require('../commands/update-video-tags');
+import getThumbnail = require('../commands/get-thumbnail');
 
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
 let version = '1.1.1'; // Fallback version for compiled binaries
@@ -123,6 +129,60 @@ program
   .option('--description <desc>', 'New localized description')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(updateVideoLocalization);
+
+// Analytics commands
+program
+  .command('get-video-analytics <videoId>')
+  .description('Get video performance analytics (views, watch time, CTR, etc.)')
+  .option('--start-date <date>', 'Start date (YYYY-MM-DD), defaults to 30 days ago')
+  .option('--end-date <date>', 'End date (YYYY-MM-DD), defaults to today')
+  .option('--metrics <metrics>', 'Comma-separated list of metrics to fetch')
+  .option('-j, --json', 'Output in JSON format')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(getVideoAnalytics);
+
+program
+  .command('get-search-terms <videoId>')
+  .description('Get YouTube search terms that led viewers to this video')
+  .option('-l, --limit <number>', 'Limit number of results', '50')
+  .option('-j, --json', 'Output in JSON format')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(getSearchTerms);
+
+program
+  .command('get-traffic-sources <videoId>')
+  .description('Get traffic source breakdown (search, suggested, external, etc.)')
+  .option('-j, --json', 'Output in JSON format')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(getTrafficSources);
+
+// Tags commands
+program
+  .command('get-video-tags <videoId>')
+  .description('Get video tags')
+  .option('-j, --json', 'Output in JSON format')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(getVideoTags);
+
+program
+  .command('update-video-tags <videoId>')
+  .description('Update video tags (replace, add, or remove)')
+  .option('--tags <tags>', 'Replace all tags with comma-separated list')
+  .option('--add <tags>', 'Add comma-separated tags')
+  .option('--remove <tags>', 'Remove comma-separated tags')
+  .option('--dry-run', 'Preview changes without applying them')
+  .option('-y, --yes', 'Skip confirmation prompt')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(updateVideoTags);
+
+// Thumbnail commands
+program
+  .command('get-thumbnail <videoId>')
+  .description('Get video thumbnail URLs')
+  .option('--quality <quality>', 'Specific quality (default, medium, high, standard, maxres)')
+  .option('-j, --json', 'Output in JSON format')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(getThumbnail);
 
 // Show help if no command provided
 if (!process.argv.slice(2).length) {
