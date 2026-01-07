@@ -96,6 +96,34 @@ function formatNumber(num: number): string {
 }
 
 /**
+ * Parse ISO 8601 duration (e.g., "PT15M40S") to seconds
+ */
+function parseDuration(duration: string): number {
+  const matches = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!matches) return 0;
+
+  const hours = parseInt(matches[1] || '0', 10);
+  const minutes = parseInt(matches[2] || '0', 10);
+  const seconds = parseInt(matches[3] || '0', 10);
+
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
+/**
+ * Format seconds to timestamp (M:SS or H:MM:SS)
+ */
+function formatTimestamp(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  return `${minutes}:${secs.toString().padStart(2, '0')}`;
+}
+
+/**
  * Print success message
  */
 function success(message: string): void {
@@ -276,6 +304,8 @@ export {
   parseVideoId,
   formatDate,
   formatNumber,
+  parseDuration,
+  formatTimestamp,
   success,
   error,
   warning,

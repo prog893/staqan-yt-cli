@@ -2,7 +2,7 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, setVerbose, debug, progress, convertToCSV, chunkDateRange, retryWithBackoff } from '../lib/utils';
+import { parseVideoId, error, setVerbose, debug, progress, convertToCSV, chunkDateRange, retryWithBackoff, parseDuration, formatTimestamp } from '../lib/utils';
 import { shouldUseJson } from '../lib/config';
 import { RetentionOptions } from '../types';
 
@@ -130,9 +130,12 @@ async function getRetentionCommand(videoId: string, options: RetentionOptions): 
         return;
       }
 
+      // Parse duration to get total seconds
+      const totalSeconds = parseDuration(duration);
+
       console.log(chalk.bold('Audience Retention Curve:'));
       console.log('');
-      console.log(chalk.gray('Time Point') + '  ' + chalk.gray('Retention %') + '  ' + chalk.gray('vs. Similar Videos'));
+      console.log(chalk.gray('Timestamp') + '  ' + chalk.gray('Retention %') + '  ' + chalk.gray('vs. Similar Videos'));
       console.log(chalk.gray('─'.repeat(60)));
 
       allRows.forEach(row => {
@@ -140,7 +143,9 @@ async function getRetentionCommand(videoId: string, options: RetentionOptions): 
         const watchRatio = row[1] as number; // Percentage still watching
         const relativePerformance = row[2] as number; // vs similar videos
 
-        const timePercent = (timeRatio * 100).toFixed(0).padStart(3);
+        // Convert time ratio to actual timestamp
+        const elapsedSeconds = timeRatio * totalSeconds;
+        const timestamp = formatTimestamp(elapsedSeconds).padStart(7);
         const retentionPercent = (watchRatio * 100).toFixed(1).padStart(5);
 
         // Color code based on retention
@@ -160,7 +165,7 @@ async function getRetentionCommand(videoId: string, options: RetentionOptions): 
         const barLength = Math.round(watchRatio * 40);
         const bar = '█'.repeat(barLength) + '░'.repeat(40 - barLength);
 
-        console.log(`  ${timePercent}%  ${retentionColor(retentionPercent + '%')}  ${perfIndicator}  ${chalk.dim(bar)}`);
+        console.log(`  ${timestamp}  ${retentionColor(retentionPercent + '%')}  ${perfIndicator}  ${chalk.dim(bar)}`);
       });
 
       console.log('');
