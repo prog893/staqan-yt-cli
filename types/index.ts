@@ -95,13 +95,17 @@ export interface AnalyticsOptions extends JsonOption, VerboseOption {
   startDate?: string;
   endDate?: string;
   metrics?: string;
+  csv?: boolean;
 }
 
 export interface SearchTermsOptions extends JsonOption, VerboseOption {
   limit?: string;
+  csv?: boolean;
 }
 
-export interface TrafficSourcesOptions extends JsonOption, VerboseOption {}
+export interface TrafficSourcesOptions extends JsonOption, VerboseOption {
+  csv?: boolean;
+}
 
 export interface RetentionOptions extends JsonOption, VerboseOption {}
 

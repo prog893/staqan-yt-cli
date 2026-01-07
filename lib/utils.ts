@@ -166,6 +166,107 @@ function debug(message: string, data?: unknown): void {
   }
 }
 
+/**
+ * Print progress message to stderr (doesn't interfere with stdout piping)
+ */
+function progress(message: string): void {
+  process.stderr.write(chalk.cyan('⏳ ') + message + '\n');
+}
+
+/**
+ * Convert analytics data to CSV format
+ */
+function convertToCSV(headers: { name?: string | null }[], rows: unknown[][]): string {
+  // Create CSV header
+  const csvHeaders = headers.map(h => h.name || '').join(',');
+
+  // Create CSV rows
+  const csvRows = rows.map(row => {
+    return row.map(cell => {
+      // Escape cells containing commas or quotes
+      const cellStr = String(cell);
+      if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+        return `"${cellStr.replace(/"/g, '""')}"`;
+      }
+      return cellStr;
+    }).join(',');
+  }).join('\n');
+
+  return `${csvHeaders}\n${csvRows}`;
+}
+
+/**
+ * Chunk a date range into 90-day periods (YouTube Analytics API limit)
+ */
+function chunkDateRange(startDate: string, endDate: string): { start: string; end: string }[] {
+  const chunks: { start: string; end: string }[] = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  let currentStart = start;
+
+  while (currentStart < end) {
+    const currentEnd = new Date(currentStart);
+    currentEnd.setDate(currentEnd.getDate() + 89); // 90 days (inclusive)
+
+    if (currentEnd > end) {
+      chunks.push({
+        start: currentStart.toISOString().split('T')[0],
+        end: end.toISOString().split('T')[0],
+      });
+      break;
+    } else {
+      chunks.push({
+        start: currentStart.toISOString().split('T')[0],
+        end: currentEnd.toISOString().split('T')[0],
+      });
+      currentStart = new Date(currentEnd);
+      currentStart.setDate(currentStart.getDate() + 1);
+    }
+  }
+
+  return chunks;
+}
+
+/**
+ * Sleep for specified milliseconds
+ */
+async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Retry a function with exponential backoff
+ */
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  initialDelay = 1000
+): Promise<T> {
+  let lastError: Error | undefined;
+
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err as Error;
+
+      // Check if it's a quota error
+      const errorMessage = lastError.message || '';
+      if (errorMessage.includes('quota') || errorMessage.includes('429')) {
+        const delay = initialDelay * Math.pow(2, i);
+        progress(`Quota limit hit, retrying in ${delay / 1000}s...`);
+        await sleep(delay);
+      } else {
+        // Not a quota error, throw immediately
+        throw lastError;
+      }
+    }
+  }
+
+  throw lastError || new Error('Max retries exceeded');
+}
+
 export {
   CONFIG_DIR,
   CREDENTIALS_PATH,
@@ -183,4 +284,9 @@ export {
   setVerbose,
   isVerbose,
   debug,
+  progress,
+  convertToCSV,
+  chunkDateRange,
+  sleep,
+  retryWithBackoff,
 };

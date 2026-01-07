@@ -134,9 +134,10 @@ program
 program
   .command('get-video-analytics <videoId>')
   .description('Get video performance analytics (views, watch time, CTR, etc.)')
-  .option('--start-date <date>', 'Start date (YYYY-MM-DD), defaults to 30 days ago')
+  .option('--start-date <date>', 'Start date (YYYY-MM-DD), defaults to upload date')
   .option('--end-date <date>', 'End date (YYYY-MM-DD), defaults to today')
   .option('--metrics <metrics>', 'Comma-separated list of metrics to fetch')
+  .option('--csv', 'Output in CSV format (can be piped to file)')
   .option('-j, --json', 'Output in JSON format')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getVideoAnalytics);
