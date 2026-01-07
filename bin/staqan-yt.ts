@@ -16,6 +16,7 @@ import configCommand = require('../commands/config');
 import getVideoAnalytics = require('../commands/get-video-analytics');
 import getSearchTerms = require('../commands/get-search-terms');
 import getTrafficSources = require('../commands/get-traffic-sources');
+import getVideoRetention = require('../commands/get-video-retention');
 import getVideoTags = require('../commands/get-video-tags');
 import updateVideoTags = require('../commands/update-video-tags');
 import getThumbnail = require('../commands/get-thumbnail');
@@ -153,9 +154,18 @@ program
 program
   .command('get-traffic-sources <videoId>')
   .description('Get traffic source breakdown (search, suggested, external, etc.)')
+  .option('--csv', 'Output in CSV format (can be piped to file)')
   .option('-j, --json', 'Output in JSON format')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getTrafficSources);
+
+program
+  .command('get-video-retention <videoId>')
+  .description('Get audience retention curve (% of viewers at each point in video)')
+  .option('--csv', 'Output in CSV format (can be piped to file)')
+  .option('-j, --json', 'Output in JSON format')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(getVideoRetention);
 
 // Tags commands
 program

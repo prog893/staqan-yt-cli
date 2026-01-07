@@ -107,7 +107,9 @@ export interface TrafficSourcesOptions extends JsonOption, VerboseOption {
   csv?: boolean;
 }
 
-export interface RetentionOptions extends JsonOption, VerboseOption {}
+export interface RetentionOptions extends JsonOption, VerboseOption {
+  csv?: boolean;
+}
 
 // Tags command options
 export interface GetTagsOptions extends JsonOption, VerboseOption {}
