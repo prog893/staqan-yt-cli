@@ -1,8 +1,43 @@
 import { google, youtube_v3 } from 'googleapis';
 import { getAuthenticatedClient } from './auth';
 import { normalizeLanguage, getLanguageName } from './language';
-import { VideoInfo, VideoListItem, VideoLocalization } from '../types';
+import { VideoInfo, VideoListItem, VideoLocalization, VideoType } from '../types';
 import { debug } from './utils';
+
+/**
+ * Check if a video is a YouTube Short by checking if the shorts URL redirects
+ * @param videoId - YouTube video ID
+ * @returns true if the video is a Short, false otherwise
+ */
+async function checkIfShort(videoId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`https://www.youtube.com/shorts/${videoId}`, {
+      method: 'HEAD',
+      redirect: 'manual',
+    });
+    // If status is 200, it's a Short (no redirect)
+    // If status is 303 or 302, it redirects to /watch?v= (regular video)
+    return response.status === 200;
+  } catch {
+    // On error, default to regular video
+    return false;
+  }
+}
+
+/**
+ * Check video types for multiple videos in parallel
+ * @param videoIds - Array of YouTube video IDs
+ * @returns Map of video ID to VideoType
+ */
+async function checkVideoTypes(videoIds: string[]): Promise<Map<string, VideoType>> {
+  const results = await Promise.all(
+    videoIds.map(async (id) => {
+      const isShort = await checkIfShort(id);
+      return [id, isShort ? 'short' : 'regular'] as [string, VideoType];
+    })
+  );
+  return new Map(results);
+}
 
 /**
  * Get YouTube API client
@@ -87,20 +122,20 @@ async function getChannelVideos(channelHandle: string, maxResults = 50): Promise
 
   const uploadsPlaylistId = channelResponse.data.items[0].contentDetails!.relatedPlaylists!.uploads!;
 
-  // Get videos from uploads playlist
-  const videos: VideoListItem[] = [];
+  // Get videos from uploads playlist (without videoType first)
+  const rawVideos: Omit<VideoListItem, 'videoType'>[] = [];
   let nextPageToken: string | undefined = undefined;
 
   do {
     const playlistResponse: youtube_v3.Schema$PlaylistItemListResponse = (await youtube.playlistItems.list({
       part: ['snippet', 'contentDetails'],
       playlistId: uploadsPlaylistId,
-      maxResults: Math.min(50, maxResults - videos.length),
+      maxResults: Math.min(50, maxResults - rawVideos.length),
       pageToken: nextPageToken,
     })).data;
 
     const items = playlistResponse.items || [];
-    videos.push(...items.map((item: youtube_v3.Schema$PlaylistItem) => ({
+    rawVideos.push(...items.map((item: youtube_v3.Schema$PlaylistItem) => ({
       id: item.contentDetails!.videoId!,
       title: item.snippet!.title!,
       description: item.snippet!.description!,
@@ -109,9 +144,16 @@ async function getChannelVideos(channelHandle: string, maxResults = 50): Promise
     })));
 
     nextPageToken = playlistResponse.nextPageToken || undefined;
-  } while (nextPageToken && videos.length < maxResults);
+  } while (nextPageToken && rawVideos.length < maxResults);
 
-  return videos;
+  // Check video types for all videos
+  const videoTypes = await checkVideoTypes(rawVideos.map(v => v.id));
+
+  // Add videoType to each video
+  return rawVideos.map(video => ({
+    ...video,
+    videoType: videoTypes.get(video.id) || 'regular',
+  }));
 }
 
 /**
@@ -121,10 +163,14 @@ async function getVideoInfo(videoIds: string[]): Promise<VideoInfo[]> {
   debug(`Fetching info for ${videoIds.length} video(s)`, videoIds);
   const youtube = await getYouTubeClient();
 
-  const response = await youtube.videos.list({
-    part: ['snippet', 'statistics', 'contentDetails', 'status'],
-    id: videoIds,
-  });
+  // Fetch video details and video types in parallel
+  const [response, videoTypes] = await Promise.all([
+    youtube.videos.list({
+      part: ['snippet', 'statistics', 'contentDetails', 'status'],
+      id: videoIds,
+    }),
+    checkVideoTypes(videoIds),
+  ]);
 
   const items = response.data.items || [];
   debug(`Retrieved ${items.length} video(s) from API`);
@@ -144,6 +190,7 @@ async function getVideoInfo(videoIds: string[]): Promise<VideoInfo[]> {
     },
     duration: item.contentDetails!.duration!,
     privacyStatus: item.status!.privacyStatus!,
+    videoType: videoTypes.get(item.id!) || 'regular',
   }));
 }
 
@@ -209,12 +256,20 @@ async function searchChannelVideos(channelHandle: string, query: string, maxResu
   });
 
   const items = response.data.items || [];
-  return items.map(item => ({
+  const rawVideos = items.map(item => ({
     id: item.id!.videoId!,
     title: item.snippet!.title!,
     description: item.snippet!.description!,
     publishedAt: item.snippet!.publishedAt!,
     thumbnail: item.snippet!.thumbnails!.default!.url!,
+  }));
+
+  // Check video types for all videos
+  const videoTypes = await checkVideoTypes(rawVideos.map(v => v.id));
+
+  return rawVideos.map(video => ({
+    ...video,
+    videoType: videoTypes.get(video.id) || 'regular',
   }));
 }
 

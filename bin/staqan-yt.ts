@@ -54,6 +54,7 @@ program
   .description('List all videos from a YouTube channel')
   .option('-j, --json', 'Output in JSON format')
   .option('-l, --limit <number>', 'Limit number of results', '50')
+  .option('-t, --type <type>', 'Filter by video type (short or regular)')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(channelVideosCommand);
 

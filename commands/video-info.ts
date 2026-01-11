@@ -39,6 +39,7 @@ async function videoInfoCommand(videoIds: string[], options: JsonOption & Verbos
         console.log(chalk.gray('Published:    ') + formatDate(video.publishedAt));
         console.log(chalk.gray('Duration:     ') + video.duration);
         console.log(chalk.gray('Privacy:      ') + video.privacyStatus);
+        console.log(chalk.gray('Type:         ') + (video.videoType === 'short' ? chalk.magenta('Short') : 'Regular'));
         console.log('');
 
         console.log(chalk.bold('Statistics:'));

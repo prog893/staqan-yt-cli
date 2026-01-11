@@ -4,6 +4,9 @@
 
 import { youtube_v3 } from 'googleapis';
 
+// Video type enum
+export type VideoType = 'short' | 'regular';
+
 // Video-related types
 export interface VideoInfo {
   id: string;
@@ -17,6 +20,7 @@ export interface VideoInfo {
   statistics: VideoStatistics;
   duration: string;
   privacyStatus: string;
+  videoType: VideoType;
 }
 
 export interface VideoStatistics {
@@ -31,6 +35,7 @@ export interface VideoListItem {
   description: string;
   publishedAt: string;
   thumbnail: string;
+  videoType: VideoType;
 }
 
 // Localization types
@@ -63,6 +68,10 @@ export interface JsonOption {
 
 export interface LimitOption {
   limit?: string;
+}
+
+export interface TypeFilterOption {
+  type?: 'short' | 'regular';
 }
 
 export interface UpdateVideoOptions extends VerboseOption {

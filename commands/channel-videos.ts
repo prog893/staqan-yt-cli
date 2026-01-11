@@ -3,9 +3,9 @@ import chalk from 'chalk';
 import { getChannelVideos } from '../lib/youtube';
 import { formatDate, error, setVerbose, debug } from '../lib/utils';
 import { getConfigValue, shouldUseJson } from '../lib/config';
-import { JsonOption, LimitOption, VerboseOption } from '../types';
+import { JsonOption, LimitOption, VerboseOption, TypeFilterOption } from '../types';
 
-async function channelVideosCommand(channelHandle: string | undefined, options: JsonOption & LimitOption & VerboseOption): Promise<void> {
+async function channelVideosCommand(channelHandle: string | undefined, options: JsonOption & LimitOption & VerboseOption & TypeFilterOption): Promise<void> {
   // Enable verbose mode if requested
   if (options.verbose) {
     setVerbose(true);
@@ -31,9 +31,17 @@ async function channelVideosCommand(channelHandle: string | undefined, options: 
     const limit = parseInt(options.limit || '50');
     debug(`Channel handle: ${channel}, limit: ${limit}`);
 
-    const videos = await getChannelVideos(channel, limit);
+    let videos = await getChannelVideos(channel, limit);
 
-    spinner.succeed(`Found ${videos.length} video(s)`);
+    // Filter by video type if specified
+    if (options.type) {
+      const typeFilter = options.type;
+      debug(`Filtering by video type: ${typeFilter}`);
+      videos = videos.filter(v => v.videoType === typeFilter);
+    }
+
+    const typeLabel = options.type ? ` ${options.type}` : '';
+    spinner.succeed(`Found ${videos.length}${typeLabel} video(s)`);
     console.log('');
 
     const useJson = await shouldUseJson(options.json);
@@ -41,7 +49,8 @@ async function channelVideosCommand(channelHandle: string | undefined, options: 
       console.log(JSON.stringify(videos, null, 2));
     } else {
       videos.forEach((video, index) => {
-        console.log(chalk.cyan(`[${index + 1}]`) + ' ' + chalk.bold(video.title));
+        const typeIndicator = video.videoType === 'short' ? chalk.magenta(' [Short]') : '';
+        console.log(chalk.cyan(`[${index + 1}]`) + ' ' + chalk.bold(video.title) + typeIndicator);
         console.log('  ID: ' + chalk.yellow(video.id));
         console.log('  Published: ' + formatDate(video.publishedAt));
         console.log('  URL: ' + chalk.blue(`https://youtube.com/watch?v=${video.id}`));
