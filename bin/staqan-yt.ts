@@ -52,7 +52,7 @@ program
 program
   .command('list-videos [channelHandle]')
   .description('List all videos from a YouTube channel')
-  .option('-j, --json', 'Output in JSON format')
+  .option('--output <format>', 'Output format: json, table, text, pretty')
   .option('-l, --limit <number>', 'Limit number of results', '50')
   .option('-t, --type <type>', 'Filter by video type (short or regular)')
   .option('-v, --verbose', 'Enable verbose output with debug information')
@@ -62,15 +62,15 @@ program
 program
   .command('get-video <videoId>')
   .description('Get detailed metadata for a single video')
-  .option('-j, --json', 'Output in JSON format')
+  .option('--output <format>', 'Output format: json, table, text, pretty')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action((videoId: string, options: { json?: boolean; verbose?: boolean }) => videoInfoCommand([videoId], options));
+  .action((videoId: string, options: { output?: 'json' | 'table' | 'text' | 'pretty'; verbose?: boolean }) => videoInfoCommand([videoId], options));
 
 // Get multiple videos command (batch operation)
 program
   .command('get-videos <videoIds...>')
   .description('Get detailed metadata for multiple videos')
-  .option('-j, --json', 'Output in JSON format')
+  .option('--output <format>', 'Output format: json, table, text, pretty')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(videoInfoCommand);
 
@@ -89,7 +89,7 @@ program
 program
   .command('search-videos [channelHandle] <query>')
   .description('Search for videos in a channel by keyword')
-  .option('-j, --json', 'Output in JSON format')
+  .option('--output <format>', 'Output format: json, table, text, pretty')
   .option('-l, --limit <number>', 'Limit number of results', '25')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(searchChannelCommand);
@@ -99,7 +99,7 @@ program
   .command('get-video-localizations <videoIds...>')
   .description('Get all video localizations including main metadata language (supports multiple videos)')
   .option('--languages <langs>', 'Comma-separated list of languages (e.g., "en,ja,ru")')
-  .option('-j, --json', 'Output in JSON format')
+  .option('--output <format>', 'Output format: json, table, text, pretty')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getVideoLocalizations);
 
@@ -108,7 +108,7 @@ program
   .command('get-video-localization <videoId>')
   .description('Get specific video localization (defaults to main metadata language)')
   .option('--language <lang>', 'Language code or name (e.g., "ja", "Japanese")')
-  .option('-j, --json', 'Output in JSON format')
+  .option('--output <format>', 'Output format: json, table, text, pretty')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getVideoLocalization);
 
@@ -140,7 +140,7 @@ program
   .option('--end-date <date>', 'End date (YYYY-MM-DD), defaults to today')
   .option('--metrics <metrics>', 'Comma-separated list of metrics to fetch')
   .option('--csv', 'Output in CSV format (can be piped to file)')
-  .option('-j, --json', 'Output in JSON format')
+  .option('--output <format>', 'Output format: json, table, text, pretty')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getVideoAnalytics);
 
@@ -148,7 +148,7 @@ program
   .command('get-search-terms <videoId>')
   .description('Get YouTube search terms that led viewers to this video')
   .option('-l, --limit <number>', 'Limit number of results', '50')
-  .option('-j, --json', 'Output in JSON format')
+  .option('--output <format>', 'Output format: json, table, text, pretty')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getSearchTerms);
 
@@ -156,7 +156,7 @@ program
   .command('get-traffic-sources <videoId>')
   .description('Get traffic source breakdown (search, suggested, external, etc.)')
   .option('--csv', 'Output in CSV format (can be piped to file)')
-  .option('-j, --json', 'Output in JSON format')
+  .option('--output <format>', 'Output format: json, table, text, pretty')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getTrafficSources);
 
@@ -164,7 +164,7 @@ program
   .command('get-video-retention <videoId>')
   .description('Get audience retention curve (% of viewers at each point in video)')
   .option('--csv', 'Output in CSV format (can be piped to file)')
-  .option('-j, --json', 'Output in JSON format')
+  .option('--output <format>', 'Output format: json, table, text, pretty')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getVideoRetention);
 
@@ -172,7 +172,7 @@ program
 program
   .command('get-video-tags <videoId>')
   .description('Get video tags')
-  .option('-j, --json', 'Output in JSON format')
+  .option('--output <format>', 'Output format: json, table, text, pretty')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getVideoTags);
 
@@ -192,7 +192,7 @@ program
   .command('get-thumbnail <videoId>')
   .description('Get video thumbnail URLs')
   .option('--quality <quality>', 'Specific quality (default, medium, high, standard, maxres)')
-  .option('-j, --json', 'Output in JSON format')
+  .option('--output <format>', 'Output format: json, table, text, pretty')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getThumbnail);
 

@@ -2,10 +2,11 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { getChannelVideos } from '../lib/youtube';
 import { formatDate, error, setVerbose, debug } from '../lib/utils';
-import { getConfigValue, shouldUseJson } from '../lib/config';
-import { JsonOption, LimitOption, VerboseOption, TypeFilterOption } from '../types';
+import { getConfigValue, getOutputFormat } from '../lib/config';
+import { formatJson, formatTable } from '../lib/formatters';
+import { OutputOption, LimitOption, VerboseOption, TypeFilterOption } from '../types';
 
-async function channelVideosCommand(channelHandle: string | undefined, options: JsonOption & LimitOption & VerboseOption & TypeFilterOption): Promise<void> {
+async function channelVideosCommand(channelHandle: string | undefined, options: OutputOption & LimitOption & VerboseOption & TypeFilterOption): Promise<void> {
   // Enable verbose mode if requested
   if (options.verbose) {
     setVerbose(true);
@@ -44,18 +45,40 @@ async function channelVideosCommand(channelHandle: string | undefined, options: 
     spinner.succeed(`Found ${videos.length}${typeLabel} video(s)`);
     console.log('');
 
-    const useJson = await shouldUseJson(options.json);
-    if (useJson) {
-      console.log(JSON.stringify(videos, null, 2));
-    } else {
-      videos.forEach((video, index) => {
-        const typeIndicator = video.videoType === 'short' ? chalk.magenta(' [Short]') : '';
-        console.log(chalk.cyan(`[${index + 1}]`) + ' ' + chalk.bold(video.title) + typeIndicator);
-        console.log('  ID: ' + chalk.yellow(video.id));
-        console.log('  Published: ' + formatDate(video.publishedAt));
-        console.log('  URL: ' + chalk.blue(`https://youtube.com/watch?v=${video.id}`));
-        console.log('');
-      });
+    const outputFormat = await getOutputFormat(options.output);
+
+    switch (outputFormat) {
+      case 'json':
+        console.log(formatJson(videos));
+        break;
+
+      case 'table':
+        const tableData = videos.map(video => ({
+          id: video.id,
+          title: video.title,
+          published: formatDate(video.publishedAt),
+          type: video.videoType,
+        }));
+        console.log(formatTable(tableData));
+        break;
+
+      case 'text':
+        videos.forEach(video => {
+          console.log([video.id, video.title, video.publishedAt, video.videoType].join('\t'));
+        });
+        break;
+
+      case 'pretty':
+      default:
+        videos.forEach((video, index) => {
+          const typeIndicator = video.videoType === 'short' ? chalk.magenta(' [Short]') : '';
+          console.log(chalk.cyan(`[${index + 1}]`) + ' ' + chalk.bold(video.title) + typeIndicator);
+          console.log('  ID: ' + chalk.yellow(video.id));
+          console.log('  Published: ' + formatDate(video.publishedAt));
+          console.log('  URL: ' + chalk.blue(`https://youtube.com/watch?v=${video.id}`));
+          console.log('');
+        });
+        break;
     }
   } catch (err) {
     spinner.fail('Failed to fetch videos');

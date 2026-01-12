@@ -3,7 +3,8 @@ import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
 import { parseVideoId, error, setVerbose, debug } from '../lib/utils';
-import { shouldUseJson } from '../lib/config';
+import { getOutputFormat } from '../lib/config';
+import { formatJson, formatTable } from '../lib/formatters';
 import { GetTagsOptions } from '../types';
 
 async function getVideoTagsCommand(videoId: string, options: GetTagsOptions): Promise<void> {
@@ -40,23 +41,38 @@ async function getVideoTagsCommand(videoId: string, options: GetTagsOptions): Pr
     spinner.succeed(`Retrieved ${tags.length} tag(s)`);
     console.log('');
 
-    const useJson = await shouldUseJson(options.json);
-    if (useJson) {
-      console.log(JSON.stringify({ videoId: parsedId, title, tags }, null, 2));
-    } else {
-      console.log(chalk.bold.cyan(title));
-      console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
-      console.log('');
+    const outputFormat = await getOutputFormat(options.output);
 
-      if (tags.length === 0) {
-        console.log(chalk.gray('(No tags set)'));
-      } else {
-        console.log(chalk.bold(`Tags (${tags.length}):`));
-        tags.forEach((tag, index) => {
-          console.log(chalk.gray(`  ${index + 1}.`) + ` ${tag}`);
-        });
-      }
-      console.log('');
+    switch (outputFormat) {
+      case 'json':
+        console.log(formatJson({ videoId: parsedId, title, tags }));
+        break;
+
+      case 'table':
+        const tableData = tags.map((tag, index) => ({ index: index + 1, tag }));
+        console.log(formatTable(tableData));
+        break;
+
+      case 'text':
+        tags.forEach(tag => console.log(tag));
+        break;
+
+      case 'pretty':
+      default:
+        console.log(chalk.bold.cyan(title));
+        console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
+        console.log('');
+
+        if (tags.length === 0) {
+          console.log(chalk.gray('(No tags set)'));
+        } else {
+          console.log(chalk.bold(`Tags (${tags.length}):`));
+          tags.forEach((tag, index) => {
+            console.log(chalk.gray(`  ${index + 1}.`) + ` ${tag}`);
+          });
+        }
+        console.log('');
+        break;
     }
   } catch (err) {
     spinner.fail('Failed to fetch video tags');

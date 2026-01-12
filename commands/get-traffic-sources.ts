@@ -3,7 +3,8 @@ import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
 import { parseVideoId, error, setVerbose, debug, formatNumber } from '../lib/utils';
-import { shouldUseJson } from '../lib/config';
+import { getOutputFormat } from '../lib/config';
+import { formatJson } from '../lib/formatters';
 import { TrafficSourcesOptions } from '../types';
 
 async function getTrafficSourcesCommand(videoId: string, options: TrafficSourcesOptions): Promise<void> {
@@ -61,16 +62,16 @@ async function getTrafficSourcesCommand(videoId: string, options: TrafficSources
     spinner.succeed('Traffic sources data retrieved');
     console.log('');
 
-    const useJson = await shouldUseJson(options.json);
+    const outputFormat = await getOutputFormat(options.output);
 
-    if (useJson) {
-      console.log(JSON.stringify({
+    if (outputFormat === 'json') {
+      console.log(formatJson({
         videoId: parsedId,
         title,
         dateRange: { startDate, endDate },
         columnHeaders: analyticsResponse.data.columnHeaders,
         rows: analyticsResponse.data.rows,
-      }, null, 2));
+      }));
     } else {
       console.log(chalk.bold.cyan(title));
       console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));

@@ -3,7 +3,8 @@ import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
 import { parseVideoId, error, setVerbose, debug } from '../lib/utils';
-import { shouldUseJson } from '../lib/config';
+import { getOutputFormat } from '../lib/config';
+import { formatJson } from '../lib/formatters';
 import { GetThumbnailOptions } from '../types';
 
 async function getThumbnailCommand(videoId: string, options: GetThumbnailOptions): Promise<void> {
@@ -40,10 +41,12 @@ async function getThumbnailCommand(videoId: string, options: GetThumbnailOptions
     spinner.succeed('Retrieved thumbnail information');
     console.log('');
 
-    const useJson = await shouldUseJson(options.json);
-    if (useJson) {
-      console.log(JSON.stringify({ videoId: parsedId, title, thumbnails }, null, 2));
+    const outputFormat = await getOutputFormat(options.output);
+
+    if (outputFormat === 'json') {
+      console.log(formatJson({ videoId: parsedId, title, thumbnails }));
     } else {
+      // For all other formats, use pretty output (thumbnails don't work well in table/text)
       console.log(chalk.bold.cyan(title));
       console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
       console.log('');

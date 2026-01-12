@@ -1,9 +1,14 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { Config, ConfigKey } from '../types';
+import { Config, ConfigKey, OutputFormat } from '../types';
 import { CONFIG_DIR } from './utils';
 
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
+
+/**
+ * Valid output formats
+ */
+export const VALID_OUTPUT_FORMATS: OutputFormat[] = ['json', 'table', 'text', 'pretty'];
 
 /**
  * Default configuration
@@ -11,7 +16,7 @@ const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 const DEFAULT_CONFIG: Config = {
   default: {
     channel: undefined,
-    output: 'text',
+    output: 'pretty',
   },
 };
 
@@ -69,11 +74,11 @@ export async function setConfigValue(key: ConfigKey, value: string): Promise<voi
   }
 
   // Validate output format
-  if (field === 'output' && value !== 'text' && value !== 'json') {
-    throw new Error(`Invalid output format: ${value}. Must be "text" or "json"`);
+  if (field === 'output' && !VALID_OUTPUT_FORMATS.includes(value as OutputFormat)) {
+    throw new Error(`Invalid output format: ${value}. Must be one of: ${VALID_OUTPUT_FORMATS.join(', ')}`);
   }
 
-  config[section][field] = value as string & ('text' | 'json');
+  config[section][field] = value as never;
   await saveConfig(config);
 }
 
@@ -96,16 +101,16 @@ export async function getConfig(): Promise<Config> {
 }
 
 /**
- * Determine if JSON output should be used
+ * Get the output format to use
  * CLI flag takes precedence over config
  */
-export async function shouldUseJson(jsonFlag?: boolean): Promise<boolean> {
+export async function getOutputFormat(formatFlag?: OutputFormat): Promise<OutputFormat> {
   // If flag is explicitly set, use it
-  if (jsonFlag !== undefined) {
-    return jsonFlag;
+  if (formatFlag !== undefined) {
+    return formatFlag;
   }
 
   // Otherwise, check config default
   const defaultOutput = await getConfigValue('default.output');
-  return defaultOutput === 'json';
+  return (defaultOutput as OutputFormat) || 'pretty';
 }

@@ -3,7 +3,8 @@ import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
 import { parseVideoId, error, setVerbose, debug, formatNumber, progress, convertToCSV, chunkDateRange, retryWithBackoff } from '../lib/utils';
-import { shouldUseJson } from '../lib/config';
+import { getOutputFormat } from '../lib/config';
+import { formatJson } from '../lib/formatters';
 import { AnalyticsOptions } from '../types';
 
 async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptions): Promise<void> {
@@ -95,7 +96,7 @@ async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptio
     progress(`✓ Retrieved ${allRows.length} row(s) of analytics data`);
 
     // Output results
-    const useJson = await shouldUseJson(options.json);
+    const outputFormat = await getOutputFormat(options.output);
     const useCsv = options.csv;
 
     if (useCsv) {
@@ -107,15 +108,15 @@ async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptio
 
       const csv = convertToCSV(columnHeaders, allRows);
       console.log(csv);
-    } else if (useJson) {
+    } else if (outputFormat === 'json') {
       // JSON output
-      console.log(JSON.stringify({
+      console.log(formatJson({
         videoId: parsedId,
         title,
         dateRange: { startDate, endDate },
         columnHeaders,
         rows: allRows,
-      }, null, 2));
+      }));
     } else {
       // Human-readable output
       console.log('');

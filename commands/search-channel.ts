@@ -2,14 +2,15 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { searchChannelVideos } from '../lib/youtube';
 import { formatDate, error, setVerbose, debug } from '../lib/utils';
-import { getConfigValue, shouldUseJson } from '../lib/config';
-import { JsonOption, LimitOption, VerboseOption } from '../types';
+import { getConfigValue, getOutputFormat } from '../lib/config';
+import { formatJson, formatTable } from '../lib/formatters';
+import { OutputOption, LimitOption, VerboseOption } from '../types';
 
-async function searchChannelCommand(channelHandleOrQuery: string, queryOrOptions?: string | (JsonOption & LimitOption & VerboseOption), options?: JsonOption & LimitOption & VerboseOption): Promise<void> {
+async function searchChannelCommand(channelHandleOrQuery: string, queryOrOptions?: string | (OutputOption & LimitOption & VerboseOption), options?: OutputOption & LimitOption & VerboseOption): Promise<void> {
   // Determine if first argument is channel or query based on whether second argument is a string
   let channelHandle: string | undefined;
   let query: string;
-  let opts: JsonOption & LimitOption & VerboseOption;
+  let opts: OutputOption & LimitOption & VerboseOption;
 
   if (typeof queryOrOptions === 'string') {
     // Two arguments provided: channel and query
@@ -57,27 +58,48 @@ async function searchChannelCommand(channelHandleOrQuery: string, queryOrOptions
       return;
     }
 
-    const useJson = await shouldUseJson(opts.json);
-    if (useJson) {
-      console.log(JSON.stringify(videos, null, 2));
-    } else {
-      videos.forEach((video, index) => {
-        console.log(chalk.cyan(`[${index + 1}]`) + ' ' + chalk.bold(video.title));
-        console.log('  ID: ' + chalk.yellow(video.id));
-        console.log('  Published: ' + formatDate(video.publishedAt));
-        console.log('  URL: ' + chalk.blue(`https://youtube.com/watch?v=${video.id}`));
+    const outputFormat = await getOutputFormat(opts.output);
 
-        // Show description preview if it contains the query
-        if (video.description && video.description.toLowerCase().includes(query.toLowerCase())) {
-          const maxLen = 100;
-          const preview = video.description.length > maxLen
-            ? video.description.substring(0, maxLen) + '...'
-            : video.description;
-          console.log('  ' + chalk.gray(preview));
-        }
+    switch (outputFormat) {
+      case 'json':
+        console.log(formatJson(videos));
+        break;
 
-        console.log('');
-      });
+      case 'table':
+        const tableData = videos.map(video => ({
+          id: video.id,
+          title: video.title,
+          published: formatDate(video.publishedAt),
+        }));
+        console.log(formatTable(tableData));
+        break;
+
+      case 'text':
+        videos.forEach(video => {
+          console.log([video.id, video.title, video.publishedAt].join('\t'));
+        });
+        break;
+
+      case 'pretty':
+      default:
+        videos.forEach((video, index) => {
+          console.log(chalk.cyan(`[${index + 1}]`) + ' ' + chalk.bold(video.title));
+          console.log('  ID: ' + chalk.yellow(video.id));
+          console.log('  Published: ' + formatDate(video.publishedAt));
+          console.log('  URL: ' + chalk.blue(`https://youtube.com/watch?v=${video.id}`));
+
+          // Show description preview if it contains the query
+          if (video.description && video.description.toLowerCase().includes(query.toLowerCase())) {
+            const maxLen = 100;
+            const preview = video.description.length > maxLen
+              ? video.description.substring(0, maxLen) + '...'
+              : video.description;
+            console.log('  ' + chalk.gray(preview));
+          }
+
+          console.log('');
+        });
+        break;
     }
   } catch (err) {
     spinner.fail('Search failed');

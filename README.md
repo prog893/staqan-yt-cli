@@ -15,7 +15,7 @@ A powerful command-line interface for managing YouTube videos and metadata using
 - **Analytics & SEO** - Performance metrics, search terms, traffic sources, and CTR analysis
 - **Tags Management** - View and update video tags for better discoverability
 - **Thumbnail Access** - Retrieve video thumbnail URLs in all available qualities
-- **JSON Output** - Machine-readable output for automation
+- **Multiple Output Formats** - JSON, table, text (tab-delimited), or pretty (colorful) output for any use case
 - **User-Friendly Interface** - Colorful output with loading spinners
 
 ## Installation
@@ -129,25 +129,25 @@ staqan-yt <command> [options]
 #### get-video (singular)
 Get metadata for a single video:
 ```bash
-staqan-yt get-video dQw4w9WgXcQ --json
+staqan-yt get-video dQw4w9WgXcQ --output json
 ```
 
 #### get-videos (plural - batch operation)
 Get metadata for multiple videos:
 ```bash
-staqan-yt get-videos dQw4w9WgXcQ abc123xyz def456uvw --json
+staqan-yt get-videos dQw4w9WgXcQ abc123xyz def456uvw --output json
 ```
 
 #### list-videos
 List all videos from a channel:
 ```bash
-staqan-yt list-videos @channelname --limit 50 --json
+staqan-yt list-videos @channelname --limit 50 --output json
 ```
 
 #### search-videos
 Search for videos within a channel:
 ```bash
-staqan-yt search-videos @channelname "keyword" --json
+staqan-yt search-videos @channelname "keyword" --output json
 ```
 
 #### update-video (singular)
@@ -193,7 +193,7 @@ Manage CLI configuration settings (set default channel, output format).
 
 **Available Configuration Keys:**
 - `default.channel` - Default channel handle or ID (e.g., @staqan)
-- `default.output` - Default output format: `text` or `json` (default: `text`)
+- `default.output` - Default output format: `json`, `table`, `text`, or `pretty` (default: `pretty`)
 
 **Examples:**
 
@@ -215,8 +215,14 @@ staqan-yt config get default.channel
 
 **How Defaults Work:**
 - When `default.channel` is set, you can omit the channel argument from `list-videos` and `search-videos` commands
-- When `default.output` is set to `json`, commands will output JSON by default (you can still override with `--json` flag)
+- When `default.output` is set, commands will use that format by default (you can still override with `--output` flag)
 - CLI flags always take precedence over config defaults
+
+**Output Format Options:**
+- `json` - Machine-readable JSON for scripting and automation
+- `table` - ASCII table format for easy reading in terminal
+- `text` - Tab-delimited output for piping to `awk`, `cut`, etc. (AWS CLI style)
+- `pretty` - Colorful, human-friendly output with formatting (default)
 
 **Example Workflow:**
 ```bash
@@ -226,6 +232,9 @@ staqan-yt config set default.output json
 
 # Now these commands work without extra arguments
 staqan-yt list-videos --limit 5        # Uses @staqan from config, outputs JSON
+
+# You can always override the format
+staqan-yt list-videos --limit 5 --output table  # Show as ASCII table instead
 staqan-yt search-videos "craft beer"   # Uses @staqan from config, outputs JSON
 
 # Override defaults when needed
@@ -246,7 +255,7 @@ List all videos from a YouTube channel.
 - `channelHandle` - (Optional) Channel @handle, username, or URL. Uses `default.channel` from config if not provided.
 
 **Options:**
-- `-j, --json` - Output in JSON format
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
 - `-l, --limit <number>` - Limit number of results (default: 50)
 
 **Examples:**
@@ -259,7 +268,7 @@ staqan-yt channel-videos @mkbhd
 staqan-yt channel-videos https://www.youtube.com/@mkbhd
 
 # Limit results and JSON output
-staqan-yt channel-videos @mkbhd --limit 10 --json
+staqan-yt channel-videos @mkbhd --limit 10 --output json
 ```
 
 **Sample Output:**
@@ -291,7 +300,7 @@ Get detailed metadata for one or more videos.
 - `videoIds` - One or more video IDs or URLs
 
 **Options:**
-- `-j, --json` - Output in JSON format
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
 
 **Examples:**
 
@@ -306,7 +315,7 @@ staqan-yt video-info dQw4w9WgXcQ abc123xyz78
 staqan-yt video-info https://youtube.com/watch?v=dQw4w9WgXcQ
 
 # JSON output
-staqan-yt video-info dQw4w9WgXcQ --json
+staqan-yt video-info dQw4w9WgXcQ --output json
 ```
 
 **Sample Output:**
@@ -408,7 +417,7 @@ Search for videos within a channel by keyword.
 - `query` - Search query
 
 **Options:**
-- `-j, --json` - Output in JSON format
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
 - `-l, --limit <number>` - Limit number of results (default: 25)
 
 **Examples:**
@@ -424,7 +433,7 @@ staqan-yt search-videos "smartphone review"
 staqan-yt search-videos @mkbhd "2024" --limit 10
 
 # JSON output
-staqan-yt search-videos @mkbhd "tutorial" --json
+staqan-yt search-videos @mkbhd "tutorial" --output json
 ```
 
 **Sample Output:**
@@ -457,7 +466,7 @@ Get all video localizations including the main metadata language.
 
 **Options:**
 - `--languages <langs>` - Comma-separated list of languages to filter (e.g., "en,ja,ru")
-- `-j, --json` - Output in JSON format
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
 
 **Examples:**
 
@@ -469,7 +478,7 @@ staqan-yt get-video-localizations dQw4w9WgXcQ
 staqan-yt get-video-localizations dQw4w9WgXcQ --languages "ja,ru"
 
 # JSON output
-staqan-yt get-video-localizations dQw4w9WgXcQ --json
+staqan-yt get-video-localizations dQw4w9WgXcQ --output json
 ```
 
 **Sample Output:**
@@ -502,7 +511,7 @@ Get a specific language localization. Defaults to main metadata language if not 
 
 **Options:**
 - `--language <lang>` - Language code (en, ja, ru) or name (English, Japanese, Russian)
-- `-j, --json` - Output in JSON format
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
 
 **Examples:**
 
@@ -517,7 +526,7 @@ staqan-yt get-video-localization dQw4w9WgXcQ --language ja
 staqan-yt get-video-localization dQw4w9WgXcQ --language JAPANESE
 
 # JSON output
-staqan-yt get-video-localization dQw4w9WgXcQ --language ja --json
+staqan-yt get-video-localization dQw4w9WgXcQ --language ja --output json
 ```
 
 **Sample Output:**
@@ -648,7 +657,7 @@ Retrieve all tags for a video. Tags are important for YouTube SEO and discoverab
 - `videoId` - Video ID or URL
 
 **Options:**
-- `-j, --json` - Output in JSON format
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
 
 **Examples:**
 
@@ -657,7 +666,7 @@ Retrieve all tags for a video. Tags are important for YouTube SEO and discoverab
 staqan-yt get-video-tags dQw4w9WgXcQ
 
 # JSON output
-staqan-yt get-video-tags dQw4w9WgXcQ --json
+staqan-yt get-video-tags dQw4w9WgXcQ --output json
 ```
 
 **Sample Output:**
@@ -754,7 +763,7 @@ Retrieve video thumbnail URLs in all available qualities.
 
 **Options:**
 - `--quality <quality>` - Show specific quality only (default, medium, high, standard, maxres)
-- `-j, --json` - Output in JSON format
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
 
 **Examples:**
 
@@ -766,7 +775,7 @@ staqan-yt get-thumbnail dQw4w9WgXcQ
 staqan-yt get-thumbnail dQw4w9WgXcQ --quality maxres
 
 # JSON output
-staqan-yt get-thumbnail dQw4w9WgXcQ --json
+staqan-yt get-thumbnail dQw4w9WgXcQ --output json
 ```
 
 **Sample Output:**
@@ -812,7 +821,7 @@ Get comprehensive video performance analytics including views, watch time, CTR, 
 - `--start-date <date>` - Start date (YYYY-MM-DD), defaults to 30 days ago
 - `--end-date <date>` - End date (YYYY-MM-DD), defaults to today
 - `--metrics <metrics>` - Comma-separated list of metrics to fetch
-- `-j, --json` - Output in JSON format
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
 
 **Available Metrics:**
 - `views` - Number of views
@@ -837,7 +846,7 @@ staqan-yt get-video-analytics dQw4w9WgXcQ \
   --metrics "views,likes,comments"
 
 # JSON output
-staqan-yt get-video-analytics dQw4w9WgXcQ --json
+staqan-yt get-video-analytics dQw4w9WgXcQ --output json
 ```
 
 **Sample Output:**
@@ -875,7 +884,7 @@ Get YouTube search terms that led viewers to your video. Critical for SEO optimi
 
 **Options:**
 - `-l, --limit <number>` - Limit number of results (default: 50)
-- `-j, --json` - Output in JSON format
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
 
 **Examples:**
 
@@ -887,7 +896,7 @@ staqan-yt get-search-terms dQw4w9WgXcQ
 staqan-yt get-search-terms dQw4w9WgXcQ --limit 10
 
 # JSON output
-staqan-yt get-search-terms dQw4w9WgXcQ --json
+staqan-yt get-search-terms dQw4w9WgXcQ --output json
 ```
 
 **Sample Output:**
@@ -922,7 +931,7 @@ Get traffic source breakdown showing how viewers found your video.
 - `videoId` - Video ID or URL
 
 **Options:**
-- `-j, --json` - Output in JSON format
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
 
 **Examples:**
 
@@ -931,7 +940,7 @@ Get traffic source breakdown showing how viewers found your video.
 staqan-yt get-traffic-sources dQw4w9WgXcQ
 
 # JSON output
-staqan-yt get-traffic-sources dQw4w9WgXcQ --json
+staqan-yt get-traffic-sources dQw4w9WgXcQ --output json
 ```
 
 **Sample Output:**
@@ -1006,7 +1015,7 @@ All commands support:
 
 ```bash
 # Get all videos as JSON
-staqan-yt channel-videos @mychannel --json > videos.json
+staqan-yt channel-videos @mychannel --output json > videos.json
 
 # Parse and update each video
 cat videos.json | jq -r '.[].id' | while read id; do
@@ -1017,7 +1026,7 @@ done
 ### Find All Videos in a Series
 
 ```bash
-staqan-yt search-channel @mychannel "Part" --limit 100 --json | \
+staqan-yt search-channel @mychannel "Part" --limit 100 --output json | \
   jq -r '.[] | "\(.title) - \(.id)"'
 ```
 
@@ -1025,10 +1034,10 @@ staqan-yt search-channel @mychannel "Part" --limit 100 --json | \
 
 ```bash
 # Get video IDs
-staqan-yt channel-videos @mychannel --json | jq -r '.[].id' > ids.txt
+staqan-yt channel-videos @mychannel --output json | jq -r '.[].id' > ids.txt
 
 # Get detailed info for each
-cat ids.txt | xargs staqan-yt video-info --json > stats.json
+cat ids.txt | xargs staqan-yt video-info --output json > stats.json
 ```
 
 ## Configuration Files

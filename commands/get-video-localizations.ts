@@ -2,7 +2,8 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { getAllVideoLocalizations } from '../lib/youtube';
 import { parseVideoId, error, setVerbose, debug } from '../lib/utils';
-import { shouldUseJson } from '../lib/config';
+import { getOutputFormat } from '../lib/config';
+import { formatJson, formatTable } from '../lib/formatters';
 import { LocalizationOptions, VideoLocalization } from '../types';
 
 async function getVideoLocalizations(videoIds: string[], options: LocalizationOptions): Promise<void> {
@@ -40,32 +41,64 @@ async function getVideoLocalizations(videoIds: string[], options: LocalizationOp
     spinner.succeed(`Retrieved ${totalLocalizations} localization(s) from ${results.length} video(s)`);
     console.log('');
 
-    const useJson = await shouldUseJson(options.json);
-    if (useJson) {
-      // For JSON output, format as object with videoId as key
-      const jsonOutput: { [videoId: string]: VideoLocalization[] } = {};
-      results.forEach(result => {
-        jsonOutput[result.videoId] = result.localizations;
-      });
-      console.log(JSON.stringify(jsonOutput, null, 2));
-    } else {
-      // For human-readable output, show each video separately
-      results.forEach((result, index) => {
-        if (index > 0) console.log(chalk.gray('─'.repeat(80)) + '\n');
+    const outputFormat = await getOutputFormat(options.output);
 
-        console.log(chalk.bold.cyan(`Localizations for video: ${result.videoId}\n`));
-
-        result.localizations.forEach(loc => {
-          const badge = loc.isMainLanguage ? chalk.yellow('[MAIN]') : chalk.gray('[LOCALIZATION]');
-          console.log(chalk.bold(`${badge} ${loc.languageName} (${loc.language})`));
-          console.log(chalk.gray('  Title:      ') + loc.title);
-          const descPreview = loc.description.length > 100
-            ? loc.description.substring(0, 100) + '...'
-            : loc.description;
-          console.log(chalk.gray('  Description:') + ' ' + descPreview);
-          console.log('');
+    switch (outputFormat) {
+      case 'json':
+        // For JSON output, format as object with videoId as key
+        const jsonOutput: { [videoId: string]: VideoLocalization[] } = {};
+        results.forEach(result => {
+          jsonOutput[result.videoId] = result.localizations;
         });
-      });
+        console.log(formatJson(jsonOutput));
+        break;
+
+      case 'table':
+        // Flatten for table view
+        const tableData: Array<{videoId: string; language: string; languageName: string; title: string; isMain: string}> = [];
+        results.forEach(result => {
+          result.localizations.forEach(loc => {
+            tableData.push({
+              videoId: result.videoId,
+              language: loc.language,
+              languageName: loc.languageName,
+              title: loc.title,
+              isMain: loc.isMainLanguage ? 'YES' : 'NO',
+            });
+          });
+        });
+        console.log(formatTable(tableData));
+        break;
+
+      case 'text':
+        // Tab-delimited output
+        results.forEach(result => {
+          result.localizations.forEach(loc => {
+            console.log([result.videoId, loc.language, loc.languageName, loc.title, loc.isMainLanguage ? 'MAIN' : 'LOC'].join('\t'));
+          });
+        });
+        break;
+
+      case 'pretty':
+      default:
+        // For human-readable output, show each video separately
+        results.forEach((result, index) => {
+          if (index > 0) console.log(chalk.gray('─'.repeat(80)) + '\n');
+
+          console.log(chalk.bold.cyan(`Localizations for video: ${result.videoId}\n`));
+
+          result.localizations.forEach(loc => {
+            const badge = loc.isMainLanguage ? chalk.yellow('[MAIN]') : chalk.gray('[LOCALIZATION]');
+            console.log(chalk.bold(`${badge} ${loc.languageName} (${loc.language})`));
+            console.log(chalk.gray('  Title:      ') + loc.title);
+            const descPreview = loc.description.length > 100
+              ? loc.description.substring(0, 100) + '...'
+              : loc.description;
+            console.log(chalk.gray('  Description:') + ' ' + descPreview);
+            console.log('');
+          });
+        });
+        break;
     }
   } catch (err) {
     spinner.fail('Failed to fetch video localizations');

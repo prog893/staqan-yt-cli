@@ -42,13 +42,13 @@ npm link  # Optional: makes 'staqan-yt' available globally
 ```bash
 staqan-yt channel-videos @channelname
 staqan-yt channel-videos https://www.youtube.com/@channelname
-staqan-yt channel-videos @channelname --json > videos.json
+staqan-yt channel-videos @channelname --output json > videos.json
 ```
 
 ### Get video details
 ```bash
 staqan-yt video-info dQw4w9WgXcQ
-staqan-yt video-info dQw4w9WgXcQ abc123xyz --json
+staqan-yt video-info dQw4w9WgXcQ abc123xyz --output json
 staqan-yt video-info https://youtube.com/watch?v=dQw4w9WgXcQ
 ```
 
@@ -93,19 +93,19 @@ node bin/staqan-yt.js <command>
 
 ### Bulk Export Video IDs
 ```bash
-staqan-yt channel-videos @mychannel --json | jq -r '.[].id' > video-ids.txt
+staqan-yt channel-videos @mychannel --output json | jq -r '.[].id' > video-ids.txt
 ```
 
 ### Get Statistics for All Videos
 ```bash
-staqan-yt channel-videos @mychannel --json | \
+staqan-yt channel-videos @mychannel --output json | \
   jq -r '.[].id' | \
-  xargs staqan-yt video-info --json > all-stats.json
+  xargs staqan-yt video-info --output json > all-stats.json
 ```
 
 ### Find Videos by Keyword
 ```bash
-staqan-yt search-channel @mychannel "Part 1" --json | \
+staqan-yt search-channel @mychannel "Part 1" --output json | \
   jq -r '.[] | "\(.publishedAt) - \(.title) - \(.id)"'
 ```
 

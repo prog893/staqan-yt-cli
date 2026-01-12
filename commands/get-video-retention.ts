@@ -3,7 +3,8 @@ import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
 import { parseVideoId, error, setVerbose, debug, progress, convertToCSV, chunkDateRange, retryWithBackoff, parseDuration, formatTimestamp } from '../lib/utils';
-import { shouldUseJson } from '../lib/config';
+import { getOutputFormat } from '../lib/config';
+import { formatJson } from '../lib/formatters';
 import { RetentionOptions } from '../types';
 
 async function getRetentionCommand(videoId: string, options: RetentionOptions): Promise<void> {
@@ -93,7 +94,7 @@ async function getRetentionCommand(videoId: string, options: RetentionOptions): 
     progress(`✓ Retrieved ${allRows.length} retention data point(s)`);
 
     // Output results
-    const useJson = await shouldUseJson(options.json);
+    const outputFormat = await getOutputFormat(options.output);
     const useCsv = options.csv;
 
     if (useCsv) {
@@ -105,16 +106,16 @@ async function getRetentionCommand(videoId: string, options: RetentionOptions): 
 
       const csv = convertToCSV(columnHeaders, allRows);
       console.log(csv);
-    } else if (useJson) {
+    } else if (outputFormat === 'json') {
       // JSON output
-      console.log(JSON.stringify({
+      console.log(formatJson({
         videoId: parsedId,
         title,
         duration,
         dateRange: { startDate, endDate },
         columnHeaders,
         rows: allRows,
-      }, null, 2));
+      }));
     } else {
       // Human-readable output
       console.log('');

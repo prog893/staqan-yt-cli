@@ -62,8 +62,10 @@ export interface VerboseOption {
   verbose?: boolean;
 }
 
-export interface JsonOption {
-  json?: boolean;
+export type OutputFormat = 'json' | 'table' | 'text' | 'pretty';
+
+export interface OutputOption {
+  output?: OutputFormat;
 }
 
 export interface LimitOption {
@@ -81,10 +83,9 @@ export interface UpdateVideoOptions extends VerboseOption {
   yes?: boolean;
 }
 
-export interface LocalizationOptions extends VerboseOption {
+export interface LocalizationOptions extends VerboseOption, OutputOption {
   language?: string;
   languages?: string;
-  json?: boolean;
 }
 
 export interface PutLocalizationOptions extends VerboseOption {
@@ -100,28 +101,28 @@ export interface UpdateLocalizationOptions extends VerboseOption {
 }
 
 // Analytics command options
-export interface AnalyticsOptions extends JsonOption, VerboseOption {
+export interface AnalyticsOptions extends OutputOption, VerboseOption {
   startDate?: string;
   endDate?: string;
   metrics?: string;
   csv?: boolean;
 }
 
-export interface SearchTermsOptions extends JsonOption, VerboseOption {
+export interface SearchTermsOptions extends OutputOption, VerboseOption {
   limit?: string;
   csv?: boolean;
 }
 
-export interface TrafficSourcesOptions extends JsonOption, VerboseOption {
+export interface TrafficSourcesOptions extends OutputOption, VerboseOption {
   csv?: boolean;
 }
 
-export interface RetentionOptions extends JsonOption, VerboseOption {
+export interface RetentionOptions extends OutputOption, VerboseOption {
   csv?: boolean;
 }
 
 // Tags command options
-export interface GetTagsOptions extends JsonOption, VerboseOption {}
+export interface GetTagsOptions extends OutputOption, VerboseOption {}
 
 export interface UpdateTagsOptions extends VerboseOption {
   tags?: string;
@@ -132,7 +133,7 @@ export interface UpdateTagsOptions extends VerboseOption {
 }
 
 // Thumbnail command options
-export interface GetThumbnailOptions extends JsonOption, VerboseOption {
+export interface GetThumbnailOptions extends OutputOption, VerboseOption {
   quality?: string;
 }
 
@@ -174,7 +175,7 @@ export interface ChannelHandle {
 export interface Config {
   default?: {
     channel?: string;
-    output?: 'text' | 'json';
+    output?: OutputFormat;
   };
 }
 

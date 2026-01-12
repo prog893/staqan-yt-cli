@@ -329,7 +329,7 @@ import yourCommand = require('../commands/your-command');
 program
   .command('your-command <arg>')
   .description('Description following AWS style')
-  .option('-j, --json', 'Output in JSON format')
+  .option('-j, --output json', 'Output in JSON format')
   .action(yourCommand);
 ```
 
@@ -487,16 +487,40 @@ if (!token) {
 
 ## Output Formatting
 
-### JSON Output (--json flag)
+### Output Format System
 
-```javascript
-if (options.json) {
-  console.log(JSON.stringify(data, null, 2));
-  return;
+The CLI supports 4 output formats via `--output <format>`:
+- `json` - Machine-readable JSON
+- `table` - ASCII table format
+- `text` - Tab-delimited (AWS CLI style)
+- `pretty` - Colorful, human-friendly (default)
+
+### Implementing Output Formats in Commands
+
+```typescript
+import { getOutputFormat } from '../lib/config';
+import { formatJson, formatTable, formatText } from '../lib/formatters';
+
+const outputFormat = await getOutputFormat(options.output);
+
+switch (outputFormat) {
+  case 'json':
+    console.log(formatJson(data));
+    break;
+  case 'table':
+    console.log(formatTable(data));
+    break;
+  case 'text':
+    data.forEach(item => console.log(Object.values(item).join('\t')));
+    break;
+  case 'pretty':
+  default:
+    // Colorful output using chalk
+    break;
 }
 ```
 
-### Terminal Output (default)
+### Pretty Output (default)
 
 Use chalk for colors:
 ```javascript
@@ -531,13 +555,13 @@ staqan-yt config set default.output json
 staqan-yt config get default.channel
 
 # Test get single video
-staqan-yt get-video dQw4w9WgXcQ --json
+staqan-yt get-video dQw4w9WgXcQ --output json
 
 # Test get multiple videos
-staqan-yt get-videos dQw4w9WgXcQ abc123xyz --json
+staqan-yt get-videos dQw4w9WgXcQ abc123xyz --output json
 
 # Test list videos (with and without channel argument)
-staqan-yt list-videos @mkbhd --limit 5 --json
+staqan-yt list-videos @mkbhd --limit 5 --output json
 staqan-yt list-videos --limit 5  # Uses default channel from config
 
 # Test update (dry run)

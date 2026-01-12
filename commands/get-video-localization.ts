@@ -2,7 +2,8 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { getVideoLocalization } from '../lib/youtube';
 import { parseVideoId, error, setVerbose, debug } from '../lib/utils';
-import { shouldUseJson } from '../lib/config';
+import { getOutputFormat } from '../lib/config';
+import { formatJson } from '../lib/formatters';
 import { LocalizationOptions } from '../types';
 
 async function getVideoLocalizationCommand(videoId: string, options: LocalizationOptions): Promise<void> {
@@ -28,10 +29,12 @@ async function getVideoLocalizationCommand(videoId: string, options: Localizatio
     spinner.succeed('Localization retrieved successfully');
     console.log('');
 
-    const useJson = await shouldUseJson(options.json);
-    if (useJson) {
-      console.log(JSON.stringify(localization, null, 2));
+    const outputFormat = await getOutputFormat(options.output);
+
+    if (outputFormat === 'json') {
+      console.log(formatJson(localization));
     } else {
+      // Use pretty format for all non-JSON outputs
       const badge = localization.isMainLanguage ? chalk.yellow('[MAIN METADATA]') : chalk.gray('[LOCALIZATION]');
       console.log(chalk.bold.cyan(`${badge} ${localization.languageName} (${localization.language})\n`));
 

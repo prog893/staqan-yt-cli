@@ -3,7 +3,8 @@ import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
 import { parseVideoId, error, setVerbose, debug, formatNumber } from '../lib/utils';
-import { shouldUseJson } from '../lib/config';
+import { getOutputFormat } from '../lib/config';
+import { formatJson } from '../lib/formatters';
 import { SearchTermsOptions } from '../types';
 
 async function getSearchTermsCommand(videoId: string, options: SearchTermsOptions): Promise<void> {
@@ -64,16 +65,16 @@ async function getSearchTermsCommand(videoId: string, options: SearchTermsOption
     spinner.succeed('Search terms data retrieved');
     console.log('');
 
-    const useJson = await shouldUseJson(options.json);
+    const outputFormat = await getOutputFormat(options.output);
 
-    if (useJson) {
-      console.log(JSON.stringify({
+    if (outputFormat === 'json') {
+      console.log(formatJson({
         videoId: parsedId,
         title,
         dateRange: { startDate, endDate },
         columnHeaders: analyticsResponse.data.columnHeaders,
         rows: analyticsResponse.data.rows,
-      }, null, 2));
+      }));
     } else {
       console.log(chalk.bold.cyan(title));
       console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
