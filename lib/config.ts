@@ -8,7 +8,7 @@ const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 /**
  * Valid output formats
  */
-export const VALID_OUTPUT_FORMATS: OutputFormat[] = ['json', 'table', 'text', 'pretty'];
+export const VALID_OUTPUT_FORMATS: OutputFormat[] = ['json', 'table', 'text', 'pretty', 'csv'];
 
 /**
  * Default configuration

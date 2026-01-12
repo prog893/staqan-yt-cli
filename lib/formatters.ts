@@ -171,3 +171,76 @@ function formatPrettyValue(value: unknown, indent = 0): string {
 
   return String(value);
 }
+
+/**
+ * Format data as RFC 4180-compliant CSV
+ * Suitable for Excel, data analysis tools
+ */
+export function formatCsv(data: unknown): string {
+  if (!data) {
+    return '';
+  }
+
+  let arrayData: unknown[];
+  if (!Array.isArray(data)) {
+    arrayData = [data];
+  } else {
+    arrayData = data;
+  }
+
+  if (arrayData.length === 0) {
+    return '';
+  }
+
+  // Get all unique keys from all objects
+  const allKeys = new Set<string>();
+  arrayData.forEach(item => {
+    if (typeof item === 'object' && item !== null) {
+      Object.keys(item).forEach(key => allKeys.add(key));
+    }
+  });
+
+  const keys = Array.from(allKeys);
+
+  if (keys.length === 0) {
+    // Primitive array - single column named "value"
+    const header = 'value';
+    const rows = arrayData.map(item => escapeCSV(String(item)));
+    return [header, ...rows].join('\n');
+  }
+
+  // Build CSV header
+  const header = keys.map(escapeCSV).join(',');
+
+  // Build CSV rows
+  const rows = arrayData.map(item => {
+    if (typeof item !== 'object' || item === null) {
+      return escapeCSV(String(item));
+    }
+    return keys.map(key => {
+      const val = (item as Record<string, unknown>)[key];
+      if (val === null || val === undefined) {
+        return '';
+      }
+      if (typeof val === 'object') {
+        // For nested objects/arrays, JSON-encode them
+        return escapeCSV(JSON.stringify(val));
+      }
+      return escapeCSV(String(val));
+    }).join(',');
+  });
+
+  return [header, ...rows].join('\n');
+}
+
+/**
+ * Escape CSV field according to RFC 4180
+ * - Quote fields containing comma, quote, or newline
+ * - Escape quotes by doubling them
+ */
+function escapeCSV(field: string): string {
+  if (field.includes(',') || field.includes('"') || field.includes('\n') || field.includes('\r')) {
+    return `"${field.replace(/"/g, '""')}"`;
+  }
+  return field;
+}

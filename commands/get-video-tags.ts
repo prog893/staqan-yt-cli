@@ -4,7 +4,7 @@ import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
 import { parseVideoId, error, setVerbose, debug } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
-import { formatJson, formatTable } from '../lib/formatters';
+import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { GetTagsOptions } from '../types';
 
 async function getVideoTagsCommand(videoId: string, options: GetTagsOptions): Promise<void> {
@@ -55,6 +55,11 @@ async function getVideoTagsCommand(videoId: string, options: GetTagsOptions): Pr
 
       case 'text':
         tags.forEach(tag => console.log(tag));
+        break;
+
+      case 'csv':
+        const csvData = tags.map((tag, index) => ({ index: index + 1, tag }));
+        console.log(formatCsv(csvData));
         break;
 
       case 'pretty':

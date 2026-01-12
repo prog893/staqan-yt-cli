@@ -4,7 +4,7 @@ import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
 import { parseVideoId, error, setVerbose, debug } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
-import { formatJson } from '../lib/formatters';
+import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { GetThumbnailOptions } from '../types';
 
 async function getThumbnailCommand(videoId: string, options: GetThumbnailOptions): Promise<void> {
@@ -43,47 +43,77 @@ async function getThumbnailCommand(videoId: string, options: GetThumbnailOptions
 
     const outputFormat = await getOutputFormat(options.output);
 
-    if (outputFormat === 'json') {
-      console.log(formatJson({ videoId: parsedId, title, thumbnails }));
-    } else {
-      // For all other formats, use pretty output (thumbnails don't work well in table/text)
-      console.log(chalk.bold.cyan(title));
-      console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
-      console.log('');
+    // Prepare flattened thumbnail data for structured formats
+    const thumbnailData: Array<{ quality: string; url: string; width?: number; height?: number }> = [];
+    if (thumbnails) {
+      const sizes = ['default', 'medium', 'high', 'standard', 'maxres'] as const;
+      sizes.forEach(size => {
+        const thumbnail = thumbnails[size];
+        if (thumbnail && thumbnail.url) {
+          thumbnailData.push({
+            quality: size,
+            url: thumbnail.url || '',
+            width: thumbnail.width || undefined,
+            height: thumbnail.height || undefined,
+          });
+        }
+      });
+    }
 
-      if (!thumbnails) {
-        console.log(chalk.gray('(No thumbnails available)'));
-      } else {
-        console.log(chalk.bold('Available Thumbnails:'));
+    switch (outputFormat) {
+      case 'json':
+        console.log(formatJson({ videoId: parsedId, title, thumbnails }));
+        break;
+
+      case 'table':
+        console.log(formatTable(thumbnailData));
+        break;
+
+      case 'text':
+        thumbnailData.forEach(thumb => {
+          console.log([thumb.quality, thumb.url, thumb.width || '', thumb.height || ''].join('\t'));
+        });
+        break;
+
+      case 'csv':
+        console.log(formatCsv(thumbnailData));
+        break;
+
+      case 'pretty':
+      default:
+        console.log(chalk.bold.cyan(title));
+        console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
         console.log('');
 
-        // Show all available thumbnail sizes
-        const sizes = ['default', 'medium', 'high', 'standard', 'maxres'] as const;
-        sizes.forEach(size => {
-          const thumbnail = thumbnails[size];
-          if (thumbnail && thumbnail.url) {
-            console.log(chalk.bold(`  ${size.toUpperCase()}:`));
-            console.log(chalk.gray('    URL:   ') + chalk.blue(thumbnail.url));
-            if (thumbnail.width && thumbnail.height) {
-              console.log(chalk.gray('    Size:  ') + `${thumbnail.width}x${thumbnail.height}`);
+        if (thumbnailData.length === 0) {
+          console.log(chalk.gray('(No thumbnails available)'));
+        } else {
+          console.log(chalk.bold('Available Thumbnails:'));
+          console.log('');
+
+          thumbnailData.forEach(thumb => {
+            console.log(chalk.bold(`  ${thumb.quality.toUpperCase()}:`));
+            console.log(chalk.gray('    URL:   ') + chalk.blue(thumb.url));
+            if (thumb.width && thumb.height) {
+              console.log(chalk.gray('    Size:  ') + `${thumb.width}x${thumb.height}`);
             }
             console.log('');
-          }
-        });
+          });
 
-        // If quality option specified, show only that one
-        if (options.quality) {
-          const quality = options.quality.toLowerCase();
-          const thumbnail = thumbnails[quality as keyof typeof thumbnails];
-          if (thumbnail && thumbnail.url) {
-            console.log(chalk.bold(`Selected Quality (${quality}):`));
-            console.log(chalk.blue(thumbnail.url));
-          } else {
-            console.log(chalk.yellow(`No thumbnail found for quality: ${options.quality}`));
+          // If quality option specified, show only that one
+          if (options.quality) {
+            const quality = options.quality.toLowerCase();
+            const selectedThumb = thumbnailData.find(t => t.quality === quality);
+            if (selectedThumb) {
+              console.log(chalk.bold(`Selected Quality (${quality}):`));
+              console.log(chalk.blue(selectedThumb.url));
+            } else {
+              console.log(chalk.yellow(`No thumbnail found for quality: ${options.quality}`));
+            }
           }
         }
-      }
-      console.log('');
+        console.log('');
+        break;
     }
   } catch (err) {
     spinner.fail('Failed to fetch video thumbnail');

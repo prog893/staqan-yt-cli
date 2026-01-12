@@ -95,7 +95,7 @@ search-videos <ch> <query> # Search multiple videos
 
 **Available configuration options:**
 - `default.channel` - Default channel handle/ID for list-videos and search-videos
-- `default.output` - Default output format (`text` or `json`, defaults to `text`)
+- `default.output` - Default output format: `json`, `table`, `text`, `pretty`, or `csv` (defaults to `pretty`)
 
 **How configuration works:**
 - Config values are loaded when commands execute
@@ -107,26 +107,26 @@ search-videos <ch> <query> # Search multiple videos
 ```bash
 # Set defaults
 staqan-yt config set default.channel @staqan
-staqan-yt config set default.output json
+staqan-yt config set default.output csv
 
 # Commands now use these defaults
-staqan-yt list-videos --limit 5        # Uses @staqan, outputs JSON
-staqan-yt search-videos "craft beer"   # Uses @staqan, outputs JSON
+staqan-yt list-videos --limit 5        # Uses @staqan, outputs CSV
+staqan-yt search-videos "craft beer"   # Uses @staqan, outputs CSV
 
 # Override when needed
-staqan-yt list-videos @otherChannel    # Explicit channel overrides config
+staqan-yt list-videos @otherChannel --output json    # Explicit format overrides config
 ```
 
 **Implementation pattern:**
 ```typescript
 // In command files
-import { getConfigValue, shouldUseJson } from '../lib/config';
+import { getConfigValue, getOutputFormat } from '../lib/config';
 
 // Load default channel if not provided
 let channel = channelHandle || await getConfigValue('default.channel');
 
-// Determine output format (flag takes precedence)
-const useJson = await shouldUseJson(options.json);
+// Determine output format (flag takes precedence over config)
+const outputFormat = await getOutputFormat(options.output);
 ```
 
 ## Code Structure
@@ -489,17 +489,19 @@ if (!token) {
 
 ### Output Format System
 
-The CLI supports 4 output formats via `--output <format>`:
-- `json` - Machine-readable JSON
-- `table` - ASCII table format
-- `text` - Tab-delimited (AWS CLI style)
-- `pretty` - Colorful, human-friendly (default)
+The CLI supports 5 output formats via `--output <format>`:
+
+- **json** - Machine-readable JSON (2-space indentation)
+- **table** - ASCII table format with borders and column alignment
+- **text** - Tab-delimited output for Unix pipelines (awk, cut)
+- **pretty** - Colorful, human-friendly output (default)
+- **csv** - RFC 4180 CSV format for Excel and data analysis
 
 ### Implementing Output Formats in Commands
 
 ```typescript
 import { getOutputFormat } from '../lib/config';
-import { formatJson, formatTable, formatText } from '../lib/formatters';
+import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 
 const outputFormat = await getOutputFormat(options.output);
 
@@ -513,11 +515,34 @@ switch (outputFormat) {
   case 'text':
     data.forEach(item => console.log(Object.values(item).join('\t')));
     break;
+  case 'csv':
+    console.log(formatCsv(data));
+    break;
   case 'pretty':
   default:
     // Colorful output using chalk
     break;
 }
+```
+
+### CSV Format Details
+
+The CSV formatter (`formatCsv`) follows RFC 4180 standards:
+- Escapes fields containing commas, quotes, or newlines
+- Doubles internal quotes for proper escaping
+- Handles nested objects by JSON-encoding them
+- Always includes a header row with field names
+
+**Example usage:**
+```bash
+# Export to Excel
+staqan-yt list-videos @channel --output csv > videos.csv
+
+# Analytics to CSV
+staqan-yt get-video-analytics VIDEO_ID --output csv > analytics.csv
+
+# Pipe to other tools
+staqan-yt get-video-tags VIDEO_ID --output csv | csvkit
 ```
 
 ### Pretty Output (default)
@@ -551,17 +576,21 @@ staqan-yt auth
 # Test configuration
 staqan-yt config list
 staqan-yt config set default.channel @staqan
-staqan-yt config set default.output json
+staqan-yt config set default.output csv
 staqan-yt config get default.channel
 
-# Test get single video
+# Test all output formats for get-video
 staqan-yt get-video dQw4w9WgXcQ --output json
+staqan-yt get-video dQw4w9WgXcQ --output table
+staqan-yt get-video dQw4w9WgXcQ --output text
+staqan-yt get-video dQw4w9WgXcQ --output csv
+staqan-yt get-video dQw4w9WgXcQ --output pretty
 
 # Test get multiple videos
-staqan-yt get-videos dQw4w9WgXcQ abc123xyz --output json
+staqan-yt get-videos dQw4w9WgXcQ abc123xyz --output csv
 
 # Test list videos (with and without channel argument)
-staqan-yt list-videos @mkbhd --limit 5 --output json
+staqan-yt list-videos @mkbhd --limit 5 --output csv
 staqan-yt list-videos --limit 5  # Uses default channel from config
 
 # Test update (dry run)

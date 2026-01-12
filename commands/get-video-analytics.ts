@@ -4,7 +4,7 @@ import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
 import { parseVideoId, error, setVerbose, debug, formatNumber, progress, convertToCSV, chunkDateRange, retryWithBackoff } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
-import { formatJson } from '../lib/formatters';
+import { formatJson, formatTable } from '../lib/formatters';
 import { AnalyticsOptions } from '../types';
 
 async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptions): Promise<void> {
@@ -97,91 +97,107 @@ async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptio
 
     // Output results
     const outputFormat = await getOutputFormat(options.output);
-    const useCsv = options.csv;
 
-    if (useCsv) {
-      // CSV output to stdout
-      if (allRows.length === 0) {
-        process.stderr.write(chalk.yellow('⚠ No analytics data available for this time period.\n'));
-        return;
+    // Prepare aggregated data for structured formats
+    const aggregated: { [key: string]: number } = {};
+    columnHeaders.forEach((header, index) => {
+      const name = header.name || '';
+      if (name === 'video') return;
+
+      let total = 0;
+      allRows.forEach(row => {
+        const value = row[index];
+        if (typeof value === 'number') {
+          total += value;
+        }
+      });
+
+      // For average metrics, divide by number of rows
+      if (name.includes('average') || name.includes('Percentage')) {
+        aggregated[name] = allRows.length > 0 ? total / allRows.length : 0;
+      } else {
+        aggregated[name] = total;
       }
+    });
 
-      const csv = convertToCSV(columnHeaders, allRows);
-      console.log(csv);
-    } else if (outputFormat === 'json') {
-      // JSON output
-      console.log(formatJson({
-        videoId: parsedId,
-        title,
-        dateRange: { startDate, endDate },
-        columnHeaders,
-        rows: allRows,
-      }));
-    } else {
-      // Human-readable output
-      console.log('');
-      console.log(chalk.bold.cyan(title));
-      console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
-      console.log(chalk.gray('Date Range: ') + `${startDate} to ${endDate}`);
-      console.log('');
+    switch (outputFormat) {
+      case 'csv':
+        if (allRows.length === 0) {
+          process.stderr.write(chalk.yellow('⚠ No analytics data available for this time period.\n'));
+          return;
+        }
+        console.log(convertToCSV(columnHeaders, allRows));
+        break;
 
-      if (allRows.length === 0) {
-        console.log(chalk.yellow('No analytics data available for this time period.'));
+      case 'json':
+        console.log(formatJson({
+          videoId: parsedId,
+          title,
+          dateRange: { startDate, endDate },
+          columnHeaders,
+          rows: allRows,
+        }));
+        break;
+
+      case 'table':
+        // Convert aggregated metrics to table format
+        const tableData = Object.entries(aggregated).map(([name, value]) => ({
+          metric: name,
+          value: value.toString(),
+        }));
+        console.log(formatTable(tableData));
+        break;
+
+      case 'text':
+        // Tab-delimited output of aggregated metrics
+        Object.entries(aggregated).forEach(([name, value]) => {
+          console.log([name, value].join('\t'));
+        });
+        break;
+
+      case 'pretty':
+      default:
         console.log('');
-        return;
-      }
+        console.log(chalk.bold.cyan(title));
+        console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
+        console.log(chalk.gray('Date Range: ') + `${startDate} to ${endDate}`);
+        console.log('');
 
-      // Aggregate metrics across all rows (sum or average as appropriate)
-      const aggregated: { [key: string]: number } = {};
+        if (allRows.length === 0) {
+          console.log(chalk.yellow('No analytics data available for this time period.'));
+          console.log('');
+          return;
+        }
 
-      columnHeaders.forEach((header, index) => {
-        const name = header.name || '';
-        if (name === 'video') return;
+        console.log(chalk.bold('Analytics Metrics (Aggregated):'));
+        console.log('');
 
-        let total = 0;
-        allRows.forEach(row => {
-          const value = row[index];
-          if (typeof value === 'number') {
-            total += value;
+        Object.entries(aggregated).forEach(([name, value]) => {
+          // Format metric name
+          const formattedName = name
+            .replace(/([A-Z])/g, ' $1')
+            .replace(/^./, str => str.toUpperCase())
+            .trim();
+
+          // Format value
+          let formattedValue: string;
+          if (name.includes('Percentage')) {
+            formattedValue = `${value.toFixed(2)}%`;
+          } else if (name.includes('Duration') || name.includes('Minutes')) {
+            formattedValue = formatNumber(Math.round(value));
+          } else if (name.includes('average')) {
+            formattedValue = value.toFixed(2);
+          } else {
+            formattedValue = formatNumber(Math.round(value));
           }
+
+          console.log(chalk.gray(`  ${formattedName}: `) + chalk.white(formattedValue));
         });
 
-        // For average metrics, divide by number of rows
-        if (name.includes('average') || name.includes('Percentage')) {
-          aggregated[name] = total / allRows.length;
-        } else {
-          aggregated[name] = total;
-        }
-      });
-
-      console.log(chalk.bold('Analytics Metrics (Aggregated):'));
-      console.log('');
-
-      Object.entries(aggregated).forEach(([name, value]) => {
-        // Format metric name
-        const formattedName = name
-          .replace(/([A-Z])/g, ' $1')
-          .replace(/^./, str => str.toUpperCase())
-          .trim();
-
-        // Format value
-        let formattedValue: string;
-        if (name.includes('Percentage')) {
-          formattedValue = `${value.toFixed(2)}%`;
-        } else if (name.includes('Duration') || name.includes('Minutes')) {
-          formattedValue = formatNumber(Math.round(value));
-        } else if (name.includes('average')) {
-          formattedValue = value.toFixed(2);
-        } else {
-          formattedValue = formatNumber(Math.round(value));
-        }
-
-        console.log(chalk.gray(`  ${formattedName}: `) + chalk.white(formattedValue));
-      });
-
-      console.log('');
-      console.log(chalk.dim(`Note: Aggregated from ${allRows.length} data point(s)`));
-      console.log('');
+        console.log('');
+        console.log(chalk.dim(`Note: Aggregated from ${allRows.length} data point(s)`));
+        console.log('');
+        break;
     }
   } catch (err) {
     spinner.fail('Failed to fetch analytics');

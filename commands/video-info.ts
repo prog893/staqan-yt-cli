@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import { getVideoInfo } from '../lib/youtube';
 import { parseVideoId, formatDate, formatNumber, error, setVerbose, debug } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
-import { formatJson, formatTable } from '../lib/formatters';
+import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { OutputOption, VerboseOption } from '../types';
 
 async function videoInfoCommand(videoIds: string[], options: OutputOption & VerboseOption): Promise<void> {
@@ -62,6 +62,21 @@ async function videoInfoCommand(videoIds: string[], options: OutputOption & Verb
             video.videoType,
           ].join('\t'));
         });
+        break;
+
+      case 'csv':
+        const csvData = videos.map(video => ({
+          id: video.id,
+          title: video.title,
+          channel: video.channelTitle,
+          published: video.publishedAt,
+          duration: video.duration,
+          views: video.statistics.viewCount,
+          likes: video.statistics.likeCount,
+          comments: video.statistics.commentCount,
+          type: video.videoType,
+        }));
+        console.log(formatCsv(csvData));
         break;
 
       case 'pretty':

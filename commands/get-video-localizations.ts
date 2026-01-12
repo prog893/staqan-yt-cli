@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import { getAllVideoLocalizations } from '../lib/youtube';
 import { parseVideoId, error, setVerbose, debug } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
-import { formatJson, formatTable } from '../lib/formatters';
+import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { LocalizationOptions, VideoLocalization } from '../types';
 
 async function getVideoLocalizations(videoIds: string[], options: LocalizationOptions): Promise<void> {
@@ -77,6 +77,23 @@ async function getVideoLocalizations(videoIds: string[], options: LocalizationOp
             console.log([result.videoId, loc.language, loc.languageName, loc.title, loc.isMainLanguage ? 'MAIN' : 'LOC'].join('\t'));
           });
         });
+        break;
+
+      case 'csv':
+        // Flatten for CSV output
+        const csvData: Array<{videoId: string; language: string; languageName: string; title: string; isMain: string}> = [];
+        results.forEach(result => {
+          result.localizations.forEach(loc => {
+            csvData.push({
+              videoId: result.videoId,
+              language: loc.language,
+              languageName: loc.languageName,
+              title: loc.title,
+              isMain: loc.isMainLanguage ? 'YES' : 'NO',
+            });
+          });
+        });
+        console.log(formatCsv(csvData));
         break;
 
       case 'pretty':

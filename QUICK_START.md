@@ -40,29 +40,30 @@ npm link  # Optional: makes 'staqan-yt' available globally
 
 ### List all videos from a channel
 ```bash
-staqan-yt channel-videos @channelname
-staqan-yt channel-videos https://www.youtube.com/@channelname
-staqan-yt channel-videos @channelname --output json > videos.json
+staqan-yt list-videos @channelname
+staqan-yt list-videos https://www.youtube.com/@channelname
+staqan-yt list-videos @channelname --output json > videos.json
+staqan-yt list-videos @channelname --output csv > videos.csv
 ```
 
 ### Get video details
 ```bash
-staqan-yt video-info dQw4w9WgXcQ
-staqan-yt video-info dQw4w9WgXcQ abc123xyz --output json
-staqan-yt video-info https://youtube.com/watch?v=dQw4w9WgXcQ
+staqan-yt get-video dQw4w9WgXcQ
+staqan-yt get-videos dQw4w9WgXcQ abc123xyz --output json
+staqan-yt get-video https://youtube.com/watch?v=dQw4w9WgXcQ --output csv
 ```
 
 ### Update video metadata
 ```bash
-staqan-yt update-metadata dQw4w9WgXcQ --title "New Title"
-staqan-yt update-metadata dQw4w9WgXcQ --description "New description"
-staqan-yt update-metadata dQw4w9WgXcQ -t "Title" -d "Description" --dry-run
+staqan-yt update-video dQw4w9WgXcQ --title "New Title"
+staqan-yt update-video dQw4w9WgXcQ --description "New description"
+staqan-yt update-video dQw4w9WgXcQ -t "Title" -d "Description" --dry-run
 ```
 
 ### Search within a channel
 ```bash
-staqan-yt search-channel @channelname "tutorial"
-staqan-yt search-channel @channelname "2024" --limit 50
+staqan-yt search-videos @channelname "tutorial"
+staqan-yt search-videos @channelname "2024" --limit 50 --output csv
 ```
 
 ## Running Locally (Without npm link)
@@ -93,19 +94,28 @@ node bin/staqan-yt.js <command>
 
 ### Bulk Export Video IDs
 ```bash
-staqan-yt channel-videos @mychannel --output json | jq -r '.[].id' > video-ids.txt
+staqan-yt list-videos @mychannel --output json | jq -r '.[].id' > video-ids.txt
+```
+
+### Export to Excel
+```bash
+# Quick CSV export
+staqan-yt list-videos @mychannel --output csv > videos.csv
+
+# Video analytics to CSV
+staqan-yt get-video-analytics VIDEO_ID --output csv > analytics.csv
 ```
 
 ### Get Statistics for All Videos
 ```bash
-staqan-yt channel-videos @mychannel --output json | \
+staqan-yt list-videos @mychannel --output json | \
   jq -r '.[].id' | \
-  xargs staqan-yt video-info --output json > all-stats.json
+  xargs staqan-yt get-videos --output json > all-stats.json
 ```
 
 ### Find Videos by Keyword
 ```bash
-staqan-yt search-channel @mychannel "Part 1" --output json | \
+staqan-yt search-videos @mychannel "Part 1" --output json | \
   jq -r '.[] | "\(.publishedAt) - \(.title) - \(.id)"'
 ```
 

@@ -3,6 +3,7 @@
 import { program } from 'commander';
 import chalk from 'chalk';
 import * as path from 'path';
+import { GroupedHelp } from '../lib/customHelp';
 import authCommand = require('../commands/auth');
 import channelVideosCommand = require('../commands/channel-videos');
 import videoInfoCommand = require('../commands/video-info');
@@ -33,12 +34,15 @@ try {
 program
   .name('staqan-yt')
   .description('CLI tool for managing YouTube videos and metadata')
-  .version(version);
+  .version(version)
+  .createHelp = () => new GroupedHelp();
 
 // Auth command
 program
   .command('auth')
   .description('Authenticate with YouTube API using OAuth 2.0')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(authCommand);
 
 // Config command
@@ -46,13 +50,15 @@ program
   .command('config [action] [key] [value]')
   .description('Manage CLI configuration (set defaults, view settings)')
   .option('--show', 'Show all configuration settings')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(configCommand);
 
 // List videos command
 program
   .command('list-videos [channelHandle]')
   .description('List all videos from a YouTube channel')
-  .option('--output <format>', 'Output format: json, table, text, pretty')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-l, --limit <number>', 'Limit number of results', '50')
   .option('-t, --type <type>', 'Filter by video type (short or regular)')
   .option('-v, --verbose', 'Enable verbose output with debug information')
@@ -62,15 +68,15 @@ program
 program
   .command('get-video <videoId>')
   .description('Get detailed metadata for a single video')
-  .option('--output <format>', 'Output format: json, table, text, pretty')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action((videoId: string, options: { output?: 'json' | 'table' | 'text' | 'pretty'; verbose?: boolean }) => videoInfoCommand([videoId], options));
+  .action((videoId: string, options: { output?: 'json' | 'table' | 'text' | 'pretty' | 'csv'; verbose?: boolean }) => videoInfoCommand([videoId], options));
 
 // Get multiple videos command (batch operation)
 program
   .command('get-videos <videoIds...>')
   .description('Get detailed metadata for multiple videos')
-  .option('--output <format>', 'Output format: json, table, text, pretty')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(videoInfoCommand);
 
@@ -82,6 +88,7 @@ program
   .option('-d, --description <description>', 'New video description')
   .option('--dry-run', 'Preview changes without applying them')
   .option('-y, --yes', 'Skip confirmation prompt')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(updateMetadataCommand);
 
@@ -89,7 +96,7 @@ program
 program
   .command('search-videos [channelHandle] <query>')
   .description('Search for videos in a channel by keyword')
-  .option('--output <format>', 'Output format: json, table, text, pretty')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-l, --limit <number>', 'Limit number of results', '25')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(searchChannelCommand);
@@ -99,7 +106,7 @@ program
   .command('get-video-localizations <videoIds...>')
   .description('Get all video localizations including main metadata language (supports multiple videos)')
   .option('--languages <langs>', 'Comma-separated list of languages (e.g., "en,ja,ru")')
-  .option('--output <format>', 'Output format: json, table, text, pretty')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getVideoLocalizations);
 
@@ -108,7 +115,7 @@ program
   .command('get-video-localization <videoId>')
   .description('Get specific video localization (defaults to main metadata language)')
   .option('--language <lang>', 'Language code or name (e.g., "ja", "Japanese")')
-  .option('--output <format>', 'Output format: json, table, text, pretty')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getVideoLocalization);
 
@@ -119,6 +126,7 @@ program
   .requiredOption('--language <lang>', 'Language code or name (e.g., "ja", "Japanese")')
   .requiredOption('--title <title>', 'Localized title')
   .requiredOption('--description <desc>', 'Localized description')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(putVideoLocalization);
 
@@ -129,6 +137,7 @@ program
   .requiredOption('--language <lang>', 'Language code or name (e.g., "ja", "Japanese")')
   .option('--title <title>', 'New localized title')
   .option('--description <desc>', 'New localized description')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(updateVideoLocalization);
 
@@ -139,8 +148,7 @@ program
   .option('--start-date <date>', 'Start date (YYYY-MM-DD), defaults to upload date')
   .option('--end-date <date>', 'End date (YYYY-MM-DD), defaults to today')
   .option('--metrics <metrics>', 'Comma-separated list of metrics to fetch')
-  .option('--csv', 'Output in CSV format (can be piped to file)')
-  .option('--output <format>', 'Output format: json, table, text, pretty')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getVideoAnalytics);
 
@@ -148,23 +156,21 @@ program
   .command('get-search-terms <videoId>')
   .description('Get YouTube search terms that led viewers to this video')
   .option('-l, --limit <number>', 'Limit number of results', '50')
-  .option('--output <format>', 'Output format: json, table, text, pretty')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getSearchTerms);
 
 program
   .command('get-traffic-sources <videoId>')
   .description('Get traffic source breakdown (search, suggested, external, etc.)')
-  .option('--csv', 'Output in CSV format (can be piped to file)')
-  .option('--output <format>', 'Output format: json, table, text, pretty')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getTrafficSources);
 
 program
   .command('get-video-retention <videoId>')
   .description('Get audience retention curve (% of viewers at each point in video)')
-  .option('--csv', 'Output in CSV format (can be piped to file)')
-  .option('--output <format>', 'Output format: json, table, text, pretty')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getVideoRetention);
 
@@ -172,7 +178,7 @@ program
 program
   .command('get-video-tags <videoId>')
   .description('Get video tags')
-  .option('--output <format>', 'Output format: json, table, text, pretty')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getVideoTags);
 
@@ -184,6 +190,7 @@ program
   .option('--remove <tags>', 'Remove comma-separated tags')
   .option('--dry-run', 'Preview changes without applying them')
   .option('-y, --yes', 'Skip confirmation prompt')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(updateVideoTags);
 
@@ -192,7 +199,7 @@ program
   .command('get-thumbnail <videoId>')
   .description('Get video thumbnail URLs')
   .option('--quality <quality>', 'Specific quality (default, medium, high, standard, maxres)')
-  .option('--output <format>', 'Output format: json, table, text, pretty')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getThumbnail);
 

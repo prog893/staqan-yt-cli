@@ -15,7 +15,7 @@ A powerful command-line interface for managing YouTube videos and metadata using
 - **Analytics & SEO** - Performance metrics, search terms, traffic sources, and CTR analysis
 - **Tags Management** - View and update video tags for better discoverability
 - **Thumbnail Access** - Retrieve video thumbnail URLs in all available qualities
-- **Multiple Output Formats** - JSON, table, text (tab-delimited), or pretty (colorful) output for any use case
+- **Multiple Output Formats** - JSON, table, text, pretty, or CSV output for any workflow
 - **User-Friendly Interface** - Colorful output with loading spinners
 
 ## Installation
@@ -193,7 +193,7 @@ Manage CLI configuration settings (set default channel, output format).
 
 **Available Configuration Keys:**
 - `default.channel` - Default channel handle or ID (e.g., @staqan)
-- `default.output` - Default output format: `json`, `table`, `text`, or `pretty` (default: `pretty`)
+- `default.output` - Default output format: `json`, `table`, `text`, `pretty`, or `csv` (default: `pretty`)
 
 **Examples:**
 
@@ -206,8 +206,8 @@ staqan-yt config
 # Set default channel
 staqan-yt config set default.channel @staqan
 
-# Set default output format to JSON
-staqan-yt config set default.output json
+# Set default output format to CSV
+staqan-yt config set default.output csv
 
 # Get specific config value
 staqan-yt config get default.channel
@@ -223,19 +223,23 @@ staqan-yt config get default.channel
 - `table` - ASCII table format for easy reading in terminal
 - `text` - Tab-delimited output for piping to `awk`, `cut`, etc. (AWS CLI style)
 - `pretty` - Colorful, human-friendly output with formatting (default)
+- `csv` - RFC 4180 CSV format for Excel and data analysis
 
 **Example Workflow:**
 ```bash
 # Set up your defaults once
 staqan-yt config set default.channel @staqan
-staqan-yt config set default.output json
+staqan-yt config set default.output csv
 
 # Now these commands work without extra arguments
-staqan-yt list-videos --limit 5        # Uses @staqan from config, outputs JSON
+staqan-yt list-videos --limit 5        # Uses @staqan from config, outputs CSV
+
+# Export to Excel
+staqan-yt list-videos --limit 50 > videos.csv
 
 # You can always override the format
 staqan-yt list-videos --limit 5 --output table  # Show as ASCII table instead
-staqan-yt search-videos "craft beer"   # Uses @staqan from config, outputs JSON
+staqan-yt search-videos "craft beer"   # Uses @staqan from config, outputs CSV
 
 # Override defaults when needed
 staqan-yt list-videos @otherChannel --limit 5  # Uses different channel

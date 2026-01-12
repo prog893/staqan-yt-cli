@@ -2,9 +2,9 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, setVerbose, debug, formatNumber } from '../lib/utils';
+import { parseVideoId, error, setVerbose, debug, formatNumber, convertToCSV } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
-import { formatJson } from '../lib/formatters';
+import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { TrafficSourcesOptions } from '../types';
 
 async function getTrafficSourcesCommand(videoId: string, options: TrafficSourcesOptions): Promise<void> {
@@ -64,74 +64,98 @@ async function getTrafficSourcesCommand(videoId: string, options: TrafficSources
 
     const outputFormat = await getOutputFormat(options.output);
 
-    if (outputFormat === 'json') {
-      console.log(formatJson({
-        videoId: parsedId,
-        title,
-        dateRange: { startDate, endDate },
-        columnHeaders: analyticsResponse.data.columnHeaders,
-        rows: analyticsResponse.data.rows,
-      }));
-    } else {
-      console.log(chalk.bold.cyan(title));
-      console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
-      console.log(chalk.gray('Date Range: ') + `${startDate} to ${endDate}`);
-      console.log('');
+    // Prepare data
+    const rows = analyticsResponse.data.rows || [];
+    const columnHeaders = analyticsResponse.data.columnHeaders || [];
 
-      if (!analyticsResponse.data.rows || analyticsResponse.data.rows.length === 0) {
-        console.log(chalk.yellow('No traffic source data available for this time period.'));
+    // Traffic source labels
+    const sourceLabels: { [key: string]: string } = {
+      'YT_SEARCH': 'YouTube Search',
+      'RELATED_VIDEO': 'Suggested Videos',
+      'EXTERNAL': 'External Sources',
+      'BROWSE': 'Browse Features',
+      'CHANNEL': 'Channel Page',
+      'NOTIFICATION': 'Notifications',
+      'PLAYLIST': 'Playlists',
+      'SUBSCRIBER': 'Subscriber Feed',
+      'CAMPAIGN_CARD': 'Campaign Card',
+      'END_SCREEN': 'End Screen',
+      'HASHTAGS': 'Hashtags',
+      'LIVE_REDIRECT': 'Live Redirect',
+      'NO_LINK_EMBEDDED': 'Embedded (No Link)',
+      'NO_LINK_OTHER': 'Other (No Link)',
+      'PRODUCT_PAGE': 'Product Page',
+      'SHORTS': 'Shorts',
+      'SOUND_PAGE': 'Sound Page',
+      'STORIES': 'Stories',
+    };
+
+    let totalViews = 0;
+    rows.forEach(row => {
+      totalViews += row[1] as number;
+    });
+
+    const trafficData = rows.map(row => ({
+      source: sourceLabels[row[0] as string] || row[0] as string,
+      views: row[1] as number,
+      percentage: totalViews > 0 ? ((row[1] as number / totalViews) * 100).toFixed(2) : '0',
+    }));
+
+    switch (outputFormat) {
+      case 'csv':
+        if (columnHeaders && rows) {
+          console.log(convertToCSV(columnHeaders, rows));
+        } else {
+          console.log(formatCsv(trafficData));
+        }
+        break;
+
+      case 'json':
+        console.log(formatJson({
+          videoId: parsedId,
+          title,
+          dateRange: { startDate, endDate },
+          columnHeaders,
+          rows,
+        }));
+        break;
+
+      case 'table':
+        console.log(formatTable(trafficData));
+        break;
+
+      case 'text':
+        trafficData.forEach(item => {
+          console.log([item.source, item.views, item.percentage].join('\t'));
+        });
+        break;
+
+      case 'pretty':
+      default:
+        console.log(chalk.bold.cyan(title));
+        console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
+        console.log(chalk.gray('Date Range: ') + `${startDate} to ${endDate}`);
         console.log('');
-        return;
-      }
 
-      const rows = analyticsResponse.data.rows;
-      let totalViews = 0;
+        if (rows.length === 0) {
+          console.log(chalk.yellow('No traffic source data available for this time period.'));
+          console.log('');
+          return;
+        }
 
-      // Calculate total views first
-      rows.forEach(row => {
-        totalViews += row[1] as number;
-      });
-
-      console.log(chalk.bold('Traffic Sources:'));
-      console.log('');
-
-      // Traffic source labels
-      const sourceLabels: { [key: string]: string } = {
-        'YT_SEARCH': 'YouTube Search',
-        'RELATED_VIDEO': 'Suggested Videos',
-        'EXTERNAL': 'External Sources',
-        'BROWSE': 'Browse Features',
-        'CHANNEL': 'Channel Page',
-        'NOTIFICATION': 'Notifications',
-        'PLAYLIST': 'Playlists',
-        'SUBSCRIBER': 'Subscriber Feed',
-        'CAMPAIGN_CARD': 'Campaign Card',
-        'END_SCREEN': 'End Screen',
-        'HASHTAGS': 'Hashtags',
-        'LIVE_REDIRECT': 'Live Redirect',
-        'NO_LINK_EMBEDDED': 'Embedded (No Link)',
-        'NO_LINK_OTHER': 'Other (No Link)',
-        'PRODUCT_PAGE': 'Product Page',
-        'SHORTS': 'Shorts',
-        'SOUND_PAGE': 'Sound Page',
-        'STORIES': 'Stories',
-      };
-
-      rows.forEach(row => {
-        const sourceType = row[0] as string;
-        const views = row[1] as number;
-        const percentage = ((views / totalViews) * 100).toFixed(2);
-
-        const sourceName = sourceLabels[sourceType] || sourceType;
-
-        console.log(chalk.bold(`  ${sourceName}:`));
-        console.log(chalk.gray('    Views:      ') + chalk.cyan(formatNumber(views)));
-        console.log(chalk.gray('    Percentage: ') + chalk.yellow(`${percentage}%`));
+        console.log(chalk.bold('Traffic Sources:'));
         console.log('');
-      });
 
-      console.log(chalk.bold('Total Views: ') + chalk.cyan(formatNumber(totalViews)));
-      console.log('');
+        trafficData.forEach(item => {
+          console.log(chalk.bold(`  ${item.source}:`));
+          console.log(chalk.gray('    Views:      ') + chalk.cyan(formatNumber(item.views)));
+          console.log(chalk.gray('    Percentage: ') + chalk.yellow(`${item.percentage}%`));
+          console.log('');
+        });
+
+        console.log(chalk.bold('Total Views: ') + chalk.cyan(formatNumber(totalViews)));
+        console.log('');
+        break;
     }
   } catch (err) {
     spinner.fail('Failed to fetch traffic sources');

@@ -2,9 +2,9 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, setVerbose, debug, formatNumber } from '../lib/utils';
+import { parseVideoId, error, setVerbose, debug, formatNumber, convertToCSV } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
-import { formatJson } from '../lib/formatters';
+import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { SearchTermsOptions } from '../types';
 
 async function getSearchTermsCommand(videoId: string, options: SearchTermsOptions): Promise<void> {
@@ -67,47 +67,78 @@ async function getSearchTermsCommand(videoId: string, options: SearchTermsOption
 
     const outputFormat = await getOutputFormat(options.output);
 
-    if (outputFormat === 'json') {
-      console.log(formatJson({
-        videoId: parsedId,
-        title,
-        dateRange: { startDate, endDate },
-        columnHeaders: analyticsResponse.data.columnHeaders,
-        rows: analyticsResponse.data.rows,
-      }));
-    } else {
-      console.log(chalk.bold.cyan(title));
-      console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
-      console.log(chalk.gray('Date Range: ') + `${startDate} to ${endDate}`);
-      console.log('');
+    // Prepare data for structured formats
+    const rows = analyticsResponse.data.rows || [];
+    const searchTermsData = rows.map((row, index) => ({
+      rank: index + 1,
+      searchTerm: row[0] as string,
+      views: row[1] as number,
+    }));
 
-      if (!analyticsResponse.data.rows || analyticsResponse.data.rows.length === 0) {
-        console.log(chalk.yellow('No search terms data available for this time period.'));
-        console.log(chalk.gray('This could mean:'));
-        console.log(chalk.gray('  - Video hasn\'t received traffic from YouTube search'));
-        console.log(chalk.gray('  - Analytics data not yet available (48-hour delay)'));
+    switch (outputFormat) {
+      case 'json':
+        console.log(formatJson({
+          videoId: parsedId,
+          title,
+          dateRange: { startDate, endDate },
+          columnHeaders: analyticsResponse.data.columnHeaders,
+          rows: analyticsResponse.data.rows,
+        }));
+        break;
+
+      case 'table':
+        console.log(formatTable(searchTermsData));
+        break;
+
+      case 'text':
+        searchTermsData.forEach(item => {
+          console.log([item.rank, item.searchTerm, item.views].join('\t'));
+        });
+        break;
+
+      case 'csv':
+        // Use convertToCSV for consistency with analytics commands
+        if (analyticsResponse.data.columnHeaders && analyticsResponse.data.rows) {
+          console.log(convertToCSV(analyticsResponse.data.columnHeaders, analyticsResponse.data.rows));
+        } else {
+          console.log(formatCsv(searchTermsData));
+        }
+        break;
+
+      case 'pretty':
+      default:
+        console.log(chalk.bold.cyan(title));
+        console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
+        console.log(chalk.gray('Date Range: ') + `${startDate} to ${endDate}`);
         console.log('');
-        return;
-      }
 
-      console.log(chalk.bold(`Top Search Terms (${analyticsResponse.data.rows.length}):`));
-      console.log('');
+        if (rows.length === 0) {
+          console.log(chalk.yellow('No search terms data available for this time period.'));
+          console.log(chalk.gray('This could mean:'));
+          console.log(chalk.gray('  - Video hasn\'t received traffic from YouTube search'));
+          console.log(chalk.gray('  - Analytics data not yet available (48-hour delay)'));
+          console.log('');
+          return;
+        }
 
-      const rows = analyticsResponse.data.rows;
-      let totalViews = 0;
+        console.log(chalk.bold(`Top Search Terms (${rows.length}):`));
+        console.log('');
 
-      rows.forEach((row, index) => {
-        const searchTerm = row[0] as string;
-        const views = row[1] as number;
-        totalViews += views;
+        let totalViews = 0;
 
-        console.log(chalk.gray(`  ${index + 1}.`) + ` ${searchTerm}`);
-        console.log(chalk.gray('      ') + chalk.cyan(`${formatNumber(views)} views`));
-      });
+        rows.forEach((row, index) => {
+          const searchTerm = row[0] as string;
+          const views = row[1] as number;
+          totalViews += views;
 
-      console.log('');
-      console.log(chalk.bold('Total views from search: ') + chalk.cyan(formatNumber(totalViews)));
-      console.log('');
+          console.log(chalk.gray(`  ${index + 1}.`) + ` ${searchTerm}`);
+          console.log(chalk.gray('      ') + chalk.cyan(`${formatNumber(views)} views`));
+        });
+
+        console.log('');
+        console.log(chalk.bold('Total views from search: ') + chalk.cyan(formatNumber(totalViews)));
+        console.log('');
+        break;
     }
   } catch (err) {
     spinner.fail('Failed to fetch search terms');

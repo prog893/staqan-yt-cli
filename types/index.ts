@@ -62,7 +62,7 @@ export interface VerboseOption {
   verbose?: boolean;
 }
 
-export type OutputFormat = 'json' | 'table' | 'text' | 'pretty';
+export type OutputFormat = 'json' | 'table' | 'text' | 'pretty' | 'csv';
 
 export interface OutputOption {
   output?: OutputFormat;
@@ -105,21 +105,15 @@ export interface AnalyticsOptions extends OutputOption, VerboseOption {
   startDate?: string;
   endDate?: string;
   metrics?: string;
-  csv?: boolean;
 }
 
 export interface SearchTermsOptions extends OutputOption, VerboseOption {
   limit?: string;
-  csv?: boolean;
 }
 
-export interface TrafficSourcesOptions extends OutputOption, VerboseOption {
-  csv?: boolean;
-}
+export interface TrafficSourcesOptions extends OutputOption, VerboseOption {}
 
-export interface RetentionOptions extends OutputOption, VerboseOption {
-  csv?: boolean;
-}
+export interface RetentionOptions extends OutputOption, VerboseOption {}
 
 // Tags command options
 export interface GetTagsOptions extends OutputOption, VerboseOption {}
