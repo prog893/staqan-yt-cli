@@ -21,6 +21,7 @@ import getVideoRetention = require('../commands/get-video-retention');
 import getVideoTags = require('../commands/get-video-tags');
 import updateVideoTags = require('../commands/update-video-tags');
 import getThumbnail = require('../commands/get-thumbnail');
+import mcpCommand = require('../commands/mcp');
 
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
 let version = '1.1.1'; // Fallback version for compiled binaries
@@ -202,6 +203,12 @@ program
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getThumbnail);
+
+// MCP server command
+program
+  .command('mcp')
+  .description('Start MCP server for AI assistant integration')
+  .action(mcpCommand);
 
 // Show help if no command provided
 if (!process.argv.slice(2).length) {

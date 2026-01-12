@@ -114,6 +114,107 @@ This will:
 2. Save the authentication token to `~/.staqan-yt-cli/token.json`
 3. Allow you to use all CLI commands
 
+## MCP Server Integration
+
+The CLI includes an MCP (Model Context Protocol) server that enables AI assistants like Claude Desktop to manage your YouTube videos through natural language.
+
+### What is MCP?
+
+MCP is a protocol that allows AI assistants to access external tools and data sources. With staqan-yt's MCP server, you can ask Claude to perform YouTube operations directly from the chat interface.
+
+### Setup for Claude Desktop
+
+1. **Authenticate with YouTube** (one-time setup):
+   ```bash
+   staqan-yt auth
+   ```
+
+2. **Configure Claude Desktop** by editing your config file:
+
+   **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+   **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+   **Linux:** `~/.config/Claude/claude_desktop_config.json`
+
+3. **Add staqan-yt MCP server:**
+   ```json
+   {
+     "mcpServers": {
+       "youtube": {
+         "command": "staqan-yt",
+         "args": ["mcp"]
+       }
+     }
+   }
+   ```
+
+4. **Restart Claude Desktop**
+
+### Available MCP Tools
+
+The MCP server exposes **15 operations** covering all CLI functionality:
+
+**Video Metadata:**
+- `youtube_get_video` - Get detailed metadata for one or more videos
+- `youtube_list_videos` - List videos from a YouTube channel
+- `youtube_search_videos` - Search for videos within a channel
+- `youtube_update_video` - Update video title and/or description
+
+**Localizations:**
+- `youtube_get_localization` - Get specific language localization
+- `youtube_get_all_localizations` - Get all available localizations
+- `youtube_create_localization` - Create new localization for a language
+- `youtube_update_localization` - Update existing localization
+
+**Analytics:**
+- `youtube_get_video_analytics` - Get performance metrics (views, watch time, CTR, etc.)
+- `youtube_get_search_terms` - Get YouTube search terms that led to video
+- `youtube_get_traffic_sources` - Get traffic source breakdown
+- `youtube_get_video_retention` - Get audience retention curve
+
+**Tags & Thumbnails:**
+- `youtube_get_video_tags` - Get video tags
+- `youtube_update_video_tags` - Update tags (add, remove, replace)
+- `youtube_get_thumbnail` - Get thumbnail URLs in all qualities
+
+### Example Usage with Claude
+
+Once configured, you can use natural language in Claude Desktop:
+
+```
+You: "Get information about video dQw4w9WgXcQ"
+Claude: [Uses youtube_get_video tool and shows results]
+
+You: "List the 10 most recent videos from @mkbhd"
+Claude: [Uses youtube_list_videos tool]
+
+You: "Update the title of video abc123xyz to 'My New Title'"
+Claude: [Uses youtube_update_video tool]
+
+You: "Search for videos about 'iPhone' in @mkbhd's channel"
+Claude: [Uses youtube_search_videos tool]
+```
+
+### Benefits of MCP Integration
+
+- **Natural language interface** - No need to remember command syntax
+- **Batch operations** - Process multiple videos in one conversation
+- **Context awareness** - Claude remembers previous results in the conversation
+- **AI-powered workflows** - Combine YouTube operations with other tasks
+- **Error handling** - Claude can interpret errors and suggest fixes
+
+### Manual MCP Server Testing
+
+You can test the MCP server manually using stdio:
+
+```bash
+# List available tools
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | staqan-yt mcp
+
+# The server returns JSON-RPC responses with tool definitions
+```
+
 ## Usage
 
 ### General Syntax

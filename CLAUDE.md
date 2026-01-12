@@ -20,17 +20,20 @@ A command-line interface for managing YouTube videos and metadata using the YouT
 
    Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
    ```
-5. **Push to GitHub**:
+5. **Release new patch version** (see Release Process section below):
+   - Bump version in package.json and Formula/staqan-yt.rb
+   - Commit, tag, and push
+6. **Push to GitHub**:
    ```bash
-   git push
+   git push && git push --tags
    ```
-6. **Verify clean state**:
+7. **Verify clean state**:
    ```bash
    git status  # Should show "working tree clean"
    ```
-7. **Return to parent** only after everything is committed and pushed
+8. **Return to parent** only after everything is committed, released, and pushed
 
-**Do NOT return from subagent execution with uncommitted changes.**
+**Do NOT return from subagent execution with uncommitted changes or without releasing a new version.**
 
 ## Architecture Principles
 
@@ -633,6 +636,64 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - [ ] Update QUICK_START.md if changing common workflows
 - [ ] Follow AWS naming conventions
 - [ ] Ensure credentials never committed
+
+### Release Process
+
+**This project does NOT use GitHub releases.** All releases are managed through version bumps, git tags, and Homebrew formula updates.
+
+**IMPORTANT: After completing a task in a session, always release a new patch version before ending the session.**
+
+**Release workflow:**
+
+1. **Bump versions in ONE commit:**
+   - Update `package.json` version
+   - Update Homebrew formula version (`Formula/staqan-yt.rb`)
+   - Commit both changes together:
+     ```bash
+     # Edit package.json and Formula/staqan-yt.rb
+     git add package.json Formula/staqan-yt.rb
+     git commit -m "Bump version to X.Y.Z
+
+     🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+     Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+     ```
+
+2. **Create git tag:**
+   ```bash
+   git tag vX.Y.Z
+   ```
+
+3. **Push commits and tags:**
+   ```bash
+   git push && git push --tags
+   ```
+
+**Semantic versioning rules (X.Y.Z):**
+
+- **Z (patch)** - Bump for normal releases:
+  - Bug fixes
+  - Minor improvements
+  - Documentation updates
+  - Non-breaking changes
+
+- **Y (minor)** - Bump only if changes are significant:
+  - New commands added
+  - New features
+  - Significant refactoring
+  - Breaking changes to non-public APIs
+
+- **X (major)** - NEVER bump unless explicitly instructed:
+  - Reserved for major breaking changes
+  - Requires explicit approval
+  - Should be extremely rare
+
+**Default behavior:** Always bump Z (patch) unless told otherwise.
+
+**Example releases:**
+- `1.2.3` → `1.2.4` - Bug fix, documentation update
+- `1.2.4` → `1.3.0` - Added new `list-playlists` command
+- `1.3.0` → `2.0.0` - Only if explicitly instructed for major breaking change
 
 ## Common Pitfalls
 
