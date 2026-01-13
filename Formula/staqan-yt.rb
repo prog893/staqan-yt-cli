@@ -1,7 +1,7 @@
 class StaqanYt < Formula
   desc "CLI tool for managing YouTube videos and metadata using the YouTube Data API v3"
   homepage "https://github.com/prog893/staqan-yt-cli"
-  version "1.3.0"
+  version "1.3.1"
   license "MIT"
 
   # Source-based installation from GitHub repo
@@ -9,21 +9,21 @@ class StaqanYt < Formula
   url "https://github.com/prog893/staqan-yt-cli.git",
       tag:      "v#{version}"
 
-  def install
-    # Get the real user's home directory (Homebrew sanitizes ENV["HOME"])
-    real_home = "/Users/#{ENV.fetch("USER", "")}"
-    bun_path = "#{real_home}/.bun/bin/bun"
+  # Require bun from the official Homebrew tap
+  depends_on "oven-sh/bun/bun"
 
-    odie "Bun is required at #{bun_path}. Install from https://bun.sh" unless File.exist?(bun_path)
+  def install
+    # Use bun from Homebrew
+    bun = Formula["bun"].opt_bin/"bun"
 
     # Install dependencies
-    system bun_path, "install"
+    system bun, "install"
 
     # Build the binary using Bun's compile feature
     if Hardware::CPU.arm?
-      system bun_path, "build", "./bin/staqan-yt.ts", "--compile", "--target=bun-darwin-arm64", "--outfile", "staqan-yt"
+      system bun, "build", "./bin/staqan-yt.ts", "--compile", "--target=bun-darwin-arm64", "--outfile", "staqan-yt"
     else
-      system bun_path, "build", "./bin/staqan-yt.ts", "--compile", "--target=bun-darwin-x64", "--outfile", "staqan-yt"
+      system bun, "build", "./bin/staqan-yt.ts", "--compile", "--target=bun-darwin-x64", "--outfile", "staqan-yt"
     end
 
     # Install the compiled binary
