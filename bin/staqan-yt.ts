@@ -24,7 +24,7 @@ import getThumbnail = require('../commands/get-thumbnail');
 import mcpCommand = require('../commands/mcp');
 
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
-let version = '1.3.1'; // Fallback version for compiled binaries
+let version = '1.3.2'; // Fallback version for compiled binaries
 try {
   const packageJson = require(path.join(__dirname, '../../package.json'));
   version = packageJson.version;
