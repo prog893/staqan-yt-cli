@@ -21,8 +21,8 @@ A command-line interface for managing YouTube videos and metadata using the YouT
    Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
    ```
 5. **Release new patch version** (see Release Process section below):
-   - Bump version in package.json and Formula/staqan-yt.rb
-   - Commit, tag, and push
+   - Run `npm version patch` (automatically syncs version everywhere)
+   - Push with tags
 6. **Push to GitHub**:
    ```bash
    git push && git push --tags
@@ -643,31 +643,46 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 
 **IMPORTANT: After completing a task in a session, always release a new patch version before ending the session.**
 
+**Single source of truth:** `package.json` is the source of truth for versioning. All other files are automatically synced from it.
+
 **Release workflow:**
 
-1. **Bump versions in ONE commit:**
-   - Update `package.json` version
-   - Update Homebrew formula version (`Formula/staqan-yt.rb`)
-   - Commit both changes together:
-     ```bash
-     # Edit package.json and Formula/staqan-yt.rb
-     git add package.json Formula/staqan-yt.rb
-     git commit -m "Bump version to X.Y.Z
+**Option 1: Using npm version (recommended):**
+```bash
+# Automatically bumps version, syncs all files, creates commit & tag
+npm version patch   # For bug fixes and minor changes (X.Y.Z -> X.Y.Z+1)
+npm version minor   # For new features (X.Y.Z -> X.Y+1.0)
+npm version major   # For breaking changes (X.Y.Z -> X+1.0.0) - rarely used
 
-     🤖 Generated with [Claude Code](https://claude.com/claude-code)
+# Push to GitHub
+git push && git push --tags
+```
 
-     Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
-     ```
+**Option 2: Manual version bump:**
+```bash
+# 1. Edit package.json version manually
+# 2. Sync version to other files
+npm run sync-version
 
-2. **Create git tag:**
-   ```bash
-   git tag vX.Y.Z
-   ```
+# 3. Commit changes
+git add -A
+git commit -m "Bump version to X.Y.Z
 
-3. **Push commits and tags:**
-   ```bash
-   git push && git push --tags
-   ```
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+
+# 4. Create git tag
+git tag vX.Y.Z
+
+# 5. Push to GitHub
+git push && git push --tags
+```
+
+**What gets synced automatically:**
+- `package.json` - Source of truth
+- `bin/staqan-yt.ts` - Fallback version for compiled binary
+- `Formula/staqan-yt.rb` - Homebrew formula version
 
 **Semantic versioning rules (X.Y.Z):**
 
