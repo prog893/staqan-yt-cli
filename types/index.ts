@@ -7,6 +7,30 @@ import { youtube_v3 } from 'googleapis';
 // Video type enum
 export type VideoType = 'short' | 'regular';
 
+// Playlist-related types
+export interface PlaylistInfo {
+  id: string;
+  title: string;
+  description: string;
+  channelId: string;
+  channelTitle: string;
+  publishedAt: string;
+  itemCount: number;
+  privacyStatus: string;
+  thumbnails: youtube_v3.Schema$ThumbnailDetails;
+}
+
+export interface PlaylistListItem {
+  id: string;
+  title: string;
+  description: string;
+  channelId: string;
+  channelTitle: string;
+  publishedAt: string;
+  itemCount: number;
+  privacyStatus: string;
+}
+
 // Video-related types
 export interface VideoInfo {
   id: string;
