@@ -1,7 +1,7 @@
 import ora from 'ora';
 import chalk from 'chalk';
 import { getPlaylistInfo } from '../lib/youtube';
-import { formatDate, formatNumber, error, setVerbose, debug } from '../lib/utils';
+import { formatDate, formatNumber, error, setVerbose, debug, parsePlaylistId } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { OutputOption, VerboseOption } from '../types';
@@ -16,8 +16,9 @@ async function getPlaylistCommand(playlistId: string, options: OutputOption & Ve
   const spinner = ora('Fetching playlist information...').start();
 
   try {
-    debug(`Fetching playlist: ${playlistId}`);
-    const playlist = await getPlaylistInfo(playlistId);
+    const parsedId = parsePlaylistId(playlistId);
+    debug(`Fetching playlist: ${parsedId} (parsed from: ${playlistId})`);
+    const playlist = await getPlaylistInfo(parsedId);
 
     spinner.succeed(`Retrieved playlist: ${playlist.title}`);
     console.log('');

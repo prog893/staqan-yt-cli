@@ -553,23 +553,6 @@ async function updateVideoLocalization(videoId: string, language: string, title:
   }
 }
 
-export {
-  getYouTubeClient,
-  getChannelId,
-  getChannelVideos,
-  getVideoInfo,
-  updateVideoMetadata,
-  searchChannelVideos,
-  getVideoWithLocalizations,
-  getVideoLocalization,
-  getAllVideoLocalizations,
-  putVideoLocalization,
-  updateVideoLocalization,
-  getPlaylistInfo,
-  getPlaylistsById,
-  listChannelPlaylists,
-};
-
 /**
  * Get detailed playlist information
  * @param playlistId - YouTube playlist ID
@@ -688,3 +671,20 @@ async function listChannelPlaylists(channelHandle: string, maxResults = 50): Pro
   debug(`Total playlists retrieved: ${playlists.length}`);
   return playlists;
 }
+
+export {
+  getYouTubeClient,
+  getChannelId,
+  getChannelVideos,
+  getVideoInfo,
+  updateVideoMetadata,
+  searchChannelVideos,
+  getVideoWithLocalizations,
+  getVideoLocalization,
+  getAllVideoLocalizations,
+  putVideoLocalization,
+  updateVideoLocalization,
+  getPlaylistInfo,
+  getPlaylistsById,
+  listChannelPlaylists,
+};

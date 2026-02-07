@@ -77,6 +77,32 @@ function parseVideoId(input: string): string {
 }
 
 /**
+ * Extract playlist ID from various input formats
+ */
+function parsePlaylistId(input: string): string {
+  // Playlist IDs are longer and typically start with PL
+  // If it looks like a raw playlist ID (no slashes or question marks), return as-is
+  if (!input.includes('/') && !input.includes('?')) {
+    return input;
+  }
+
+  // Extract from URL
+  const patterns = [
+    /(?:[?&]list=)([^&]+)/,
+    /youtube\.com\/playlist\?list=([^&\?\/]+)/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = input.match(pattern);
+    if (match) {
+      return match[1];
+    }
+  }
+
+  return input;
+}
+
+/**
  * Format date for display
  */
 function formatDate(dateString: string): string {
@@ -302,6 +328,7 @@ export {
   ensureConfigDir,
   parseChannelHandle,
   parseVideoId,
+  parsePlaylistId,
   formatDate,
   formatNumber,
   parseDuration,
