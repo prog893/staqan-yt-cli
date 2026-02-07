@@ -1,7 +1,7 @@
 import { google, youtube_v3 } from 'googleapis';
 import { getAuthenticatedClient } from './auth';
 import { normalizeLanguage, getLanguageName } from './language';
-import { VideoInfo, VideoListItem, VideoLocalization, VideoType, PlaylistInfo, PlaylistListItem } from '../types';
+import { VideoInfo, VideoListItem, VideoLocalization, VideoType, PlaylistInfo, PlaylistListItem, CommentInfo } from '../types';
 import { debug } from './utils';
 
 /**
@@ -672,6 +672,61 @@ async function listChannelPlaylists(channelHandle: string, maxResults = 50): Pro
   return playlists;
 }
 
+/**
+ * List comments for a video
+ * @param videoId - YouTube video ID
+ * @param maxResults - Maximum number of comments to return
+ * @param order - Sort order: 'relevance' (top) or 'time' (newest first)
+ * @returns Array of comment info
+ */
+async function listVideoComments(videoId: string, maxResults = 20, order: 'relevance' | 'time' = 'relevance'): Promise<CommentInfo[]> {
+  debug(`Listing comments for video: ${videoId}, maxResults: ${maxResults}, order: ${order}`);
+  const youtube = await getYouTubeClient();
+
+  const comments: CommentInfo[] = [];
+  let nextPageToken: string | undefined = undefined;
+
+  do {
+    debug(`Fetching comment thread page with token: ${nextPageToken || 'none'}`);
+    const response: youtube_v3.Schema$CommentThreadListResponse = (await youtube.commentThreads.list({
+      part: ['snippet'],
+      videoId,
+      maxResults: Math.min(100, maxResults - comments.length),
+      order,
+      pageToken: nextPageToken,
+    })).data;
+
+    const items = response.items || [];
+    debug(`Retrieved ${items.length} comment thread(s) from API`);
+
+    // Extract top-level comments from threads
+    comments.push(...items.map((item: youtube_v3.Schema$CommentThread) => {
+      const topLevelComment = item.snippet!.topLevelComment!;
+      const snippet = topLevelComment.snippet!;
+
+      return {
+        id: topLevelComment.id!,
+        videoId: snippet.videoId!,
+        authorName: snippet.authorDisplayName!,
+        authorChannelId: snippet.authorChannelId!.value!,
+        textDisplay: snippet.textDisplay || '',
+        textOriginal: snippet.textOriginal || '',
+        likeCount: snippet.likeCount || 0,
+        replyCount: item.snippet!.totalReplyCount || 0,
+        isReply: false,
+        parentId: null,
+        publishedAt: snippet.publishedAt!,
+        updatedAt: snippet.updatedAt!,
+      };
+    }));
+
+    nextPageToken = response.nextPageToken || undefined;
+  } while (nextPageToken && comments.length < maxResults);
+
+  debug(`Total comments retrieved: ${comments.length}`);
+  return comments;
+}
+
 export {
   getYouTubeClient,
   getChannelId,
@@ -687,4 +742,5 @@ export {
   getPlaylistInfo,
   getPlaylistsById,
   listChannelPlaylists,
+  listVideoComments,
 };
