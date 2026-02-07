@@ -12,6 +12,7 @@ A powerful command-line interface for managing YouTube videos and metadata using
 - **Metadata Updates** - Update video titles and descriptions
 - **Video Localizations** - Manage multilingual titles and descriptions (English, Japanese, Russian)
 - **Channel Search** - Search for specific videos within a channel
+- **Playlist Management** - List and retrieve YouTube playlists
 - **Analytics & SEO** - Performance metrics, search terms, traffic sources, and CTR analysis
 - **Tags Management** - View and update video tags for better discoverability
 - **Thumbnail Access** - Retrieve video thumbnail URLs in all available qualities
@@ -255,6 +256,24 @@ staqan-yt search-videos @channelname "keyword" --output json
 Update a single video's metadata:
 ```bash
 staqan-yt update-video dQw4w9WgXcQ --title "New Title" --description "New Desc" --dry-run
+```
+
+#### get-playlist (singular)
+Get metadata for a single playlist:
+```bash
+staqan-yt get-playlist PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO- --output json
+```
+
+#### get-playlists (plural - batch operation)
+Get metadata for multiple playlists:
+```bash
+staqan-yt get-playlists PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO- PLjkl012MNOP345 --output json
+```
+
+#### list-playlists
+List all playlists from a channel:
+```bash
+staqan-yt list-playlists @channelname --limit 50 --output json
 ```
 
 ---
@@ -911,7 +930,171 @@ Available Thumbnails:
 
 ---
 
-#### 13. Get Video Analytics
+#### 13. Get Playlist (singular)
+
+```bash
+staqan-yt get-playlist <playlistId> [options]
+```
+
+Get detailed metadata for a single playlist.
+
+**Arguments:**
+- `playlistId` - Playlist ID or URL
+
+**Options:**
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
+- `-v, --verbose` - Enable verbose logging
+
+**Examples:**
+
+```bash
+# Get playlist details
+staqan-yt get-playlist PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO-
+
+# Using playlist URL
+staqan-yt get-playlist https://www.youtube.com/playlist?list=PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO-
+
+# JSON output
+staqan-yt get-playlist PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO- --output json
+```
+
+**Sample Output:**
+```
+✓ Retrieved playlist: My Awesome Playlist
+
+My Awesome Playlist
+
+Playlist ID:   PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO-
+Channel:       STAQAN (@staqan)
+Videos:        42
+Privacy:       public
+Published:     Jan 15, 2024
+
+Description:
+  A collection of my favorite videos about craft beer and brewing...
+
+URL:           https://youtube.com/playlist?list=PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO-
+```
+
+---
+
+#### 14. Get Playlists (plural - batch operation)
+
+```bash
+staqan-yt get-playlists <playlistIds...> [options]
+```
+
+Get detailed metadata for multiple playlists at once.
+
+**Arguments:**
+- `playlistIds` - One or more playlist IDs or URLs
+
+**Options:**
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
+- `-v, --verbose` - Enable verbose logging
+
+**Examples:**
+
+```bash
+# Get multiple playlists
+staqan-yt get-playlists PLabc123 PLdef456 PLghi789
+
+# Using URLs
+staqan-yt get-playlists \
+  https://www.youtube.com/playlist?list=PLabc123 \
+  https://www.youtube.com/playlist?list=PLdef456
+
+# JSON output
+staqan-yt get-playlists PLabc123 PLdef456 --output json
+```
+
+**Sample Output:**
+```
+✓ Retrieved information for 2 playlist(s)
+
+[1] My Awesome Playlist
+
+Playlist ID:   PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO-
+Channel:       STAQAN (@staqan)
+Videos:        42
+Privacy:       public
+Published:     Jan 15, 2024
+
+URL:           https://youtube.com/playlist?list=PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO-
+
+────────────────────────────────────────────────────────────────────────────────
+
+[2] Another Great Playlist
+
+Playlist ID:   PLjkl012MNOP345
+Channel:       STAQAN (@staqan)
+Videos:        15
+Privacy:       public
+Published:     Dec 20, 2023
+
+URL:           https://youtube.com/playlist?list=PLjkl012MNOP345
+```
+
+---
+
+#### 15. List Playlists
+
+```bash
+staqan-yt list-playlists [channelHandle] [options]
+```
+
+List all playlists from a YouTube channel.
+
+**Arguments:**
+- `channelHandle` - (Optional) Channel @handle, username, or URL. Uses `default.channel` from config if not provided.
+
+**Options:**
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
+- `-l, --limit <number>` - Limit number of results (default: 50)
+- `-v, --verbose` - Enable verbose logging
+
+**Examples:**
+
+```bash
+# List playlists for a channel
+staqan-yt list-playlists @mkbhd
+
+# Using default channel from config
+staqan-yt list-playlists
+
+# Limit results
+staqan-yt list-playlists @mkbhd --limit 10
+
+# JSON output
+staqan-yt list-playlists @mkbhd --output json
+```
+
+**Sample Output:**
+```
+✓ Found 5 playlist(s)
+
+[1] MKBHD Videos
+  ID: PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO-
+  Videos: 500
+  Published: Jan 15, 2024
+  URL: https://youtube.com/playlist?list=PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO-
+
+[2] MKBHD Shorts
+  ID: PLjkl012MNOP345
+  Videos: 150
+  Published: Dec 20, 2023
+  URL: https://youtube.com/playlist?list=PLjkl012MNOP345
+
+[3] MKBHD Reviews [Private]
+  ID: PLghi789xyz012
+  Videos: 25
+  Published: Nov 10, 2023
+  URL: https://youtube.com/playlist?list=PLghi789xyz012
+```
+
+---
+
+#### 16. Get Video Analytics
 
 ```bash
 staqan-yt get-video-analytics <videoId> [options]
