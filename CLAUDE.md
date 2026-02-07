@@ -615,6 +615,37 @@ staqan-yt --help
 
 ## Git Workflow
 
+### Branch Strategy
+
+**CRITICAL: NEVER commit directly to main.** Always use feature branches.
+
+**Branch naming convention:**
+- `feature/feature-name` - New features
+- `fix/bug-name` - Bug fixes
+- `refactor/name` - Code refactoring
+
+**Workflow:**
+```bash
+# 1. Create a feature branch
+git checkout -b feature/your-feature-name
+
+# 2. Make changes and commit
+git add -A
+git commit -m "Description"
+
+# 3. Push feature branch
+git push -u origin feature/your-feature-name
+
+# 4. Create PR via GitHub or gh CLI
+gh pr create --title "Feature: Your Feature" --body "Description"
+
+# 5. After PR merge, delete the branch
+git branch -d feature/your-feature-name
+```
+
+**Protecting main branch:**
+Consider enabling branch protection rules on GitHub to prevent direct commits to main.
+
 ### Commit Message Format
 
 Follow the established pattern:

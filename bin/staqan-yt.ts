@@ -22,6 +22,9 @@ import getVideoTags = require('../commands/get-video-tags');
 import updateVideoTags = require('../commands/update-video-tags');
 import getThumbnail = require('../commands/get-thumbnail');
 import mcpCommand = require('../commands/mcp');
+import getPlaylistCommand = require('../commands/get-playlist');
+import getPlaylistsCommand = require('../commands/get-playlists');
+import listPlaylistsCommand = require('../commands/list-playlists');
 
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
 let version = '1.3.3'; // Fallback version for compiled binaries
@@ -209,6 +212,32 @@ program
   .command('mcp')
   .description('Start MCP server for AI assistant integration')
   .action(mcpCommand);
+
+// Playlist commands
+// Get single playlist command (singular)
+program
+  .command('get-playlist <playlistId>')
+  .description('Get detailed metadata for a single playlist')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(getPlaylistCommand);
+
+// Get multiple playlists command (plural - batch operation)
+program
+  .command('get-playlists <playlistIds...>')
+  .description('Get detailed metadata for multiple playlists')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(getPlaylistsCommand);
+
+// List playlists command (plural - list collection)
+program
+  .command('list-playlists [channelHandle]')
+  .description('List all playlists from a YouTube channel')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
+  .option('-l, --limit <number>', 'Limit number of results', '50')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(listPlaylistsCommand);
 
 // Show help if no command provided
 if (!process.argv.slice(2).length) {

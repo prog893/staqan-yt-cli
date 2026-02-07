@@ -1,7 +1,7 @@
 import { google, youtube_v3 } from 'googleapis';
 import { getAuthenticatedClient } from './auth';
 import { normalizeLanguage, getLanguageName } from './language';
-import { VideoInfo, VideoListItem, VideoLocalization, VideoType } from '../types';
+import { VideoInfo, VideoListItem, VideoLocalization, VideoType, PlaylistInfo, PlaylistListItem } from '../types';
 import { debug } from './utils';
 
 /**
@@ -565,4 +565,126 @@ export {
   getAllVideoLocalizations,
   putVideoLocalization,
   updateVideoLocalization,
+  getPlaylistInfo,
+  getPlaylistsById,
+  listChannelPlaylists,
 };
+
+/**
+ * Get detailed playlist information
+ * @param playlistId - YouTube playlist ID
+ * @returns Playlist details with full metadata
+ */
+async function getPlaylistInfo(playlistId: string): Promise<PlaylistInfo> {
+  debug(`Fetching playlist info for: ${playlistId}`);
+  const youtube = await getYouTubeClient();
+
+  const response = await youtube.playlists.list({
+    part: ['snippet', 'contentDetails', 'status'],
+    id: [playlistId],
+  });
+
+  if (!response.data.items || response.data.items.length === 0) {
+    throw new Error(`Playlist not found: ${playlistId}`);
+  }
+
+  const item = response.data.items[0];
+  debug(`Retrieved playlist: ${item.snippet?.title}`);
+
+  return {
+    id: item.id!,
+    title: item.snippet!.title!,
+    description: item.snippet!.description!,
+    channelId: item.snippet!.channelId!,
+    channelTitle: item.snippet!.channelTitle!,
+    publishedAt: item.snippet!.publishedAt!,
+    itemCount: item.contentDetails!.itemCount || 0,
+    privacyStatus: item.status!.privacyStatus!,
+    thumbnails: item.snippet!.thumbnails!,
+  };
+}
+
+/**
+ * Get multiple playlists by ID (batch operation)
+ * @param playlistIds - Array of YouTube playlist IDs
+ * @returns Array of playlist details
+ */
+async function getPlaylistsById(playlistIds: string[]): Promise<PlaylistInfo[]> {
+  debug(`Fetching info for ${playlistIds.length} playlist(s)`, playlistIds);
+  const youtube = await getYouTubeClient();
+
+  // YouTube API allows up to 50 IDs per request
+  const results: PlaylistInfo[] = [];
+  const batchSize = 50;
+
+  for (let i = 0; i < playlistIds.length; i += batchSize) {
+    const batch = playlistIds.slice(i, i + batchSize);
+    debug(`Fetching batch ${Math.floor(i / batchSize) + 1}: ${batch.join(', ')}`);
+
+    const response = await youtube.playlists.list({
+      part: ['snippet', 'contentDetails', 'status'],
+      id: batch,
+    });
+
+    const items = response.data.items || [];
+    debug(`Retrieved ${items.length} playlist(s) from API`);
+
+    results.push(...items.map((item: youtube_v3.Schema$Playlist) => ({
+      id: item.id!,
+      title: item.snippet!.title!,
+      description: item.snippet!.description!,
+      channelId: item.snippet!.channelId!,
+      channelTitle: item.snippet!.channelTitle!,
+      publishedAt: item.snippet!.publishedAt!,
+      itemCount: item.contentDetails!.itemCount || 0,
+      privacyStatus: item.status!.privacyStatus!,
+      thumbnails: item.snippet!.thumbnails!,
+    })));
+  }
+
+  return results;
+}
+
+/**
+ * List all playlists for a channel
+ * @param channelHandle - Channel handle or ID
+ * @param maxResults - Maximum number of playlists to return
+ * @returns Array of playlist list items (lighter weight than full info)
+ */
+async function listChannelPlaylists(channelHandle: string, maxResults = 50): Promise<PlaylistListItem[]> {
+  debug(`Listing playlists for channel: ${channelHandle}, maxResults: ${maxResults}`);
+  const youtube = await getYouTubeClient();
+  const channelId = await getChannelId(channelHandle);
+
+  const playlists: PlaylistListItem[] = [];
+  let nextPageToken: string | undefined = undefined;
+
+  do {
+    debug(`Fetching page with token: ${nextPageToken || 'none'}`);
+    const playlistResponse: youtube_v3.Schema$PlaylistListResponse = (await youtube.playlists.list({
+      part: ['snippet', 'contentDetails', 'status'],
+      channelId,
+      maxResults: Math.min(50, maxResults - playlists.length),
+      pageToken: nextPageToken,
+    })).data;
+
+    const items = playlistResponse.items || [];
+    debug(`Retrieved ${items.length} playlist(s) from API`);
+
+    playlists.push(...items.map((item: youtube_v3.Schema$Playlist) => ({
+      id: item.id!,
+      title: item.snippet!.title!,
+      description: item.snippet!.description!,
+      channelId: item.snippet!.channelId!,
+      channelTitle: item.snippet!.channelTitle!,
+      publishedAt: item.snippet!.publishedAt!,
+      itemCount: item.contentDetails!.itemCount || 0,
+      privacyStatus: item.status!.privacyStatus!,
+    })));
+
+    nextPageToken = playlistResponse.nextPageToken || undefined;
+  } while (nextPageToken && playlists.length < maxResults);
+
+  debug(`Total playlists retrieved: ${playlists.length}`);
+  return playlists;
+}
