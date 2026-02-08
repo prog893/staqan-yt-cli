@@ -48,7 +48,7 @@ export async function loadConfig(): Promise<Config> {
         ...config.default,
       },
     };
-  } catch (err) {
+  } catch {
     // File doesn't exist or is invalid - return defaults
     return { ...DEFAULT_CONFIG };
   }

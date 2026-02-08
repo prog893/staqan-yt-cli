@@ -32,7 +32,7 @@ let version = '1.3.6'; // Fallback version for compiled binaries
 try {
   const packageJson = require(path.join(__dirname, '../../package.json'));
   version = packageJson.version;
-} catch (err) {
+} catch {
   // Running as compiled binary - use hardcoded version
 }
 
