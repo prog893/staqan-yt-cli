@@ -871,6 +871,148 @@ If YouTube API changes:
 3. Update documentation
 4. Increment major version
 
+## Dependabot Vulnerability Management
+
+This project uses GitHub Dependabot for automated dependency vulnerability tracking. When Dependabot detects vulnerabilities, they appear as alerts on the repository.
+
+### Checking for Vulnerabilities
+
+**Use GitHub CLI to fetch Dependabot alerts:**
+```bash
+# List all open Dependabot alerts
+gh api '/repos/OWNER/REPO/dependabot/alerts?state=open'
+
+# Get formatted summary
+gh api '/repos/prog893/staqan-yt-cli/dependabot/alerts?state=open' \
+  --jq '.[] | "\(.security_vulnerability.severity) - \(.dependency.package.name) (vulnerable: \(.security_vulnerability.vulnerable_version_range), patched: \(.security_vulnerability.first_patched_version.identifier))"'
+```
+
+**Git push provides vulnerability feedback:**
+When you push to GitHub, the remote will alert you if there are vulnerabilities:
+```
+remote: GitHub found 7 vulnerabilities on prog893/staqan-yt-cli's default branch (3 high, 4 moderate).
+remote: To find out more about visit: https://github.com/prog893/staqan-yt-cli/security/dependabot
+```
+
+This serves as an **automatic trigger** - if you see this message, you should address the vulnerabilities before continuing.
+
+**IMPORTANT:** The vulnerability count shown during push reflects the state **before** your push. Dependabot rescans after the push completes, so even after pushing a fix, you'll still see the old warning. Don't worry - the count will update on the next push once Dependabot rescans.
+
+### Vulnerability Fix Workflow
+
+**1. Assess the vulnerabilities**
+```bash
+# Fetch and review alerts
+gh api '/repos/prog893/staqan-yt-cli/dependabot/alerts?state=open' | jq .
+
+# Check dependency chain
+npm ls <vulnerable-package>
+```
+
+**2. Update dependencies**
+```bash
+# Update specific package
+npm update <package-name>
+
+# Or update all (use with caution)
+npm update
+```
+
+**3. Test thoroughly**
+```bash
+# Build the project
+npm run build
+
+# Test all non-destructive commands:
+# - Video operations: get-video, get-videos, get-thumbnail, get-video-tags
+# - Localizations: get-video-localizations, get-video-localization
+# - Comments: list-comments
+# - Playlists: list-playlists, get-playlist, get-playlists
+# - Config: config list/get/set
+# - MCP server: staqan-yt mcp (test with timeout)
+# - Output formats: test with --output json/table/text/csv/pretty
+```
+
+**4. Commit and release**
+```bash
+# Commit the fix
+git add package-lock.json
+git commit -m "Fix: Update <package> to address security vulnerabilities
+
+- Updated <package> from X.Y.Z to A.B.C
+- Fixes N Dependabot alerts (X HIGH, Y MEDIUM severity)
+- Resolves CVE-XXXX-XXXXX
+- All non-destructive CLI commands tested and working
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+
+# Bump patch version
+npm version patch
+
+# Push to GitHub
+git push && git push --tags
+```
+
+**5. Verify**
+After pushing, GitHub will rescan the repository asynchronously.
+- **Expected:** You may still see vulnerability warnings on this push (they reflect the pre-push state)
+- **Verification:** The Dependabot alerts page will update within a few minutes
+- **Confirmation:** Next time you push, the warning will be gone if the fix was successful
+
+### Vulnerability Severity Classification
+
+Based on the article [Dependabot alerts を 0 でキープしたい](https://zenn.dev/tsukulink/articles/c4a204897930a9):
+
+| Severity | Timeline | Examples |
+|----------|----------|----------|
+| **Critical** | Immediate | System can be stopped, personal data exposed |
+| **High** | This month | Limited attack conditions, non-critical impact |
+| **Moderate** | Within 6 months | Dev-only usage, vulnerable feature not used |
+| **None** | Skip | Not actually used |
+
+### Example: Real-World Fix
+
+**Issue:** 7 Dependabot alerts (3 HIGH, 4 MEDIUM)
+- `@modelcontextprotocol/sdk` - Cross-client data leak (HIGH)
+- `hono` - Multiple vulnerabilities (2 HIGH, 4 MEDIUM)
+
+**Root cause analysis:**
+```bash
+npm ls hono
+# staqan-yt-cli
+# └── @modelcontextprotocol/sdk@1.25.2
+#     └── @hono/node-server@1.19.8
+#         └── hono@4.11.3
+```
+
+**Solution:** Update the direct dependency
+```bash
+npm update @modelcontextprotocol/sdk
+# This automatically updates hono to 4.11.8 (patched version)
+```
+
+**Result:** All 7 alerts fixed with one update, tested comprehensively, released as v1.3.6.
+
+### Best Practices
+
+1. **Keep alerts at 0** - Stay sensitive to new security warnings
+2. **Check dependency chains** - Transitive dependencies often bring vulnerabilities
+3. **Test after updates** - Especially for functionality that uses vulnerable packages
+4. **Document legitimate usage** - If a package has vulnerabilities but you don't use the affected features, document why
+5. **Update quickly for HIGH/CRITICAL** - These can have real security impact
+6. **Plan updates for MODERATE** - These can be batched with other maintenance
+
+### Automating Vulnerability Detection
+
+Consider creating a GitHub Actions workflow (similar to the Zenn article) to:
+- Check Dependabot alerts daily
+- Post to Slack when new alerts appear
+- Create issues for unaddressed vulnerabilities
+
+Example reference: https://zenn.dev/tsukulink/articles/c4a204897930a9
+
 ## Support
 
 ### GitHub Issues
