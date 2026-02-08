@@ -25,7 +25,8 @@
     "bin/**/*",
     "lib/**/*",
     "commands/**/*",
-    "types/**/*"
+    "types/**/*",
+    "scripts/**/*"
   ],
   "exclude": [
     "node_modules",
