@@ -280,6 +280,40 @@ async function updateMetadataCommand(videoId: string, options: UpdateVideoOption
 }
 ```
 
+### Non-Null Assertion Usage
+
+**ESLint Rule:** `@typescript-eslint/no-non-null-assertion` is set to `'off'`
+
+**Rationale:**
+Non-null assertions (`!`) are used intentionally throughout the codebase, particularly in `lib/youtube.ts`, when working with YouTube API responses from the `googleapis` library.
+
+**Why this is safe:**
+1. **Explicit validation precedes all assertions**: Properties are validated before using `!`
+   - Example: `if (response.data.items && response.data.items.length > 0)` followed by `item.snippet!.title!`
+
+2. **YouTube API contract**: The YouTube Data API v3 guarantees certain properties exist when specific conditions are met
+   - Example: If `items` array has elements, each `item.snippet` is guaranteed to exist
+
+3. **googleapis type definitions**: The official TypeScript definitions use optional types extensively (`property?: type`), even for required fields
+
+4. **Readability**: Using `!` after validation is more concise than repeated null checks
+
+**Pattern to follow:**
+```typescript
+// Good: Validate first, then assert
+if (response.data.items && response.data.items.length > 0) {
+  const title = response.data.items[0].snippet!.title!;  // Safe!
+}
+
+// Bad: Assert without validation
+const title = response.data.items![0].snippet!.title!;  // Unsafe!
+```
+
+**When adding new code:**
+- Always validate before asserting
+- If you're unsure whether a property can be null, use optional chaining (`?.`) instead
+- Prefer explicit checks over assertions for user input or external data
+
 ## Adding New Commands
 
 ### Step 1: Choose the Correct Name

@@ -62,7 +62,14 @@ async function createOAuth2Client(): Promise<OAuth2Client> {
     throw new Error('Credentials not found. Please run the auth command first.');
   }
 
-  const { client_id, client_secret } = credentials.installed || credentials.web!;
+  // Google OAuth credentials have either 'installed' or 'web' at root level
+  const authConfig = credentials.installed || credentials.web;
+
+  if (!authConfig) {
+    throw new Error('Invalid credentials format. Expected "installed" or "web" properties.');
+  }
+
+  const { client_id, client_secret } = authConfig;
 
   return new google.auth.OAuth2(
     client_id,
