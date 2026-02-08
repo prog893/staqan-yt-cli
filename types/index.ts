@@ -212,6 +212,34 @@ export interface OAuth2Token {
   scope: string;
 }
 
+export interface ChannelInfo {
+  id: string;
+  title: string;
+  description: string;
+  customUrl: string | null;
+  handle: string | null;
+  publishedAt: string;
+  country: string | null;
+  statistics: {
+    viewCount: number;
+    subscriberCount: number;
+    videoCount: number;
+    hiddenSubscriberCount: boolean;
+  };
+  brandingSettings: {
+    channel: {
+      title: string;
+      description: string;
+      keywords: string;
+      featuredChannelsUrls: string[];
+    } | null;
+  } | null;
+  topicDetails: {
+    topicCategories: string[];
+    topicIds: string[];
+  } | null;
+}
+
 // Utility types
 export interface ChannelHandle {
   type: 'handle' | 'id';
