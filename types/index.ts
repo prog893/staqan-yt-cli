@@ -76,6 +76,8 @@ export interface VideoListItem {
   publishedAt: string;
   thumbnail: string;
   videoType: VideoType;
+  channelTitle?: string;  // For global search results
+  channelId?: string;     // For global search results
 }
 
 // Localization types
@@ -180,6 +182,12 @@ export interface UpdateThumbnailOptions extends VerboseOption {
 // Comments command options
 export interface ListCommentsOptions extends OutputOption, VerboseOption, LimitOption {
   sort?: 'top' | 'new';
+}
+
+// Search videos command options
+export interface SearchVideosOptions extends OutputOption, LimitOption, VerboseOption {
+  global?: boolean;
+  channel?: string;
 }
 
 // OAuth types

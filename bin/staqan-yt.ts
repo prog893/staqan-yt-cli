@@ -99,8 +99,10 @@ program
 
 // Search videos command
 program
-  .command('search-videos [channelHandle] <query>')
-  .description('Search for videos in a channel by keyword')
+  .command('search-videos <query>')
+  .description('Search for videos on YouTube or within a specific channel')
+  .option('-g, --global', 'Search all of YouTube (ignores channel filters)')
+  .option('-c, --channel <handle>', 'Search within a specific channel (overrides config default)')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-l, --limit <number>', 'Limit number of results', '25')
   .option('-v, --verbose', 'Enable verbose output with debug information')

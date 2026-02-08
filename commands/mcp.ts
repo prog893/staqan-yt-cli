@@ -10,6 +10,7 @@ import {
   getVideoInfo,
   updateVideoMetadata,
   searchChannelVideos,
+  searchVideosGlobal,
   getVideoLocalization,
   getAllVideoLocalizations,
   putVideoLocalization,
@@ -18,6 +19,7 @@ import {
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
 import { parseVideoId, chunkDateRange, retryWithBackoff } from '../lib/utils';
+import { getConfigValue } from '../lib/config';
 
 // Tool definitions
 const TOOLS: Tool[] = [
@@ -59,26 +61,30 @@ const TOOLS: Tool[] = [
   },
   {
     name: 'youtube_search_videos',
-    description: 'Search for videos within a specific YouTube channel',
+    description: 'Search for videos on YouTube. Can search globally or within a specific channel.',
     inputSchema: {
       type: 'object',
       properties: {
-        channelHandle: {
-          type: 'string',
-          description: 'Channel handle (e.g., @mkbhd) or channel ID',
-        },
         query: {
           type: 'string',
           description: 'Search query string',
         },
+        channelHandle: {
+          type: 'string',
+          description: 'Optional: Channel handle (e.g., @mkbhd) or channel ID to restrict search',
+        },
+        global: {
+          type: 'boolean',
+          description: 'Search all of YouTube (default: false, searches in config default channel)',
+        },
         maxResults: {
           type: 'number',
-          description: 'Maximum number of results to return (default: 25)',
+          description: 'Maximum number of results (default: 25)',
           minimum: 1,
           maximum: 50,
         },
       },
-      required: ['channelHandle', 'query'],
+      required: ['query'],
     },
   },
   {
@@ -365,11 +371,23 @@ async function handleToolCall(name: string, args: any) {
     }
 
     case 'youtube_search_videos': {
-      const results = await searchChannelVideos(
-        args.channelHandle,
-        args.query,
-        args.maxResults || 25
-      );
+      const { query, channelHandle, global, maxResults = 25 } = args;
+
+      let results;
+      if (global === true) {
+        results = await searchVideosGlobal(query, maxResults);
+      } else if (channelHandle) {
+        results = await searchChannelVideos(channelHandle, query, maxResults);
+      } else {
+        const defaultChannel = await getConfigValue('default.channel');
+        if (!defaultChannel) {
+          throw new Error(
+            'No channel specified. Either provide channelHandle, set global=true, or configure default.channel'
+          );
+        }
+        results = await searchChannelVideos(defaultChannel, query, maxResults);
+      }
+
       return {
         content: [
           {

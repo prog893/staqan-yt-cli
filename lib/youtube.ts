@@ -274,6 +274,43 @@ async function searchChannelVideos(channelHandle: string, query: string, maxResu
 }
 
 /**
+ * Search videos globally on YouTube (not restricted to a channel)
+ * @param query - Search query string
+ * @param maxResults - Maximum number of results (default: 25)
+ * @returns Array of video list items with channel info
+ */
+async function searchVideosGlobal(query: string, maxResults = 25): Promise<VideoListItem[]> {
+  debug(`Global search for: ${query}, maxResults: ${maxResults}`);
+  const youtube = await getYouTubeClient();
+
+  const response = await youtube.search.list({
+    part: ['snippet'],
+    q: query,
+    type: ['video'],
+    maxResults,
+    order: 'relevance',
+  });
+
+  const items = response.data.items || [];
+  const rawVideos = items.map(item => ({
+    id: item.id!.videoId!,
+    title: item.snippet!.title!,
+    description: item.snippet!.description!,
+    publishedAt: item.snippet!.publishedAt!,
+    thumbnail: item.snippet!.thumbnails!.default!.url!,
+    channelTitle: item.snippet!.channelTitle!,
+    channelId: item.snippet!.channelId!,
+  }));
+
+  const videoTypes = await checkVideoTypes(rawVideos.map(v => v.id));
+
+  return rawVideos.map(video => ({
+    ...video,
+    videoType: videoTypes.get(video.id) || 'regular',
+  }));
+}
+
+/**
  * Get video with localizations
  * @param videoId - YouTube video ID
  * @returns Video resource with snippet and localizations
@@ -734,6 +771,7 @@ export {
   getVideoInfo,
   updateVideoMetadata,
   searchChannelVideos,
+  searchVideosGlobal,
   getVideoWithLocalizations,
   getVideoLocalization,
   getAllVideoLocalizations,

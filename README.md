@@ -248,9 +248,27 @@ staqan-yt list-videos @channelname --limit 50 --output json
 ```
 
 #### search-videos
-Search for videos within a channel:
+Search for videos on YouTube or within a specific channel:
+
+**Global search (all of YouTube):**
 ```bash
-staqan-yt search-videos @channelname "keyword" --output json
+staqan-yt search-videos "craft beer tutorial" --global
+```
+
+**Channel-specific search:**
+```bash
+staqan-yt search-videos "smartphone review" --channel @mkbhd
+```
+
+**Using config default:**
+```bash
+staqan-yt search-videos "smartphone review"  # Uses default.channel from config
+```
+
+**With output format:**
+```bash
+staqan-yt search-videos "python tutorial" --global --output json
+staqan-yt search-videos "react" --channel @Fireship --output csv
 ```
 
 #### update-video (singular)
@@ -335,7 +353,10 @@ staqan-yt config get default.channel
 ```
 
 **How Defaults Work:**
-- When `default.channel` is set, you can omit the channel argument from `list-videos` and `search-videos` commands
+- When `default.channel` is set, `list-videos` lists videos from that channel by default
+- When `default.channel` is set, `search-videos` searches within that channel by default
+- Use `--global` flag with `search-videos` to override and search all of YouTube
+- Use `--channel @handle` flag with `search-videos` to override and search a different channel
 - When `default.output` is set, commands will use that format by default (you can still override with `--output` flag)
 - CLI flags always take precedence over config defaults
 
@@ -532,46 +553,53 @@ Apply these changes? (y/N): y
 #### 5. Search Channel Videos
 
 ```bash
-staqan-yt search-videos [channelHandle] <query> [options]
+staqan-yt search-videos <query> [options]
 ```
 
-Search for videos within a channel by keyword.
+Search for videos on YouTube or within a specific channel.
 
 **Arguments:**
-- `channelHandle` - (Optional) Channel @handle, username, or URL. Uses `default.channel` from config if not provided.
-- `query` - Search query
+- `query` - Search query string
 
 **Options:**
+- `-g, --global` - Search all of YouTube (ignores channel filters)
+- `-c, --channel <handle>` - Search within a specific channel (overrides config default)
 - `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
 - `-l, --limit <number>` - Limit number of results (default: 25)
+- `-v, --verbose` - Enable verbose output with debug information
 
 **Examples:**
 
 ```bash
-# Search by keyword (with explicit channel)
-staqan-yt search-videos @mkbhd "smartphone review"
+# Global YouTube search
+staqan-yt search-videos "python tutorial" --global
+
+# Search within a specific channel
+staqan-yt search-videos "smartphone review" --channel @mkbhd
 
 # Search using default channel from config
 staqan-yt search-videos "smartphone review"
 
-# Limit results
-staqan-yt search-videos @mkbhd "2024" --limit 10
+# Limit results and output format
+staqan-yt search-videos "machine learning" --global --limit 10 --output json
 
-# JSON output
-staqan-yt search-videos @mkbhd "tutorial" --output json
+# Export search results to CSV
+staqan-yt search-videos "rust programming" --global --output csv > results.csv
 ```
 
 **Sample Output:**
 ```
-✓ Found 5 matching video(s)
+✓ Found 5 video(s)
 
-[1] Smartphone Review 2024
+[1] Python Tutorial for Beginners
   ID: dQw4w9WgXcQ
+  Channel: @programming
   Published: Jan 15, 2024
   URL: https://youtube.com/watch?v=dQw4w9WgXcQ
 
-[2] Best Smartphones of 2024
+[2] Learn Python in 1 Hour
   ID: abc123xyz78
+  Channel: @codemaster
   Published: Dec 20, 2023
   URL: https://youtube.com/watch?v=abc123xyz78
 ```
