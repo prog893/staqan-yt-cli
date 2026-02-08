@@ -140,7 +140,8 @@ async function getChannelCommand(channelHandle: string | undefined, options: Out
           const keywords = channel.brandingSettings.channel.keywords;
           if (keywords) {
             console.log(chalk.bold('Keywords:'));
-            const keywordList = keywords.split(',').map((k: string) => k.trim()).filter((k: string) => k);
+            // Parse space-delimited keywords, handling quoted multi-word phrases
+            const keywordList = keywords.match(/"([^"]+)"|(\S+)/g)?.map((k: string) => k.replace(/"/g, '')) || [];
             keywordList.forEach((keyword: string) => {
               console.log('  • ' + keyword);
             });
