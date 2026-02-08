@@ -13,6 +13,7 @@ A powerful command-line interface for managing YouTube videos and metadata using
 - **Video Localizations** - Manage multilingual titles and descriptions (English, Japanese, Russian)
 - **Channel Search** - Search for specific videos within a channel
 - **Playlist Management** - List and retrieve YouTube playlists
+- **Comments** - List video comments for engagement monitoring
 - **Analytics & SEO** - Performance metrics, search terms, traffic sources, and CTR analysis
 - **Tags Management** - View and update video tags for better discoverability
 - **Thumbnail Access** - Retrieve video thumbnail URLs in all available qualities
@@ -1094,7 +1095,67 @@ staqan-yt list-playlists @mkbhd --output json
 
 ---
 
-#### 16. Get Video Analytics
+#### 16. List Comments
+
+```bash
+staqan-yt list-comments <videoId> [options]
+```
+
+List comments for a YouTube video.
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
+- `-l, --limit <number>` - Limit number of results (default: 20)
+- `-s, --sort <order>` - Sort order: `top` (by relevance) or `new` (by recency, default: `top`)
+- `-v, --verbose` - Enable verbose logging
+
+**Examples:**
+
+```bash
+# List top 20 comments (default)
+staqan-yt list-comments dQw4w9WgXcQ
+
+# List 50 most recent comments
+staqan-yt list-comments dQw4w9WgXcQ --limit 50 --sort new
+
+# Export to CSV
+staqan-yt list-comments dQw4w9WgXcQ --output csv > comments.csv
+
+# JSON output
+staqan-yt list-comments dQw4w9WgXcQ --output json
+```
+
+**Sample Output:**
+```
+✔ Found 5 comment(s)
+
+[1] @YouTube
+  ID: Ugzge340dBgB75hWBm54AaABAg
+  can confirm: he never gave us up
+  ♥ Likes: 175045 | Replies: 1001
+  Posted: Apr 23, 2025
+
+[2] @Oatman69
+  ID: UgyEnXfdC-umwvTt8JF4AaABAg
+  Gonna flag this for nudity so I can rick roll the YouTube staff
+  ♥ Likes: 544998 | Replies: 587
+  Posted: Nov 23, 2019
+```
+
+**Use Cases:**
+- **Engagement monitoring** - See top comments on a video
+- **Moderation** - Review flagged comments
+- **Feedback analysis** - Export comments for sentiment analysis
+- **Community insights** - Understand audience response
+
+**Note:** This command fetches top-level comments only. Replies are counted but not expanded.
+
+---
+
+#### 17. Get Video Analytics
 
 ```bash
 staqan-yt get-video-analytics <videoId> [options]

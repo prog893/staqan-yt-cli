@@ -25,6 +25,7 @@ import mcpCommand = require('../commands/mcp');
 import getPlaylistCommand = require('../commands/get-playlist');
 import getPlaylistsCommand = require('../commands/get-playlists');
 import listPlaylistsCommand = require('../commands/list-playlists');
+import listCommentsCommand = require('../commands/list-comments');
 
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
 let version = '1.3.4'; // Fallback version for compiled binaries
@@ -238,6 +239,16 @@ program
   .option('-l, --limit <number>', 'Limit number of results', '50')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(listPlaylistsCommand);
+
+// List comments command (plural - list collection)
+program
+  .command('list-comments <videoId>')
+  .description('List comments for a YouTube video')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
+  .option('-l, --limit <number>', 'Limit number of results', '20')
+  .option('-s, --sort <order>', 'Sort order: top or new', 'top')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(listCommentsCommand);
 
 // Show help if no command provided
 if (!process.argv.slice(2).length) {

@@ -31,6 +31,22 @@ export interface PlaylistListItem {
   privacyStatus: string;
 }
 
+// Comment-related types
+export interface CommentInfo {
+  id: string;
+  videoId: string;
+  authorName: string;
+  authorChannelId: string;
+  textDisplay: string;
+  textOriginal: string;
+  likeCount: number;
+  replyCount: number;
+  isReply: boolean;
+  parentId: string | null;
+  publishedAt: string;
+  updatedAt: string;
+}
+
 // Video-related types
 export interface VideoInfo {
   id: string;
@@ -159,6 +175,11 @@ export interface UpdateThumbnailOptions extends VerboseOption {
   file: string;
   dryRun?: boolean;
   yes?: boolean;
+}
+
+// Comments command options
+export interface ListCommentsOptions extends OutputOption, VerboseOption, LimitOption {
+  sort?: 'top' | 'new';
 }
 
 // OAuth types
