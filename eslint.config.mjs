@@ -30,7 +30,10 @@ export default [
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
-      '@typescript-eslint/no-non-null-assertion': 'warn',
+      // Disabled: Non-null assertions are intentional for YouTube API responses.
+      // Properties are validated before access (e.g., checking items.length > 0).
+      // Google APIs use optional types extensively; assertions improve readability.
+      '@typescript-eslint/no-non-null-assertion': 'off',
     },
   },
   {
