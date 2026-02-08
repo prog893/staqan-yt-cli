@@ -1,7 +1,7 @@
 import ora from 'ora';
 import chalk from 'chalk';
 import { listVideoComments } from '../lib/youtube';
-import { formatDate, error, setVerbose, debug } from '../lib/utils';
+import { formatDate, error, setVerbose, debug, parseVideoId } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ListCommentsOptions } from '../types';
@@ -12,6 +12,9 @@ async function listCommentsCommand(videoId: string, options: ListCommentsOptions
     setVerbose(true);
     debug('Verbose mode enabled');
   }
+
+  // Parse video ID from URL or raw ID
+  videoId = parseVideoId(videoId);
 
   // Validate video ID format (basic check)
   if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
