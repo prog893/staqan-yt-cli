@@ -26,6 +26,7 @@ import getPlaylistCommand = require('../commands/get-playlist');
 import getPlaylistsCommand = require('../commands/get-playlists');
 import listPlaylistsCommand = require('../commands/list-playlists');
 import listCommentsCommand = require('../commands/list-comments');
+import getChannelCommand = require('../commands/get-channel');
 
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
 let version = '1.3.8'; // Fallback version for compiled binaries
@@ -251,6 +252,14 @@ program
   .option('-s, --sort <order>', 'Sort order: top or new', 'top')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(listCommentsCommand);
+
+// Get channel command (singular - single item)
+program
+  .command('get-channel [channelHandle]')
+  .description('Get detailed metadata for a YouTube channel')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(getChannelCommand);
 
 // Show help if no command provided
 if (!process.argv.slice(2).length) {

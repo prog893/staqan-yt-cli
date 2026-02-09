@@ -1,7 +1,7 @@
 import { google, youtube_v3 } from 'googleapis';
 import { getAuthenticatedClient } from './auth';
 import { normalizeLanguage, getLanguageName } from './language';
-import { VideoInfo, VideoListItem, VideoLocalization, VideoType, PlaylistInfo, PlaylistListItem, CommentInfo } from '../types';
+import { VideoInfo, VideoListItem, VideoLocalization, VideoType, PlaylistInfo, PlaylistListItem, CommentInfo, ChannelInfo } from '../types';
 import { debug } from './utils';
 
 /**
@@ -101,6 +101,57 @@ async function getChannelId(handleOrId: string): Promise<string> {
   }
 
   throw new Error(`Channel not found: ${handleOrId}`);
+}
+
+/**
+ * Get detailed channel information
+ * @param handleOrId - Channel handle, ID, or URL
+ * @returns Channel details with full metadata
+ */
+async function getChannelInfo(handleOrId: string): Promise<ChannelInfo> {
+  debug(`Fetching channel info for: ${handleOrId}`);
+  const youtube = await getYouTubeClient();
+  const channelId = await getChannelId(handleOrId);
+
+  const response = await youtube.channels.list({
+    part: ['snippet', 'statistics', 'brandingSettings', 'topicDetails'],
+    id: [channelId],
+  });
+
+  if (!response.data.items || response.data.items.length === 0) {
+    throw new Error(`Channel not found: ${handleOrId}`);
+  }
+
+  const item = response.data.items[0];
+  debug(`Retrieved channel: ${item.snippet?.title}`);
+
+  return {
+    id: item.id!,
+    title: item.snippet!.title!,
+    description: item.snippet!.description!,
+    customUrl: item.snippet!.customUrl || null,
+    handle: item.snippet!.customUrl || null,
+    publishedAt: item.snippet!.publishedAt!,
+    country: item.snippet!.country || null,
+    statistics: {
+      viewCount: parseInt(item.statistics?.viewCount || '0'),
+      subscriberCount: parseInt(item.statistics?.subscriberCount || '0'),
+      videoCount: parseInt(item.statistics?.videoCount || '0'),
+      hiddenSubscriberCount: item.statistics?.hiddenSubscriberCount || false,
+    },
+    brandingSettings: item.brandingSettings ? {
+      channel: item.brandingSettings.channel ? {
+        title: item.brandingSettings.channel.title || '',
+        description: item.brandingSettings.channel.description || '',
+        keywords: item.brandingSettings.channel.keywords || '',
+        featuredChannelsUrls: item.brandingSettings.channel.featuredChannelsUrls || [],
+      } : null,
+    } : null,
+    topicDetails: item.topicDetails ? {
+      topicCategories: item.topicDetails.topicCategories || [],
+      topicIds: item.topicDetails.topicIds || [],
+    } : null,
+  };
 }
 
 /**
@@ -767,6 +818,7 @@ async function listVideoComments(videoId: string, maxResults = 20, order: 'relev
 export {
   getYouTubeClient,
   getChannelId,
+  getChannelInfo,
   getChannelVideos,
   getVideoInfo,
   updateVideoMetadata,
