@@ -9,13 +9,66 @@
 
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { execSync } from 'child_process';
 
 const rootDir = join(__dirname, '..');
+
+/**
+ * Execute git command and return output
+ */
+function git(cmd: string): string {
+  return execSync(cmd, { encoding: 'utf-8', cwd: rootDir }).trim();
+}
+
+/**
+ * Safety checks before version bump
+ */
+function runSafetyChecks(): void {
+  console.log('🔍 Running safety checks...\n');
+
+  // 1. Check we're on main branch
+  const currentBranch = git('git rev-parse --abbrev-ref HEAD');
+  if (currentBranch !== 'main') {
+    console.error(`❌ Not on main branch (currently on: ${currentBranch})`);
+    console.error('Please switch to main branch first: git checkout main');
+    process.exit(1);
+  }
+  console.log('  ✓ On main branch');
+
+  // 2. Check there's nothing to pull
+  git('git fetch origin');
+  const localCommit = git('git rev-parse HEAD');
+  const remoteCommit = git('git rev-parse origin/main');
+  if (localCommit !== remoteCommit) {
+    console.error('❌ Local main is behind origin/main');
+    console.error('Please pull first: git pull');
+    process.exit(1);
+  }
+  console.log('  ✓ Up to date with origin');
+
+  // 3. Check no tag exists for current commit
+  const currentCommit = git('git rev-parse HEAD');
+  const existingTags = git(`git tag --points-at ${currentCommit}`);
+  if (existingTags) {
+    console.error(`❌ Current commit already has tags:`);
+    existingTags.split('\n').forEach((tag) => console.error(`   - ${tag}`));
+    console.error('Cannot create another tag for this commit');
+    process.exit(1);
+  }
+  console.log('  ✓ No existing tags on current commit');
+
+  console.log('\n✅ All safety checks passed!\n');
+}
 
 // Read version from package.json
 const packageJsonPath = join(rootDir, 'package.json');
 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 const version = packageJson.version;
+
+console.log(`📦 Syncing version ${version} to all files...\n`);
+
+// Run safety checks first
+runSafetyChecks();
 
 console.log(`📦 Syncing version ${version} to all files...`);
 
@@ -42,6 +95,7 @@ console.log(`  ✓ Updated Formula/staqan-yt.rb`);
 console.log(`\n✨ Version ${version} synced successfully!\n`);
 console.log(`Next steps:`);
 console.log(`  1. Review changes: git diff`);
-console.log(`  2. Commit: git add -A && git commit -m "Bump version to ${version}"`);
-console.log(`  3. Tag: git tag v${version}`);
-console.log(`  4. Push: git push && git push --tags`);
+console.log(`  2. Stage changes: git add -A`);
+console.log(`  3. Commit: git commit -m "Bump version to ${version}"`);
+console.log(`  4. Create tag: git tag v${version}`);
+console.log(`  5. Push: git push && git push --tags`);
