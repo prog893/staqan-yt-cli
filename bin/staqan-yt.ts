@@ -27,6 +27,8 @@ import getPlaylistsCommand = require('../commands/get-playlists');
 import listPlaylistsCommand = require('../commands/list-playlists');
 import listCommentsCommand = require('../commands/list-comments');
 import getChannelCommand = require('../commands/get-channel');
+import listCaptionsCommand = require('../commands/list-captions');
+import getCaptionCommand = require('../commands/get-caption');
 
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
 let version = '1.3.10'; // Fallback version for compiled binaries
@@ -260,6 +262,23 @@ program
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getChannelCommand);
+
+// Caption commands
+// List captions command (plural - list collection)
+program
+  .command('list-captions <videoId>')
+  .description('List all caption tracks for a YouTube video')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(listCaptionsCommand);
+
+// Get single caption command (singular)
+program
+  .command('get-caption <captionId>')
+  .description('Download caption content to stdout (get caption ID from list-captions)')
+  .option('--format <format>', 'Caption format: srt, vtt, sbv, srv2, ttml, json (default: json)', 'json')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(getCaptionCommand);
 
 // Show help if no command provided
 if (!process.argv.slice(2).length) {
