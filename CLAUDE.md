@@ -1,17 +1,60 @@
 # staqan-yt-cli Development Guide
 
+## ⚠️ CRITICAL RULES
+
+**🚨 NEVER COMMIT DIRECTLY TO MAIN BRANCH 🚨**
+
+**EVERY commit MUST be on a feature branch:**
+```bash
+# BEFORE making any changes, create a feature branch
+git checkout -b feature/your-feature-name
+
+# Make your changes and commit on the feature branch
+git add -A
+git commit -m "Description"
+
+# Push feature branch and create PR
+git push -u origin feature/your-feature-name
+gh pr create --title "Feature: Your Feature" --body "Description"
+```
+
+**If you accidentally commit to main:**
+```bash
+# Undo the commit (keep changes)
+git reset --soft HEAD~1
+
+# Create proper feature branch
+git checkout -b feature/your-feature-name
+git add -A
+git commit -m "Description"
+git push -u origin feature/your-feature-name
+gh pr create
+```
+
+**Why this matters:**
+- Prevents breaking main branch
+- Allows code review via PRs
+- Maintains clean git history
+- Team workflow best practice
+
+---
+
 ## Project Overview
 
 A command-line interface for managing YouTube videos and metadata using the YouTube Data API v3. Built with Node.js and designed for programmatic YouTube channel management.
 
 ## 🤖 Subagent Development Workflow
 
-**When a subagent is spawned to work on this tool:**
+**⚠️ CRITICAL: When a subagent is spawned to work on this tool:**
 
 1. **Read this CLAUDE.md first** - Understand architecture and conventions
-2. **Make changes** following AWS naming conventions and best practices
-3. **Test changes** manually with example commands
-4. **Commit all changes**:
+2. **Create a feature branch IMMEDIATELY** - BEFORE making any changes:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+3. **Make changes** following AWS naming conventions and best practices
+4. **Test changes** manually with example commands
+5. **Commit on feature branch**:
    ```bash
    git add -A
    git commit -m "Description
@@ -20,20 +63,20 @@ A command-line interface for managing YouTube videos and metadata using the YouT
 
    Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
    ```
-5. **Release new patch version** (see Release Process section below):
-   - Run `npm version patch` (automatically syncs version everywhere)
-   - Push with tags
-6. **Push to GitHub**:
+6. **Push feature branch and create PR**:
    ```bash
-   git push && git push --tags
+   git push -u origin feature/your-feature-name
+   gh pr create --title "Feature: Your Feature" --body "Description"
    ```
-7. **Verify clean state**:
-   ```bash
-   git status  # Should show "working tree clean"
-   ```
-8. **Return to parent** only after everything is committed, released, and pushed
+7. **Return to parent** after PR is created (do NOT wait for merge)
 
-**Do NOT return from subagent execution with uncommitted changes or without releasing a new version.**
+**Do NOT:**
+- ❌ Make changes on main branch
+- ❌ Commit directly to main
+- ❌ Push to main without a PR
+- ❌ Return with uncommitted changes
+
+**Remember:** Even for "small" changes, ALWAYS use a feature branch.
 
 ## Architecture Principles
 
@@ -649,32 +692,56 @@ staqan-yt --help
 
 ## Git Workflow
 
-### Branch Strategy
+### ⚠️ BRANCH STRATEGY - MOST CRITICAL RULE
 
-**CRITICAL: NEVER commit directly to main.** Always use feature branches.
+**🚨 NEVER, EVER commit directly to main branch! 🚨**
+
+**Before making ANY changes:**
+```bash
+# Check current branch - MUST NOT be main
+git branch --show-current
+
+# If on main, create feature branch FIRST
+git checkout -b feature/your-feature-name
+```
 
 **Branch naming convention:**
 - `feature/feature-name` - New features
 - `fix/bug-name` - Bug fixes
 - `refactor/name` - Code refactoring
 
-**Workflow:**
+**Correct Workflow:**
 ```bash
-# 1. Create a feature branch
+# 1. Create a feature branch (DO THIS FIRST)
 git checkout -b feature/your-feature-name
 
-# 2. Make changes and commit
+# 2. Make changes and commit on feature branch
 git add -A
 git commit -m "Description"
 
-# 3. Push feature branch
+# 3. Push feature branch (NOT main)
 git push -u origin feature/your-feature-name
 
 # 4. Create PR via GitHub or gh CLI
 gh pr create --title "Feature: Your Feature" --body "Description"
 
 # 5. After PR merge, delete the branch
+git checkout main
+git pull
 git branch -d feature/your-feature-name
+```
+
+**Recovery if you mess up:**
+```bash
+# If you accidentally committed to main:
+git reset --soft HEAD~1              # Undo commit, keep changes
+git checkout -b feature/your-feature  # Create proper branch
+git add -A                           # Stage changes
+git commit -m "Description"           # Commit on feature branch
+git push -u origin feature/your-feature  # Push feature branch
+gh pr create                          # Create PR
+
+# Never push the commit to main!
 ```
 
 **Protecting main branch:**
@@ -695,6 +762,32 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 ```
 
 ### Before Committing
+
+**MANDATORY PRE-COMMIT CHECKLIST:**
+- [ ] **On a feature branch?** (NOT main!)
+- [ ] **Tested all affected commands?**
+- [ ] **Updated README.md if adding/changing commands?**
+- [ ] **Updated QUICK_START.md if changing common workflows?**
+- [ ] **Following AWS naming conventions?**
+- [ ] **Credentials never committed?**
+
+**Verify branch before committing:**
+```bash
+# This MUST NOT be "main"
+git branch --show-current
+
+# If it shows "main", STOP and create feature branch:
+git checkout -b feature/your-feature-name
+```
+
+**Verify what you're committing:**
+```bash
+# Check staged files
+git diff --staged --name-only
+
+# Check for unintended files (credentials, etc.)
+git status
+```
 
 - [ ] Test all affected commands
 - [ ] Update README.md if adding/changing commands
