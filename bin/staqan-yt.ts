@@ -31,7 +31,7 @@ import listCaptionsCommand = require('../commands/list-captions');
 import getCaptionCommand = require('../commands/get-caption');
 
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
-let version = '1.3.10'; // Fallback version for compiled binaries
+let version = '1.3.12'; // Fallback version for compiled binaries
 try {
   const packageJson = require(path.join(__dirname, '../../package.json'));
   version = packageJson.version;
