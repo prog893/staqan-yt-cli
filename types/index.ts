@@ -266,6 +266,15 @@ export interface GetCaptionOptions extends OutputOption, VerboseOption {
   format?: CaptionFormat;
 }
 
+// Channel analytics command options
+export interface ChannelAnalyticsOptions extends OutputOption, VerboseOption {
+  report?: 'demographics' | 'devices' | 'geography' | 'traffic-sources' | 'subscription-status';
+  startDate?: string;
+  endDate?: string;
+  dimensions?: string;
+  metrics?: string;
+}
+
 // Utility types
 export interface ChannelHandle {
   type: 'handle' | 'id';
