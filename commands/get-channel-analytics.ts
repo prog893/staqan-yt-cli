@@ -259,7 +259,7 @@ async function getChannelAnalyticsCommand(channelHandle: string | undefined, opt
             const header = columnHeaders[j];
             const headerName = header?.name || `Column ${j}`;
             const formattedHeader = headerName
-              .replace(/([a-z])/g, ' $1')
+              .replace(/([A-Z])/g, ' $1')
               .replace(/^./, str => str.toUpperCase())
               .trim();
 
@@ -299,7 +299,12 @@ async function getChannelAnalyticsCommand(channelHandle: string | undefined, opt
       } else if (errorMessage.includes('not supported')) {
         error('Report type not available for this channel.');
         console.log('');
-        console.log(chalk.dim('Demographic data (age, gender) requires channel owner permissions.'));
+        console.log(chalk.dim('Demographic data might be limited because:'));
+        console.log(chalk.dim('  1. Metrics do not meet certain thresholds'));
+        console.log(chalk.dim('  2. Channel has limited traffic during the time period'));
+        console.log('');
+        console.log(chalk.dim('Learn more: https://developers.google.com/youtube/analytics/data_model#data-anonymization'));
+        console.log('');
         console.log(chalk.dim('Try other report types: devices, geography, traffic-sources, subscription-status'));
       } else {
         error(errorMessage);

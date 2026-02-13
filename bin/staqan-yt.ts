@@ -292,18 +292,9 @@ program
   .option('--metrics <metrics>', 'Custom metrics (comma-separated, requires --dimensions)')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action((channelHandle: string | undefined, options: { report?: 'demographics' | 'devices' | 'geography' | 'traffic-sources' | 'subscription-status'; start_date?: string; end_date?: string; dimensions?: string; metrics?: string; output?: 'json' | 'table' | 'text' | 'pretty' | 'csv'; verbose?: boolean }) => {
-    // Convert kebab-case to camelCase for options
-    const normalizedOptions = {
-      report: options.report,
-      startDate: options.start_date,
-      endDate: options.end_date,
-      dimensions: options.dimensions,
-      metrics: options.metrics,
-      output: options.output,
-      verbose: options.verbose,
-    };
-    getChannelAnalyticsCommand(channelHandle, normalizedOptions);
+  .action((channelHandle: string | undefined, options: { report?: 'demographics' | 'devices' | 'geography' | 'traffic-sources' | 'subscription-status'; startDate?: string; endDate?: string; dimensions?: string; metrics?: string; output?: 'json' | 'table' | 'text' | 'pretty' | 'csv'; verbose?: boolean }) => {
+    // Commander v12+ automatically converts kebab-case to camelCase
+    getChannelAnalyticsCommand(channelHandle, options);
   });
 
 // Show help if no command provided
