@@ -14,7 +14,8 @@ A powerful command-line interface for managing YouTube videos and metadata using
 - **Channel Search** - Search for specific videos within a channel
 - **Playlist Management** - List and retrieve YouTube playlists
 - **Comments** - List video comments for engagement monitoring
-- **Analytics & SEO** - Performance metrics, search terms, traffic sources, and CTR analysis
+- **Channel Analytics** - Channel-level analytics reports (demographics, devices, geography, traffic sources, subscription status)
+- **Video Analytics & SEO** - Performance metrics, search terms, traffic sources, and CTR analysis
 - **Tags Management** - View and update video tags for better discoverability
 - **Thumbnail Access** - Retrieve video thumbnail URLs in all available qualities
 - **Multiple Output Formats** - JSON, table, text, pretty, or CSV output for any workflow
@@ -170,6 +171,7 @@ The MCP server exposes **15 operations** covering all CLI functionality:
 - `youtube_update_localization` - Update existing localization
 
 **Analytics:**
+- `youtube_get_channel_analytics` - Get channel-level analytics reports (demographics, devices, geography, etc.)
 - `youtube_get_video_analytics` - Get performance metrics (views, watch time, CTR, etc.)
 - `youtube_get_search_terms` - Get YouTube search terms that led to video
 - `youtube_get_traffic_sources` - Get traffic source breakdown
@@ -1359,6 +1361,80 @@ Total Views: 51
 - **Notifications** - Push notifications
 - **Subscriber Feed** - Subscriber home feed
 
+---
+
+#### 16. Get Channel Analytics
+```bash
+staqan-yt get-channel-analytics [channelHandle] [options]
+```
+
+Get channel-level analytics reports from YouTube Analytics API (demographics, devices, geography, etc.).
+
+**Arguments:**
+- `channelHandle` - (Optional) Channel @handle, username, or URL. Uses `default.channel` from config if not provided.
+
+**Options:**
+- `--report <type>` - Predefined report type: `demographics`, `devices`, `geography`, `traffic-sources`, or `subscription-status`
+- `--start-date <date>` - Start date (YYYY-MM-DD), defaults to 30 days ago
+- `--end-date <date>` - End date (YYYY-MM-DD), defaults to today
+- `--dimensions <dims>` - Custom dimensions (comma-separated, requires `--metrics`)
+- `--metrics <metrics>` - Custom metrics (comma-separated, requires `--dimensions`)
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`), or from config
+- `-v, --verbose` - Enable verbose output with debug information
+
+**Predefined Report Types:**
+
+| Report Type | Dimensions | Metrics |
+|-------------|------------|---------|
+| demographics | ageGroup,gender | views,estimatedMinutesWatched |
+| devices | deviceType,operatingSystem | views,estimatedMinutesWatched |
+| geography | country | views,estimatedMinutesWatched |
+| traffic-sources | insightTrafficSourceType | views,estimatedMinutesWatched |
+| subscription-status | subscribedStatus | views,estimatedMinutesWatched |
+
+**Examples:**
+```bash
+# Predefined reports
+staqan-yt get-channel-analytics @channel --report demographics
+staqan-yt get-channel-analytics @channel --report devices --output csv
+
+# Custom query
+staqan-yt get-channel-analytics @channel \
+  --dimensions "deviceType,operatingSystem" \
+  --metrics "views,estimatedMinutesWatched" \
+  --start-date 2025-01-01 \
+  --end-date 2025-01-31
+
+# Using config default channel
+staqan-yt get-channel-analytics --report geography
+```
+
+**Sample Output:**
+```
+✓ Analytics data retrieved
+
+My Channel
+Channel ID: UCxxxxxxxxxxxxxxxxxx
+Report Type: demographics
+Date Range: 2025-01-13 to 2026-02-13
+
+Age Group:    age13-17
+Views:        12,345
+Watch Time:    234,567
+
+Age Group:    age18-24
+Views:        45,678
+Watch Time:    890,123
+
+...
+Total: 10 result(s)
+```
+
+**Important:**
+- Requires YouTube Analytics API to be enabled in Google Cloud Console
+- Requires re-authentication after enabling analytics API: `staqan-yt auth`
+- Channel must have sufficient views and activity to report analytics
+- **Demographic Limitation:** The `demographics` report type (age, gender) requires channel owner permissions and may not be available for all channels, especially smaller or newer channels. If unavailable, try: `devices`, `geography`, `traffic-sources`, or `subscription-status`.
 ---
 
 ### Localization Features

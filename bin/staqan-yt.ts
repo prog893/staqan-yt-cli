@@ -29,6 +29,7 @@ import listCommentsCommand = require('../commands/list-comments');
 import getChannelCommand = require('../commands/get-channel');
 import listCaptionsCommand = require('../commands/list-captions');
 import getCaptionCommand = require('../commands/get-caption');
+import getChannelAnalyticsCommand = require('../commands/get-channel-analytics');
 
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
 let version = '1.3.12'; // Fallback version for compiled binaries
@@ -279,6 +280,31 @@ program
   .option('--format <format>', 'Caption format: srt, vtt, sbv, srv2, ttml, json (default: json)', 'json')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getCaptionCommand);
+
+// Channel analytics command (singular - single channel report)
+program
+  .command('get-channel-analytics [channelHandle]')
+  .description('Get channel-level analytics reports (demographics, devices, geography, etc.)')
+  .option('--report <type>', 'Predefined report type: demographics, devices, geography, traffic-sources, subscription-status')
+  .option('--start-date <date>', 'Start date (YYYY-MM-DD), defaults to 30 days ago')
+  .option('--end-date <date>', 'End date (YYYY-MM-DD), defaults to today')
+  .option('--dimensions <dims>', 'Custom dimensions (comma-separated, requires --metrics)')
+  .option('--metrics <metrics>', 'Custom metrics (comma-separated, requires --dimensions)')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action((channelHandle: string | undefined, options: { report?: 'demographics' | 'devices' | 'geography' | 'traffic-sources' | 'subscription-status'; start_date?: string; end_date?: string; dimensions?: string; metrics?: string; output?: 'json' | 'table' | 'text' | 'pretty' | 'csv'; verbose?: boolean }) => {
+    // Convert kebab-case to camelCase for options
+    const normalizedOptions = {
+      report: options.report,
+      startDate: options.start_date,
+      endDate: options.end_date,
+      dimensions: options.dimensions,
+      metrics: options.metrics,
+      output: options.output,
+      verbose: options.verbose,
+    };
+    getChannelAnalyticsCommand(channelHandle, normalizedOptions);
+  });
 
 // Show help if no command provided
 if (!process.argv.slice(2).length) {

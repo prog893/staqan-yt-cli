@@ -199,6 +199,41 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    name: 'youtube_get_channel_analytics',
+    description: 'Get channel-level analytics reports from YouTube Analytics API (demographics, devices, geography, traffic sources, subscription status, etc.)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        channelHandle: {
+          type: 'string',
+          description: 'Channel handle (e.g., @mkbhd) or channel ID',
+        },
+        report: {
+          type: 'string',
+          description: 'Predefined report type: demographics, devices, geography, traffic-sources, subscription-status',
+          enum: ['demographics', 'devices', 'geography', 'traffic-sources', 'subscription-status'],
+        },
+        dimensions: {
+          type: 'string',
+          description: 'Custom dimensions (comma-separated, requires metrics)',
+        },
+        metrics: {
+          type: 'string',
+          description: 'Custom metrics (comma-separated, requires dimensions)',
+        },
+        startDate: {
+          type: 'string',
+          description: 'Start date in YYYY-MM-DD format (defaults to 30 days ago)',
+        },
+        endDate: {
+          type: 'string',
+          description: 'End date in YYYY-MM-DD format (defaults to today)',
+        },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'youtube_get_video_analytics',
     description: 'Get video performance analytics including views, watch time, average view duration, likes, comments, and more',
     inputSchema: {
@@ -477,6 +512,107 @@ async function handleToolCall(name: string, args: any) {
           {
             type: 'text',
             text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    }
+    case 'youtube_get_channel_analytics': {
+      const auth = await getAuthenticatedClient();
+      const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
+      const youtube = google.youtube({ version: 'v3', auth });
+
+      // Resolve channel ID
+      let channelId = args.channelHandle;
+      if (!channelId) {
+        channelId = await getConfigValue('default.channel');
+      }
+      if (!channelId) {
+        throw new Error('No channel specified and no default channel configured.');
+      }
+
+      const parsedChannel = channelId.startsWith('@')
+        ? { type: 'handle', value: channelId }
+        : { type: 'id', value: channelId };
+
+      let actualChannelId = parsedChannel.value;
+
+      // Resolve handle to ID if needed
+      if (parsedChannel.type === 'handle') {
+        const channelResponse = await youtube.channels.list({
+          part: ['id'],
+          forHandle: parsedChannel.value.replace('@', ''),
+        });
+
+        if (channelResponse.data.items && channelResponse.data.items.length > 0) {
+          actualChannelId = channelResponse.data.items[0].id!;
+        }
+      }
+
+      // Determine date range (default: last 30 days)
+      const endDate = args.endDate || new Date().toISOString().split('T')[0];
+      const startDate = args.startDate ||
+        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      // Determine dimensions and metrics
+      let dimensions: string;
+      let metrics: string;
+
+      if (args.report) {
+        const REPORT_TYPES: Record<string, { dimensions: string; metrics: string }> = {
+          demographics: { dimensions: 'ageGroup,gender', metrics: 'views,estimatedMinutesWatched' },
+          devices: { dimensions: 'deviceType,operatingSystem', metrics: 'views,estimatedMinutesWatched' },
+          geography: { dimensions: 'country', metrics: 'views,estimatedMinutesWatched' },
+          'traffic-sources': { dimensions: 'insightTrafficSourceType', metrics: 'views,estimatedMinutesWatched' },
+          'subscription-status': { dimensions: 'subscribedStatus', metrics: 'views,estimatedMinutesWatched' },
+        };
+        const reportConfig = REPORT_TYPES[args.report];
+        if (!reportConfig) {
+          throw new Error(`Unknown report type: ${args.report}`);
+        }
+        dimensions = reportConfig.dimensions;
+        metrics = reportConfig.metrics;
+      } else if (args.dimensions && args.metrics) {
+        dimensions = args.dimensions;
+        metrics = args.metrics;
+      } else {
+        throw new Error('Must specify either --report type or both --dimensions and --metrics');
+      }
+
+      // Fetch analytics
+      const response = await youtubeAnalytics.reports.query({
+        ids: `channel==${actualChannelId}`,
+        startDate,
+        endDate,
+        dimensions,
+        metrics,
+        sort: '-views',
+      });
+
+      if (!response.data.rows || response.data.rows.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'No analytics data available for this channel and time period.',
+            },
+          ],
+        };
+      }
+
+      const columnHeaders = response.data.columnHeaders || [];
+      const rows = response.data.rows || [];
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              channelId: actualChannelId,
+              reportType: args.report || 'custom',
+              dateRange: { startDate, endDate },
+              columnHeaders: columnHeaders.map(h => h.name),
+              rows,
+            }, null, 2),
           },
         ],
       };
