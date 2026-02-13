@@ -32,7 +32,7 @@ import getCaptionCommand = require('../commands/get-caption');
 import getChannelAnalyticsCommand = require('../commands/get-channel-analytics');
 
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
-let version = '1.3.12'; // Fallback version for compiled binaries
+let version = '1.3.13'; // Fallback version for compiled binaries
 try {
   const packageJson = require(path.join(__dirname, '../../package.json'));
   version = packageJson.version;
