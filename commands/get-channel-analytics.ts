@@ -296,6 +296,11 @@ async function getChannelAnalyticsCommand(channelHandle: string | undefined, opt
         error('Invalid analytics request. Check your date range, dimensions, and metrics.');
         console.log('');
         console.log('Valid report types: demographics, devices, geography, traffic-sources, subscription-status');
+      } else if (errorMessage.includes('not supported')) {
+        error('Report type not available for this channel.');
+        console.log('');
+        console.log(chalk.dim('Demographic data (age, gender) requires channel owner permissions.'));
+        console.log(chalk.dim('Try other report types: devices, geography, traffic-sources, subscription-status'));
       } else {
         error(errorMessage);
       }

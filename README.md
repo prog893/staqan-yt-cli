@@ -1434,7 +1434,7 @@ Total: 10 result(s)
 - Requires YouTube Analytics API to be enabled in Google Cloud Console
 - Requires re-authentication after enabling analytics API: `staqan-yt auth`
 - Channel must have sufficient views and activity to report analytics
-
+- **Demographic Limitation:** The `demographics` report type (age, gender) requires channel owner permissions and may not be available for all channels, especially smaller or newer channels. If unavailable, try: `devices`, `geography`, `traffic-sources`, or `subscription-status`.
 ---
 
 ### Localization Features
