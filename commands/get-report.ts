@@ -72,11 +72,32 @@ async function getReportCommand(options: ReportOptions): Promise<void> {
 
     if (reports.length === 0) {
       error('No reports available yet.');
-      info('Reports are generated daily. First report takes up to 48 hours.');
+      info('Reports are generated daily. First report takes up to 48 hours after job creation.');
+      info(`Job created: ${new Date().toISOString()}, first report expected by ${new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()}`);
+      console.error('WARNING: Data for the first 48 hours after job creation will not be available.');
       return;
     }
 
     info(`Found ${reports.length} report(s)\n`);
+
+    // Check if requested date range overlaps with 48h window after job creation
+    if (matchingJob.createTime && (options.startDate || options.endDate)) {
+      const jobCreatedTime = new Date(matchingJob.createTime);
+      const dataAvailableTime = new Date(jobCreatedTime.getTime() + 48 * 60 * 60 * 1000);
+
+      const checkDate = (dateStr?: string) => dateStr ? new Date(dateStr) : null;
+      const startDate = checkDate(options.startDate);
+      const endDate = checkDate(options.endDate);
+
+      if (startDate && startDate < dataAvailableTime) {
+        console.error(`WARNING: Requested start date (${options.startDate}) is within 48 hours of job creation.`);
+        console.error(`         Data may be incomplete or unavailable for dates before ${dataAvailableTime.toISOString().split('T')[0]}.`);
+      }
+      if (endDate && endDate < dataAvailableTime) {
+        console.error(`WARNING: Requested end date (${options.endDate}) is within 48 hours of job creation.`);
+        console.error(`         Data may be incomplete or unavailable for dates before ${dataAvailableTime.toISOString().split('T')[0]}.`);
+      }
+    }
 
     // Filter by date range if specified
     if (options.startDate || options.endDate) {

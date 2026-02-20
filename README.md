@@ -15,7 +15,8 @@ A powerful command-line interface for managing YouTube videos and metadata using
 - **Playlist Management** - List and retrieve YouTube playlists
 - **Comments** - List video comments for engagement monitoring
 - **Channel Analytics** - Channel-level analytics reports (demographics, devices, geography, traffic sources, subscription status)
-- **Video Analytics & SEO** - Performance metrics, search terms, traffic sources, and CTR analysis
+- **Video Analytics & SEO** - Performance metrics, search terms, traffic sources
+- **Bulk Reports** - YouTube Reporting API access for CTR, impressions, and historical data
 - **Tags Management** - View and update video tags for better discoverability
 - **Thumbnail Access** - Retrieve video thumbnail URLs in all available qualities
 - **Multiple Output Formats** - JSON, table, text, pretty, or CSV output for any workflow
@@ -172,10 +173,12 @@ The MCP server exposes **15 operations** covering all CLI functionality:
 
 **Analytics:**
 - `youtube_get_channel_analytics` - Get channel-level analytics reports (demographics, devices, geography, etc.)
-- `youtube_get_video_analytics` - Get performance metrics (views, watch time, CTR, etc.)
+- `youtube_get_video_analytics` - Get performance metrics (views, watch time, engagement)
 - `youtube_get_search_terms` - Get YouTube search terms that led to video
 - `youtube_get_traffic_sources` - Get traffic source breakdown
 - `youtube_get_video_retention` - Get audience retention curve
+- `youtube_list_report_types` - List available YouTube Reporting API report types
+- `youtube_get_report` - Download bulk reports (CTR, impressions, historical data)
 
 **Tags & Thumbnails:**
 - `youtube_get_video_tags` - Get video tags
@@ -1191,7 +1194,7 @@ staqan-yt list-comments dQw4w9WgXcQ --output json
 staqan-yt get-video-analytics <videoId> [options]
 ```
 
-Get comprehensive video performance analytics including views, watch time, CTR, and more.
+Get comprehensive video performance analytics including views, watch time, and engagement metrics.
 
 **Arguments:**
 - `videoId` - Video ID or URL
@@ -1437,6 +1440,122 @@ Total: 10 result(s)
 - **Demographic Limitation:** The `demographics` report type (age, gender) requires channel owner permissions and may not be available for all channels, especially smaller or newer channels. If unavailable, try: `devices`, `geography`, `traffic-sources`, or `subscription-status`.
 ---
 
+---
+
+#### 18. List Report Types
+
+```bash
+staqan-yt list-report-types [options]
+```
+
+List all available YouTube Reporting API report types for bulk data downloads.
+
+**Options:**
+- `--output <format>` - Output format: `json`, `table`, `text` (default: `table`)
+- `-v, --verbose` - Enable verbose output with debug information
+
+**Examples:**
+```bash
+# List all report types
+staqan-yt list-report-types
+
+# JSON output
+staqan-yt list-report-types --output json
+```
+
+**Sample Output:**
+```
+Available Report Types:
+
+ID:     channel_reach_basic_a1
+Name:   Reach basic
+
+ID:     channel_reach_combined_a1
+Name:   Reach combined
+
+ID:     channel_traffic_source_a3
+Name:   Traffic sources
+
+...
+Total: 20 report type(s)
+```
+
+---
+
+#### 19. Get Report (Bulk Data)
+
+```bash
+staqan-yt get-report --type <type> [options]
+```
+
+Download bulk reports from YouTube Reporting API (contains CTR, impressions, historical data).
+
+**Required:**
+- `--type <type>` - Report type ID (e.g., `channel_reach_basic_a1` for CTR/impressions)
+
+**Options:**
+- `--start-date <date>` - Start date (YYYY-MM-DD)
+- `--end-date <date>` - End date (YYYY-MM-DD)
+- `--latest` - Download the most recent report
+- `--output <format>` - Output format: `json`, `csv` (default: `csv`)
+- `-v, --verbose` - Enable verbose output with debug information
+
+**Common Report Types:**
+
+| Report Type | Contains | Use For |
+|-------------|----------|---------|
+| `channel_reach_basic_a1` | Thumbnail impressions, CTR | CTR analysis |
+| `channel_reach_combined_a1` | CTR + traffic sources + devices | Detailed CTR breakdown |
+| `channel_traffic_source_a3` | Traffic source metrics | Where views come from |
+| `channel_demographics_a1` | Age, gender demographics | Audience demographics |
+
+**Examples:**
+```bash
+# Download latest CTR report
+staqan-yt get-report --type=channel_reach_basic_a1 --latest
+
+# Download specific date range (JSON)
+staqan-yt get-report --type=channel_reach_basic_a1 \
+  --start-date=2026-01-01 \
+  --end-date=2026-01-31 \
+  --output json
+
+# Download traffic source report
+staqan-yt get-report --type=channel_traffic_source_a3 --latest
+```
+
+**Sample Output:**
+```
+✓ Found existing job: channel_reach_basic_a1 Report Job
+✓ Found 31 report(s)
+
+Downloading report:
+  Period: 2026-01-01 to 2026-01-01
+  Created: 2026-01-03T00:00:00Z
+
+Downloaded to: /tmp/abc123.csv
+
+video_key,day,video_id,video_title,subscribed_status,country_code,video_thumbnail_impressions,video_thumbnail_impressions_ctr
+UCxxxxxxxxxx,2026-01-01,abc123xyz,"My Video",Subscribed,US,12345,8.5
+...
+```
+
+**Important:**
+- **First report takes up to 48 hours** to generate after job creation
+- **Reports are generated daily** for 24-hour periods
+- **Historical data:** If your channel is older than 48 hours, you can request reports from dates prior to job creation
+- **48h window warning:** Data for dates within 48 hours of job creation may be incomplete or unavailable
+- **Requires:** YouTube Reporting API enabled in Google Cloud Console
+- **Re-authentication required** after enabling Reporting API: `staqan-yt auth`
+
+**Setup Steps:**
+1. Enable YouTube Reporting API: https://console.cloud.google.com/apis/library/youtubereporting.googleapis.com
+2. Re-authenticate: `staqan-yt auth`
+3. Run `staqan-yt get-report --type=channel_reach_basic_a1 --latest` to create reporting job
+4. Wait up to 48 hours for first report
+5. Subsequent reports generated daily
+
+---
 ### Localization Features
 
 **Supported Languages:**
