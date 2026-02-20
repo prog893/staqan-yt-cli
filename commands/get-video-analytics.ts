@@ -99,15 +99,19 @@ async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptio
     let ctrData: { impressions: number; ctr: number } | null = null;
 
     try {
-      // Try without dimensions first (aggregated data for the filtered video)
+      // CTR metrics require the "Basic user activity statistics" report
+      // This report has NO dimensions, but can be filtered by video
+      // According to YouTube docs, videoThumbnailImpressions and videoThumbnailImpressionsClickRate
+      // are supported in this report with optional video filter
       const ctrResponse = await retryWithBackoff(async () => {
         return await youtubeAnalytics.reports.query({
           ids: 'channel==MINE',
           startDate,
           endDate,
           metrics: impressionMetrics,
+          // Try WITH video filter to get data for this specific video
           filters: `video==${parsedId}`,
-          // No dimensions - get aggregated data for this video
+          // NO dimensions - required for this report type
         });
       });
 
@@ -121,13 +125,26 @@ async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptio
         const ctr = ctrIndex >= 0 ? (row[ctrIndex] as number) : 0;
 
         ctrData = { impressions, ctr };
-        progress(`✓ Retrieved CTR data: ${impressions} impressions, ${ctr.toFixed(2)}% CTR`);
+        progress(`✓ Retrieved CTR data: ${impressions.toLocaleString()} impressions, ${ctr.toFixed(2)}% CTR`);
       } else {
-        progress('⚠ No CTR data available for this video');
+        debug('CTR query returned no rows');
+        progress('⚠ CTR data not available for this video (may require monetization or minimum views)');
       }
-    } catch (ctrErr) {
-      debug('CTR fetch error:', (ctrErr as Error).message);
-      progress('⚠ CTR data not available (may require API quota or permissions)');
+    } catch (ctrErr: unknown) {
+      const errorMessage = ctrErr instanceof Error ? ctrErr.message : String(ctrErr);
+      debug('CTR fetch error:', errorMessage);
+
+      // Check if it's the "not supported" error
+      if (errorMessage.includes('not supported')) {
+        progress('⚠ CTR metrics not supported by API for this channel/video');
+        debug('Note: CTR metrics (videoThumbnailImpressions, videoThumbnailImpressionsClickRate) are');
+        debug('only available in the "Basic user activity statistics" report and may require:');
+        debug('- Channel monetization');
+        debug('- Minimum impression threshold');
+        debug('- Sufficient video age');
+      } else {
+        progress(`⚠ CTR data unavailable: ${errorMessage}`);
+      }
     }
 
     progress(`✓ Retrieved ${allRows.length} row(s) of analytics data`);
