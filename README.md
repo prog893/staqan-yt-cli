@@ -1541,9 +1541,12 @@ UCxxxxxxxxxx,2026-01-01,abc123xyz,"My Video",Subscribed,US,12345,8.5
 ```
 
 **Important:**
-- **First report takes up to 48 hours** to generate after job creation
-- **Reports are generated daily** for 24-hour periods
-- **Historical data:** If your channel is older than 48 hours, you can request reports from dates prior to job creation
+- **First report batch takes up to 48 hours** to generate after job creation
+  - YouTube generates ALL reports from scratch (historical + new) when job is created
+  - This bulk processing applies to ALL date ranges, including dates before job creation
+  - During this 48h window, no reports will be available (even for historical dates)
+- **After 48h window:** Reports are generated daily for 24-hour periods
+- **Historical data:** You can request reports from any date (before or after job creation), but they won't appear until the first batch completes (~48h)
 - **48h window warning:** Data for dates within 48 hours of job creation may be incomplete or unavailable
 - **Requires:** YouTube Reporting API enabled in Google Cloud Console
 - **Re-authentication required** after enabling Reporting API: `staqan-yt auth`
@@ -1552,8 +1555,8 @@ UCxxxxxxxxxx,2026-01-01,abc123xyz,"My Video",Subscribed,US,12345,8.5
 1. Enable YouTube Reporting API: https://console.cloud.google.com/apis/library/youtubereporting.googleapis.com
 2. Re-authenticate: `staqan-yt auth`
 3. Run `staqan-yt get-report --type=channel_reach_basic_a1 --latest` to create reporting job
-4. Wait up to 48 hours for first report
-5. Subsequent reports generated daily
+4. **Wait up to 48 hours** for first batch of reports (historical + new) to generate
+5. After 48h window, both historical and daily reports will be available
 
 ---
 ### Localization Features
