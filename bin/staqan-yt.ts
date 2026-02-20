@@ -30,6 +30,8 @@ import getChannelCommand = require('../commands/get-channel');
 import listCaptionsCommand = require('../commands/list-captions');
 import getCaptionCommand = require('../commands/get-caption');
 import getChannelAnalyticsCommand = require('../commands/get-channel-analytics');
+import listReportTypesCommand = require('../commands/list-report-types');
+import getReportCommand = require('../commands/get-report');
 
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
 let version = '1.3.13'; // Fallback version for compiled binaries
@@ -296,6 +298,25 @@ program
     // Commander v12+ automatically converts kebab-case to camelCase
     getChannelAnalyticsCommand(channelHandle, options);
   });
+
+// YouTube Reporting API commands
+program
+  .command('list-report-types')
+  .description('List all available YouTube Reporting API report types')
+  .option('--output <format>', 'Output format: json, table, text')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(listReportTypesCommand);
+
+program
+  .command('get-report')
+  .description('Download YouTube Reporting API bulk report (contains CTR, impressions, etc.)')
+  .requiredOption('--type <type>', 'Report type ID (e.g., channel_reach_basic_a1 for CTR data)')
+  .option('--start-date <date>', 'Start date (YYYY-MM-DD)')
+  .option('--end-date <date>', 'End date (YYYY-MM-DD)')
+  .option('--latest', 'Download the most recent report')
+  .option('--output <format>', 'Output format: json, csv', 'csv')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(getReportCommand);
 
 // Show help if no command provided
 if (!process.argv.slice(2).length) {
