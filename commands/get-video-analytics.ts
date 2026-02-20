@@ -56,14 +56,15 @@ async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptio
     debug(`Date range: ${startDate} to ${endDate}`);
     progress(`Fetching analytics from ${startDate} to ${endDate}...`);
 
-    // Default metrics
-    const metrics = options.metrics || 'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares';
+    // Default metrics (split into two groups due to API limitations)
+    const engagementMetrics = options.metrics || 'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares';
+    const impressionMetrics = 'videoThumbnailImpressions,videoThumbnailImpressionsClickRate';
 
     // Chunk date range into 90-day periods
     const dateChunks = chunkDateRange(startDate, endDate);
     debug(`Split into ${dateChunks.length} chunk(s) of 90 days`);
 
-    // Fetch analytics for each chunk
+    // Fetch engagement analytics for each chunk
     const allRows: unknown[][] = [];
     let columnHeaders: { name?: string | null }[] = [];
 
@@ -76,7 +77,7 @@ async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptio
           ids: 'channel==MINE',
           startDate: chunk.start,
           endDate: chunk.end,
-          metrics,
+          metrics: engagementMetrics,
           dimensions: 'video',
           filters: `video==${parsedId}`,
         });
@@ -91,6 +92,42 @@ async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptio
       if (analyticsResponse.data.rows && analyticsResponse.data.rows.length > 0) {
         allRows.push(...analyticsResponse.data.rows);
       }
+    }
+
+    // Fetch impression/CTR metrics separately
+    progress('Fetching impression and CTR data...');
+    let ctrData: { impressions: number; ctr: number } | null = null;
+
+    try {
+      // Try without dimensions first (aggregated data for the filtered video)
+      const ctrResponse = await retryWithBackoff(async () => {
+        return await youtubeAnalytics.reports.query({
+          ids: 'channel==MINE',
+          startDate,
+          endDate,
+          metrics: impressionMetrics,
+          filters: `video==${parsedId}`,
+          // No dimensions - get aggregated data for this video
+        });
+      });
+
+      if (ctrResponse.data.rows && ctrResponse.data.rows.length > 0) {
+        const row = ctrResponse.data.rows[0];
+        const headers = ctrResponse.data.columnHeaders || [];
+        const impressionsIndex = headers.findIndex(h => h.name === 'videoThumbnailImpressions');
+        const ctrIndex = headers.findIndex(h => h.name === 'videoThumbnailImpressionsClickRate');
+
+        const impressions = impressionsIndex >= 0 ? (row[impressionsIndex] as number) : 0;
+        const ctr = ctrIndex >= 0 ? (row[ctrIndex] as number) : 0;
+
+        ctrData = { impressions, ctr };
+        progress(`✓ Retrieved CTR data: ${impressions} impressions, ${ctr.toFixed(2)}% CTR`);
+      } else {
+        progress('⚠ No CTR data available for this video');
+      }
+    } catch (ctrErr) {
+      debug('CTR fetch error:', (ctrErr as Error).message);
+      progress('⚠ CTR data not available (may require API quota or permissions)');
     }
 
     progress(`✓ Retrieved ${allRows.length} row(s) of analytics data`);
@@ -120,6 +157,12 @@ async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptio
       }
     });
 
+    // Add CTR data if available
+    if (ctrData) {
+      aggregated.videoThumbnailImpressions = ctrData.impressions;
+      aggregated.videoThumbnailImpressionsClickRate = ctrData.ctr;
+    }
+
     switch (outputFormat) {
       case 'csv':
         if (allRows.length === 0) {
@@ -130,13 +173,21 @@ async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptio
         break;
 
       case 'json':
-        console.log(formatJson({
+        // Prepare output with CTR data
+        const jsonOutput: Record<string, unknown> = {
           videoId: parsedId,
           title,
           dateRange: { startDate, endDate },
           columnHeaders,
           rows: allRows,
-        }));
+        };
+
+        if (ctrData) {
+          jsonOutput.impressions = ctrData.impressions;
+          jsonOutput.impressionCTR = ctrData.ctr;
+        }
+
+        console.log(formatJson(jsonOutput));
         break;
 
       case 'table':
@@ -177,11 +228,13 @@ async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptio
           const formattedName = name
             .replace(/([A-Z])/g, ' $1')
             .replace(/^./, str => str.toUpperCase())
-            .trim();
+            .trim()
+            .replace('Video Thumbnail Impressions Click Rate', 'Impression CTR')
+            .replace('Video Thumbnail Impressions', 'Thumbnail Impressions');
 
           // Format value
           let formattedValue: string;
-          if (name.includes('Percentage')) {
+          if (name.includes('ClickRate') || name.includes('Percentage')) {
             formattedValue = `${value.toFixed(2)}%`;
           } else if (name.includes('Duration') || name.includes('Minutes')) {
             formattedValue = formatNumber(Math.round(value));
