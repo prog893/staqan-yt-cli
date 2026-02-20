@@ -70,34 +70,43 @@ async function getReportCommand(options: ReportOptions): Promise<void> {
 
     let reports = (await reportsResponse).data.reports || [];
 
-    if (reports.length === 0) {
-      error('No reports available yet.');
-      info('Reports are generated daily. First report takes up to 48 hours after job creation.');
-      info(`Job created: ${new Date().toISOString()}, first report expected by ${new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()}`);
-      console.error('WARNING: Data for the first 48 hours after job creation will not be available.');
-      return;
-    }
-
-    info(`Found ${reports.length} report(s)\n`);
-
     // Check if requested date range overlaps with 48h window after job creation
+    // IMPORTANT: Do this check BEFORE checking if reports exist, so user gets warned immediately
     if (matchingJob.createTime && (options.startDate || options.endDate)) {
-      const jobCreatedTime = new Date(matchingJob.createTime);
+      const jobCreatedTime = new Date(matchingJob.createTime || '');
       const dataAvailableTime = new Date(jobCreatedTime.getTime() + 48 * 60 * 60 * 1000);
 
       const checkDate = (dateStr?: string) => dateStr ? new Date(dateStr) : null;
       const startDate = checkDate(options.startDate);
       const endDate = checkDate(options.endDate);
 
-      if (startDate && startDate < dataAvailableTime) {
+      // Only warn if dates are AFTER job creation but BEFORE 48h window
+      // Historical dates (before job creation) are fine and will return data if available
+      if (startDate && startDate > jobCreatedTime && startDate < dataAvailableTime) {
         console.error(`WARNING: Requested start date (${options.startDate}) is within 48 hours of job creation.`);
         console.error(`         Data may be incomplete or unavailable for dates before ${dataAvailableTime.toISOString().split('T')[0]}.`);
       }
-      if (endDate && endDate < dataAvailableTime) {
+      if (endDate && endDate > jobCreatedTime && endDate < dataAvailableTime) {
         console.error(`WARNING: Requested end date (${options.endDate}) is within 48 hours of job creation.`);
         console.error(`         Data may be incomplete or unavailable for dates before ${dataAvailableTime.toISOString().split('T')[0]}.`);
       }
+
+      // Special case: if requesting dates BEFORE job creation, that's fine for historical data
+      if (startDate && startDate < jobCreatedTime) {
+        info(`Note: Requesting historical data from before job creation. If reports exist, they will be returned.`);
+      }
     }
+
+    if (reports.length === 0) {
+      error('No reports available yet.');
+      info('Reports are generated daily. First report takes up to 48 hours after job creation.');
+      const createdTime = new Date(matchingJob.createTime || '');
+      info(`Job created: ${matchingJob.createTime}, first report expected by ${new Date(createdTime.getTime() + 48 * 60 * 60 * 1000).toISOString()}`);
+      console.error('WARNING: Data for the first 48 hours after job creation will not be available.');
+      return;
+    }
+
+    info(`Found ${reports.length} report(s)\n`);
 
     // Filter by date range if specified
     if (options.startDate || options.endDate) {
