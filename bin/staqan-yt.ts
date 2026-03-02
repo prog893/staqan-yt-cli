@@ -30,6 +30,7 @@ import getChannelCommand = require('../commands/get-channel');
 import listCaptionsCommand = require('../commands/list-captions');
 import getCaptionCommand = require('../commands/get-caption');
 import getChannelAnalyticsCommand = require('../commands/get-channel-analytics');
+import getChannelSearchTermsCommand = require('../commands/get-channel-search-terms');
 
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
 let version = '1.3.13'; // Fallback version for compiled binaries
@@ -280,6 +281,16 @@ program
   .option('--format <format>', 'Caption format: srt, vtt, sbv, srv2, ttml, json (default: json)', 'json')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getCaptionCommand);
+
+// Channel search terms command — lifetime keywords from YouTube Search traffic
+program
+  .command('get-channel-search-terms [channelHandle]')
+  .description('Get lifetime search keywords driving traffic to a channel (YouTube Search source)')
+  .option('-l, --limit <number>', 'Limit number of results', '50')
+  .option('--content-type <type>', 'Filter by content type: all (default), video (non-shorts), shorts', 'all')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(getChannelSearchTermsCommand);
 
 // Channel analytics command (singular - single channel report)
 program

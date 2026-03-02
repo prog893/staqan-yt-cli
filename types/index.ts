@@ -275,6 +275,11 @@ export interface ChannelAnalyticsOptions extends OutputOption, VerboseOption {
   metrics?: string;
 }
 
+// Channel search terms command options
+export interface ChannelSearchTermsOptions extends OutputOption, VerboseOption, LimitOption {
+  contentType?: 'all' | 'video' | 'shorts';
+}
+
 // Utility types
 export interface ChannelHandle {
   type: 'handle' | 'id';
