@@ -13,13 +13,12 @@ const CONTENT_TYPE_FILTERS: Record<string, string> = {
   shorts: 'creatorContentType==SHORT_FORM_CONTENT',
 };
 
-// Metrics supported by the Analytics API for the insightTrafficSourceDetail report.
-// Ref: https://developers.google.com/youtube/analytics/channel_reports
+// Metrics for insightTrafficSourceDetail with insightTrafficSourceType==YT_SEARCH.
+// videoThumbnailImpressions/CTR are only valid for discovery-type sources and
+// cause a 400 when combined with YT_SEARCH. Keep only the two safe ones.
 const ANALYTICS_METRICS = [
   'views',
   'estimatedMinutesWatched',
-  'videoThumbnailImpressions',
-  'videoThumbnailImpressionsClickRate',
 ].join(',');
 
 // This report type enforces a hard limit of 25 results
@@ -190,17 +189,13 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
     const idxTerm  = colIndex('insightTrafficSourceDetail');
     const idxViews = colIndex('views');
     const idxWatch = colIndex('estimatedMinutesWatched');
-    const idxImpr  = colIndex('videoThumbnailImpressions');
-    const idxCtr   = colIndex('videoThumbnailImpressionsClickRate');
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const structuredRows = rows.map((row: any[]) => ({
       rank: 0,           // filled below
       searchTerm:        row[idxTerm]  as string,
       views:             row[idxViews] as number,
-      watchTimeMinutes:  row[idxWatch] as number,
-      impressions:       idxImpr >= 0 ? row[idxImpr] as number : 0,
-      ctr:               idxCtr  >= 0 ? row[idxCtr]  as number : 0,
+      watchTimeMinutes:  idxWatch >= 0 ? row[idxWatch] as number : 0,
     }));
 
     structuredRows.forEach((r, i) => { r.rank = i + 1; });
@@ -233,9 +228,9 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
         break;
 
       case 'text':
-        console.log(['rank', 'searchTerm', 'views', 'watchTimeMinutes', 'impressions', 'ctr'].join('\t'));
+        console.log(['rank', 'searchTerm', 'views', 'watchTimeMinutes'].join('\t'));
         structuredRows.forEach(r => {
-          console.log([r.rank, r.searchTerm, r.views, r.watchTimeMinutes, r.impressions, r.ctr].join('\t'));
+          console.log([r.rank, r.searchTerm, r.views, r.watchTimeMinutes].join('\t'));
         });
         break;
 
@@ -288,12 +283,6 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
             const watchHours = (r.watchTimeMinutes / 60).toFixed(0);
             console.log(chalk.gray('      Watch time:  ') + chalk.cyan(`${formatNumber(parseInt(watchHours, 10))}h`));
           }
-          if (r.impressions > 0) {
-            console.log(chalk.gray('      Impressions: ') + chalk.cyan(formatNumber(r.impressions)));
-          }
-          if (r.ctr > 0) {
-            console.log(chalk.gray('      CTR:         ') + chalk.cyan(`${(r.ctr * 100).toFixed(2)}%`));
-          }
           console.log('');
         });
 
@@ -308,19 +297,16 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
 
     const errorMessage = (err as Error).message || '';
 
+    // Always show the raw API error so nothing is hidden during debugging
+    error(errorMessage);
+
     if (errorMessage.includes('403') || errorMessage.includes('insufficient')) {
-      error('Analytics API access denied. Make sure you have:');
+      console.log('');
+      console.log('Analytics API access denied. Make sure you have:');
       console.log('  1. Enabled YouTube Analytics API in Google Cloud Console');
       console.log('  2. Re-authenticated with: staqan-yt auth');
       console.log('');
       console.log('Required scope: https://www.googleapis.com/auth/yt-analytics.readonly');
-    } else if (errorMessage.includes('400') || errorMessage.includes('not supported')) {
-      error('Analytics query failed. This may happen if:');
-      console.log('  - The channel has no search traffic yet');
-      console.log('  - The content-type filter is unsupported for this account');
-      console.log('  - Re-authenticate if analytics access was recently granted: staqan-yt auth');
-    } else {
-      error(errorMessage);
     }
 
     process.exit(1);
