@@ -286,7 +286,7 @@ program
 program
   .command('get-channel-search-terms [channelHandle]')
   .description('Get lifetime search keywords driving traffic to a channel (YouTube Search source)')
-  .option('-l, --limit <number>', 'Limit number of results', '50')
+  .option('-l, --limit <number>', 'Limit number of results (max 25, API restriction)', '25')
   .option('--content-type <type>', 'Filter by content type: all (default), video (non-shorts), shorts', 'all')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')

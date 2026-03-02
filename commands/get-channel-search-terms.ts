@@ -13,14 +13,18 @@ const CONTENT_TYPE_FILTERS: Record<string, string> = {
   shorts: 'creatorContentType==SHORT_FORM_CONTENT',
 };
 
-// Metrics supported by the Analytics API for insightTrafficSourceDetail dimension.
-// Note: impressions, impressionsClickThroughRate, and estimatedRevenue belong to
-// separate Reach/Revenue report types and are not available here.
+// Metrics supported by the Analytics API for the insightTrafficSourceDetail
+// channel-level report. Reference:
+// https://developers.google.com/youtube/analytics/channel_reports
 const ANALYTICS_METRICS = [
   'views',
   'estimatedMinutesWatched',
-  'subscribersGained',
+  'videoThumbnailImpressions',
+  'videoThumbnailImpressionsClickRate',
 ].join(',');
+
+// This report type enforces a hard limit of 25 results
+const MAX_RESULTS_LIMIT = 25;
 
 // YouTube founding date — used as the effective "lifetime" start
 const YOUTUBE_START_DATE = '2005-02-14';
@@ -101,7 +105,8 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
       : 'insightTrafficSourceType==YT_SEARCH';
 
     const endDate = new Date().toISOString().split('T')[0];
-    const limit = options.limit ? parseInt(options.limit, 10) : 50;
+    // API enforces maxResults ≤ 25 for this report type
+    const limit = Math.min(options.limit ? parseInt(options.limit, 10) : 25, MAX_RESULTS_LIMIT);
 
     debug('Filters:', filters);
     debug(`Date range: ${YOUTUBE_START_DATE} to ${endDate}`);
@@ -136,7 +141,8 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
     const idxTerm  = colIndex('insightTrafficSourceDetail');
     const idxViews = colIndex('views');
     const idxWatch = colIndex('estimatedMinutesWatched');
-    const idxSubs  = colIndex('subscribersGained');
+    const idxImpr  = colIndex('videoThumbnailImpressions');
+    const idxCtr   = colIndex('videoThumbnailImpressionsClickRate');
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const structuredRows = rows.map((row: any[]) => ({
@@ -144,7 +150,8 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
       searchTerm:        row[idxTerm]  as string,
       views:             row[idxViews] as number,
       watchTimeMinutes:  row[idxWatch] as number,
-      subscribersGained: row[idxSubs]  as number,
+      impressions:       idxImpr  >= 0 ? row[idxImpr]  as number : 0,
+      ctr:               idxCtr   >= 0 ? row[idxCtr]   as number : 0,
     }));
 
     structuredRows.forEach((r, i) => { r.rank = i + 1; });
@@ -173,9 +180,9 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
 
       case 'text':
         // Tab-delimited: header then rows
-        console.log(['rank', 'searchTerm', 'views', 'watchTimeMinutes', 'subscribersGained'].join('\t'));
+        console.log(['rank', 'searchTerm', 'views', 'watchTimeMinutes', 'impressions', 'ctr'].join('\t'));
         structuredRows.forEach(r => {
-          console.log([r.rank, r.searchTerm, r.views, r.watchTimeMinutes, r.subscribersGained].join('\t'));
+          console.log([r.rank, r.searchTerm, r.views, r.watchTimeMinutes, r.impressions, r.ctr].join('\t'));
         });
         break;
 
@@ -225,10 +232,13 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
           );
           if (r.watchTimeMinutes > 0) {
             const watchHours = (r.watchTimeMinutes / 60).toFixed(0);
-            console.log(chalk.gray('      Watch time: ') + chalk.cyan(`${formatNumber(parseInt(watchHours, 10))}h`));
+            console.log(chalk.gray('      Watch time:  ') + chalk.cyan(`${formatNumber(parseInt(watchHours, 10))}h`));
           }
-          if (r.subscribersGained > 0) {
-            console.log(chalk.gray('      Subs gained: ') + chalk.green(`+${formatNumber(r.subscribersGained)}`));
+          if (r.impressions > 0) {
+            console.log(chalk.gray('      Impressions: ') + chalk.cyan(formatNumber(r.impressions)));
+          }
+          if (r.ctr > 0) {
+            console.log(chalk.gray('      CTR:         ') + chalk.cyan(`${(r.ctr * 100).toFixed(2)}%`));
           }
           console.log('');
         });
