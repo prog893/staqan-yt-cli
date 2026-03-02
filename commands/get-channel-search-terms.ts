@@ -13,14 +13,13 @@ const CONTENT_TYPE_FILTERS: Record<string, string> = {
   shorts: 'creatorContentType==SHORT_FORM_CONTENT',
 };
 
-// Metrics matching the YouTube Studio "Traffic source: YouTube Search" explore view
+// Metrics supported by the Analytics API for insightTrafficSourceDetail dimension.
+// Note: impressions, impressionsClickThroughRate, and estimatedRevenue belong to
+// separate Reach/Revenue report types and are not available here.
 const ANALYTICS_METRICS = [
   'views',
   'estimatedMinutesWatched',
   'subscribersGained',
-  'estimatedRevenue',
-  'impressions',
-  'impressionsClickThroughRate',
 ].join(',');
 
 // YouTube founding date — used as the effective "lifetime" start
@@ -134,24 +133,18 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
     const colIndex = (name: string) =>
       columnHeaders.findIndex(h => h.name === name);
 
-    const idxTerm    = colIndex('insightTrafficSourceDetail');
-    const idxViews   = colIndex('views');
-    const idxWatch   = colIndex('estimatedMinutesWatched');
-    const idxSubs    = colIndex('subscribersGained');
-    const idxRevenue = colIndex('estimatedRevenue');
-    const idxImpr    = colIndex('impressions');
-    const idxCtr     = colIndex('impressionsClickThroughRate');
+    const idxTerm  = colIndex('insightTrafficSourceDetail');
+    const idxViews = colIndex('views');
+    const idxWatch = colIndex('estimatedMinutesWatched');
+    const idxSubs  = colIndex('subscribersGained');
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const structuredRows = rows.map((row: any[]) => ({
       rank: 0,           // filled below
-      searchTerm:        row[idxTerm]    as string,
-      views:             row[idxViews]   as number,
-      watchTimeMinutes:  row[idxWatch]   as number,
-      subscribersGained: row[idxSubs]    as number,
-      estimatedRevenue:  row[idxRevenue] as number,
-      impressions:       row[idxImpr]    as number,
-      ctr:               row[idxCtr]     as number,
+      searchTerm:        row[idxTerm]  as string,
+      views:             row[idxViews] as number,
+      watchTimeMinutes:  row[idxWatch] as number,
+      subscribersGained: row[idxSubs]  as number,
     }));
 
     structuredRows.forEach((r, i) => { r.rank = i + 1; });
@@ -180,9 +173,9 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
 
       case 'text':
         // Tab-delimited: header then rows
-        console.log(['rank', 'searchTerm', 'views', 'watchTimeMinutes', 'subscribersGained', 'estimatedRevenue', 'impressions', 'ctr'].join('\t'));
+        console.log(['rank', 'searchTerm', 'views', 'watchTimeMinutes', 'subscribersGained'].join('\t'));
         structuredRows.forEach(r => {
-          console.log([r.rank, r.searchTerm, r.views, r.watchTimeMinutes, r.subscribersGained, r.estimatedRevenue, r.impressions, r.ctr].join('\t'));
+          console.log([r.rank, r.searchTerm, r.views, r.watchTimeMinutes, r.subscribersGained].join('\t'));
         });
         break;
 
@@ -236,15 +229,6 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
           }
           if (r.subscribersGained > 0) {
             console.log(chalk.gray('      Subs gained: ') + chalk.green(`+${formatNumber(r.subscribersGained)}`));
-          }
-          if (r.estimatedRevenue > 0) {
-            console.log(chalk.gray('      Revenue:    ') + chalk.yellow(`$${r.estimatedRevenue.toFixed(2)}`));
-          }
-          if (r.impressions > 0) {
-            console.log(chalk.gray('      Impressions: ') + chalk.cyan(formatNumber(r.impressions)));
-          }
-          if (r.ctr > 0) {
-            console.log(chalk.gray('      CTR:         ') + chalk.cyan(`${(r.ctr * 100).toFixed(2)}%`));
           }
           console.log('');
         });
