@@ -13,9 +13,8 @@ const CONTENT_TYPE_FILTERS: Record<string, string> = {
   shorts: 'creatorContentType==SHORT_FORM_CONTENT',
 };
 
-// Metrics supported by the Analytics API for the insightTrafficSourceDetail
-// channel-level report. Reference:
-// https://developers.google.com/youtube/analytics/channel_reports
+// Metrics supported by the Analytics API for the insightTrafficSourceDetail report.
+// Ref: https://developers.google.com/youtube/analytics/channel_reports
 const ANALYTICS_METRICS = [
   'views',
   'estimatedMinutesWatched',
@@ -25,6 +24,9 @@ const ANALYTICS_METRICS = [
 
 // This report type enforces a hard limit of 25 results
 const MAX_RESULTS_LIMIT = 25;
+
+// Maximum video IDs per Analytics API call (documented limit)
+const MAX_VIDEO_IDS = 500;
 
 // YouTube founding date — used as the effective "lifetime" start
 const YOUTUBE_START_DATE = '2005-02-14';
@@ -63,14 +65,17 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
     const youtube = google.youtube({ version: 'v3', auth });
     const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
 
-    // Resolve handle → channel ID and fetch title
+    // Resolve handle → channel ID, uploads playlist ID, and title
     let channelId = parsedChannel.value;
     let channelTitle = '';
+    let uploadsPlaylistId = '';
+
+    const channelParts = ['id', 'snippet', 'contentDetails'];
 
     if (parsedChannel.type === 'handle') {
       debug('Looking up channel by handle:', parsedChannel.value);
       const channelResponse = await youtube.channels.list({
-        part: ['id', 'snippet'],
+        part: channelParts,
         forHandle: parsedChannel.value.replace('@', ''),
       });
 
@@ -82,40 +87,84 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
 
       channelId = channelResponse.data.items[0].id!;
       channelTitle = channelResponse.data.items[0].snippet?.title || '';
+      uploadsPlaylistId = channelResponse.data.items[0].contentDetails?.relatedPlaylists?.uploads || '';
     } else {
       const channelResponse = await youtube.channels.list({
-        part: ['snippet'],
+        part: channelParts,
         id: [parsedChannel.value],
       });
       if (channelResponse.data.items && channelResponse.data.items.length > 0) {
         channelTitle = channelResponse.data.items[0].snippet?.title || '';
+        uploadsPlaylistId = channelResponse.data.items[0].contentDetails?.relatedPlaylists?.uploads || '';
       }
     }
 
     debug('Resolved channel ID:', channelId);
     debug('Channel title:', channelTitle);
+    debug('Uploads playlist ID:', uploadsPlaylistId);
 
-    // Build filter string
+    if (!uploadsPlaylistId) {
+      spinner.fail('Could not determine uploads playlist');
+      error('Unable to find the uploads playlist for this channel.');
+      process.exit(1);
+    }
+
+    // Fetch video IDs from the uploads playlist.
+    // The Analytics API requires video==id1,id2,... in the filter —
+    // there is no channel-wide aggregate endpoint in the public API.
+    // We collect up to MAX_VIDEO_IDS (500) IDs, which is the per-call limit.
+    spinner.text = `Fetching video list from ${channelTitle || channelId}...`;
+
+    const videoIds: string[] = [];
+    let nextPageToken: string | undefined;
+
+    do {
+      const playlistResponse = await youtube.playlistItems.list({
+        part: ['contentDetails'],
+        playlistId: uploadsPlaylistId,
+        maxResults: 50,
+        pageToken: nextPageToken,
+      });
+
+      for (const item of playlistResponse.data.items || []) {
+        const vid = item.contentDetails?.videoId;
+        if (vid) videoIds.push(vid);
+      }
+
+      nextPageToken = playlistResponse.data.nextPageToken || undefined;
+    } while (nextPageToken && videoIds.length < MAX_VIDEO_IDS);
+
+    debug(`Collected ${videoIds.length} video IDs`);
+
+    if (videoIds.length === 0) {
+      spinner.fail('No videos found');
+      error('No videos found for this channel.');
+      process.exit(1);
+    }
+
+    // Build filter: video IDs + traffic source + optional content type
     const contentTypeFilter = options.contentType && options.contentType !== 'all'
       ? CONTENT_TYPE_FILTERS[options.contentType]
       : undefined;
 
+    const videoFilter = `video==${videoIds.join(',')}`;
+    const sourceFilter = 'insightTrafficSourceType==YT_SEARCH';
     const filters = contentTypeFilter
-      ? `insightTrafficSourceType==YT_SEARCH;${contentTypeFilter}`
-      : 'insightTrafficSourceType==YT_SEARCH';
+      ? `${videoFilter};${sourceFilter};${contentTypeFilter}`
+      : `${videoFilter};${sourceFilter}`;
 
     const endDate = new Date().toISOString().split('T')[0];
     // API enforces maxResults ≤ 25 for this report type
     const limit = Math.min(options.limit ? parseInt(options.limit, 10) : 25, MAX_RESULTS_LIMIT);
 
-    debug('Filters:', filters);
+    debug('Video count in filter:', videoIds.length);
+    debug('Filters (truncated):', filters.substring(0, 120) + '...');
     debug(`Date range: ${YOUTUBE_START_DATE} to ${endDate}`);
-    debug('Metrics:', ANALYTICS_METRICS);
 
     spinner.text = 'Fetching channel search terms (lifetime)...';
 
     const analyticsResponse = await youtubeAnalytics.reports.query({
-      ids: `channel==${channelId}`,
+      ids: 'channel==MINE',
       startDate: YOUTUBE_START_DATE,
       endDate,
       metrics: ANALYTICS_METRICS,
@@ -150,8 +199,8 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
       searchTerm:        row[idxTerm]  as string,
       views:             row[idxViews] as number,
       watchTimeMinutes:  row[idxWatch] as number,
-      impressions:       idxImpr  >= 0 ? row[idxImpr]  as number : 0,
-      ctr:               idxCtr   >= 0 ? row[idxCtr]   as number : 0,
+      impressions:       idxImpr >= 0 ? row[idxImpr] as number : 0,
+      ctr:               idxCtr  >= 0 ? row[idxCtr]  as number : 0,
     }));
 
     structuredRows.forEach((r, i) => { r.rank = i + 1; });
@@ -161,6 +210,10 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
       options.contentType === 'shorts' ? 'Shorts only' :
       'All content';
 
+    const videoCountNote = videoIds.length >= MAX_VIDEO_IDS
+      ? ` (first ${MAX_VIDEO_IDS} videos)`
+      : ` (${videoIds.length} videos)`;
+
     switch (outputFormat) {
       case 'json':
         console.log(formatJson({
@@ -168,6 +221,7 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
           channelTitle,
           contentType: contentTypeLabel,
           period: 'lifetime',
+          videosAnalyzed: videoIds.length,
           dateRange: { startDate: YOUTUBE_START_DATE, endDate },
           columnHeaders: columnHeaders.map(h => h.name),
           rows,
@@ -179,7 +233,6 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
         break;
 
       case 'text':
-        // Tab-delimited: header then rows
         console.log(['rank', 'searchTerm', 'views', 'watchTimeMinutes', 'impressions', 'ctr'].join('\t'));
         structuredRows.forEach(r => {
           console.log([r.rank, r.searchTerm, r.views, r.watchTimeMinutes, r.impressions, r.ctr].join('\t'));
@@ -202,9 +255,10 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
         } else {
           console.log(chalk.bold.cyan(channelId));
         }
-        console.log(chalk.gray('Period:       ') + chalk.white('Lifetime'));
-        console.log(chalk.gray('Content type: ') + chalk.white(contentTypeLabel));
+        console.log(chalk.gray('Period:         ') + chalk.white('Lifetime'));
+        console.log(chalk.gray('Content type:   ') + chalk.white(contentTypeLabel));
         console.log(chalk.gray('Traffic source: ') + chalk.white('YouTube Search'));
+        console.log(chalk.gray('Videos covered: ') + chalk.white(`${videoIds.length}${videoIds.length >= MAX_VIDEO_IDS ? ' (capped at 500)' : ''}`));
         console.log('');
 
         if (rows.length === 0) {
@@ -216,7 +270,7 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
           return;
         }
 
-        console.log(chalk.bold(`Top Search Terms (${rows.length}):`));
+        console.log(chalk.bold(`Top Search Terms (${rows.length}${videoCountNote}):`));
         console.log('');
 
         let totalViews = 0;
@@ -260,10 +314,11 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
       console.log('  2. Re-authenticated with: staqan-yt auth');
       console.log('');
       console.log('Required scope: https://www.googleapis.com/auth/yt-analytics.readonly');
-    } else if (errorMessage.includes('400')) {
-      error('Invalid analytics request. This may happen if:');
-      console.log('  - The channel has no lifetime search data yet');
-      console.log('  - The content-type filter is not supported for your account');
+    } else if (errorMessage.includes('400') || errorMessage.includes('not supported')) {
+      error('Analytics query failed. This may happen if:');
+      console.log('  - The channel has no search traffic yet');
+      console.log('  - The content-type filter is unsupported for this account');
+      console.log('  - Re-authenticate if analytics access was recently granted: staqan-yt auth');
     } else {
       error(errorMessage);
     }
