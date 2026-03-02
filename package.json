@@ -1,6 +1,6 @@
 {
   "name": "staqan-yt-cli",
-  "version": "1.3.13",
+  "version": "1.3.14",
   "description": "A powerful CLI tool for managing YouTube videos and metadata using the YouTube Data API v3",
   "main": "dist/bin/staqan-yt.js",
   "bin": {

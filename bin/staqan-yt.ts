@@ -33,7 +33,7 @@ import getChannelAnalyticsCommand = require('../commands/get-channel-analytics')
 import getChannelSearchTermsCommand = require('../commands/get-channel-search-terms');
 
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
-let version = '1.3.13'; // Fallback version for compiled binaries
+let version = '1.3.14'; // Fallback version for compiled binaries
 try {
   const packageJson = require(path.join(__dirname, '../../package.json'));
   version = packageJson.version;
