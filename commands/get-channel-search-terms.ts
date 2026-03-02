@@ -152,19 +152,21 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
       ? `${videoFilter};${sourceFilter};${contentTypeFilter}`
       : `${videoFilter};${sourceFilter}`;
 
-    const endDate = new Date().toISOString().split('T')[0];
+    const endDate = options.endDate || new Date().toISOString().split('T')[0];
+    const startDate = options.startDate || YOUTUBE_START_DATE;
+    const isLifetime = startDate === YOUTUBE_START_DATE;
     // API enforces maxResults ≤ 25 for this report type
     const limit = Math.min(options.limit ? parseInt(options.limit, 10) : 25, MAX_RESULTS_LIMIT);
 
     debug('Video count in filter:', videoIds.length);
     debug('Filters (truncated):', filters.substring(0, 120) + '...');
-    debug(`Date range: ${YOUTUBE_START_DATE} to ${endDate}`);
+    debug(`Date range: ${startDate} to ${endDate}`);
 
-    spinner.text = 'Fetching channel search terms (lifetime)...';
+    spinner.text = `Fetching channel search terms (${isLifetime ? 'lifetime' : `${startDate} → ${endDate}`})...`;
 
     const analyticsResponse = await youtubeAnalytics.reports.query({
       ids: 'channel==MINE',
-      startDate: YOUTUBE_START_DATE,
+      startDate,
       endDate,
       metrics: ANALYTICS_METRICS,
       dimensions: 'insightTrafficSourceDetail',
@@ -215,9 +217,9 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
           channelId,
           channelTitle,
           contentType: contentTypeLabel,
-          period: 'lifetime',
+          period: isLifetime ? 'lifetime' : 'custom',
           videosAnalyzed: videoIds.length,
-          dateRange: { startDate: YOUTUBE_START_DATE, endDate },
+          dateRange: { startDate, endDate },
           columnHeaders: columnHeaders.map(h => h.name),
           rows,
         }));
@@ -250,7 +252,7 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
         } else {
           console.log(chalk.bold.cyan(channelId));
         }
-        console.log(chalk.gray('Period:         ') + chalk.white('Lifetime'));
+        console.log(chalk.gray('Period:         ') + chalk.white(isLifetime ? 'Lifetime' : `${startDate} → ${endDate}`));
         console.log(chalk.gray('Content type:   ') + chalk.white(contentTypeLabel));
         console.log(chalk.gray('Traffic source: ') + chalk.white('YouTube Search'));
         console.log(chalk.gray('Videos covered: ') + chalk.white(`${videoIds.length}${videoIds.length >= MAX_VIDEO_IDS ? ' (capped at 500)' : ''}`));

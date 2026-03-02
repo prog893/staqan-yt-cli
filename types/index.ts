@@ -278,6 +278,8 @@ export interface ChannelAnalyticsOptions extends OutputOption, VerboseOption {
 // Channel search terms command options
 export interface ChannelSearchTermsOptions extends OutputOption, VerboseOption, LimitOption {
   contentType?: 'all' | 'video' | 'shorts';
+  startDate?: string;
+  endDate?: string;
 }
 
 // Utility types

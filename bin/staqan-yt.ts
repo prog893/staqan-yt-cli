@@ -282,12 +282,14 @@ program
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getCaptionCommand);
 
-// Channel search terms command — lifetime keywords from YouTube Search traffic
+// Channel search terms command — top keywords from YouTube Search traffic
 program
   .command('get-channel-search-terms [channelHandle]')
-  .description('Get lifetime search keywords driving traffic to a channel (YouTube Search source)')
+  .description('Get top search keywords driving traffic to a channel (YouTube Search source)')
   .option('-l, --limit <number>', 'Limit number of results (max 25, API restriction)', '25')
   .option('--content-type <type>', 'Filter by content type: all (default), video (non-shorts), shorts', 'all')
+  .option('--start-date <date>', 'Start date (YYYY-MM-DD), defaults to all-time (2005-02-14)')
+  .option('--end-date <date>', 'End date (YYYY-MM-DD), defaults to today')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getChannelSearchTermsCommand);
