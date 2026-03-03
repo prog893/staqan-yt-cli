@@ -1587,59 +1587,6 @@ staqan-yt get-report-data --type=channel_reach_basic_a1 --output csv
 5. Run again to fetch data
 
 ---
-
-#### 21. Download Expiring Reports
-
-```bash
-staqan-yt download-expiring-reports --type <id> [options]
-```
-
-Download reports expiring soon to prevent data loss. Archives to `~/.staqan-yt/reports/`.
-
-**Required:**
-- `--type <id>` - Report type ID (e.g., `channel_reach_basic_a1`)
-
-**Options:**
-- `--days <number>` - Expiration threshold in days (default: `7`)
-- `--output-dir <dir>` - Output directory (default: `~/.staqan-yt/reports`)
-- `-v, --verbose` - Enable verbose output with debug information
-
-**Examples:**
-```bash
-# Download reports expiring within 7 days
-staqan-yt download-expiring-reports --type=channel_reach_basic_a1
-
-# Download reports expiring within 14 days to custom directory
-staqan-yt download-expiring-reports --type=channel_reach_basic_a1 --days 14 --output-dir ~/backup/reports
-```
-
-**Sample Output:**
-```
-⚠️  Found 3 report(s) expiring within 7 days
-
-Downloading: channel_reach_basic_a1_2026-02-24_to_2026-02-25.csv (expires in 7 days)...
-  ✓ Downloaded: channel_reach_basic_a1_2026-02-24_to_2026-02-25.csv
-
-Downloading: channel_reach_basic_a1_2026-02-25_to_2026-02-26.csv (expires in 6 days)...
-  ✓ Downloaded: channel_reach_basic_a1_2026-02-25_to_2026-02-26.csv
-
----
-Downloaded 2 report(s) to /Users/prog893/.staqan-yt/reports
-
-💡 Tip: Run this command weekly to stay ahead of expiration
-💡 Or use cron: 0 9 * * 0 staqan-yt download-expiring-reports --type=channel_reach_basic_a1
-```
-
-**Cron Setup (Optional):**
-```bash
-# Edit crontab
-crontab -e
-
-# Add weekly check (Sundays at 9 AM JST)
-0 9 * * 0 staqan-yt download-expiring-reports --type=channel_reach_basic_a1 >> ~/.staqan-yt/download.log 2>&1
-```
-
----
 ### Localization Features
 
 **Supported Languages:**

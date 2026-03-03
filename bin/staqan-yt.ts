@@ -33,7 +33,6 @@ import getChannelAnalyticsCommand = require('../commands/get-channel-analytics')
 import listReportTypesCommand = require('../commands/list-report-types');
 import listReportJobsCommand = require('../commands/list-report-jobs');
 import getReportDataCommand = require('../commands/get-report-data');
-import downloadExpiringReportsCommand = require('../commands/download-expiring-reports');
 
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
 let version = '1.3.13'; // Fallback version for compiled binaries
@@ -327,15 +326,6 @@ program
   .option('--output <format>', 'Output format: json, csv', 'json')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getReportDataCommand);
-
-program
-  .command('download-expiring-reports')
-  .description('Download reports expiring soon to prevent data loss')
-  .requiredOption('--type <id>', 'Report type ID (e.g., channel_reach_basic_a1)')
-  .option('--days <number>', 'Expiration threshold in days', '7')
-  .option('--output-dir <dir>', 'Output directory (default: ~/.staqan-yt/reports)')
-  .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(downloadExpiringReportsCommand);
 
 // Show help if no command provided
 if (!process.argv.slice(2).length) {
