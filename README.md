@@ -1581,10 +1581,12 @@ staqan-yt get-report-data --type=channel_reach_basic_a1 --output csv
 
 **Setup Steps:**
 1. Enable YouTube Reporting API: https://console.cloud.google.com/apis/library/youtubereporting.googleapis.com
-2. Re-authenticate: `staqan-yt auth`
+2. Re-authenticate to add Reporting API scope: `staqan-yt auth`
 3. Run `staqan-yt get-report-data --type=channel_reach_basic_a1`
 4. **Wait 48 hours** for first report
 5. Run again to fetch data
+
+**Important:** You must re-run `staqan-yt auth` after enabling the Reporting API to add the required OAuth scopes.
 
 ---
 ### Localization Features

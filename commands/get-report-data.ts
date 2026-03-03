@@ -149,15 +149,37 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
       progress(`  Downloading: ${report.startTime} to ${report.endTime}...\n`);
 
-      await new Promise<void>((resolve, reject) => {
-        const file = createWriteStream(tmpPath);
+      // Get access token for authenticated request
+      const accessToken = await auth.getAccessToken();
 
-        https.get(report.downloadUrl!, (response) => {
+      await new Promise<void>((resolve, reject) => {
+        const url = new URL(report.downloadUrl!);
+
+        const options = {
+          hostname: url.hostname,
+          path: url.pathname + url.search,
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          }
+        };
+
+        https.get(options, (response) => {
+          if (response.statusCode === 401 || response.statusCode === 403) {
+            unlink(tmpPath).catch(() => {});
+            error(`HTTP ${response.statusCode}: Unauthorized`);
+            error(`\nYour access token may lack the required scope for YouTube Reporting API.`);
+            error(`Please run: staqan-yt auth`);
+            error(`This will re-authenticate and add the necessary permissions.`);
+            process.exit(1);
+          }
+          
           if (response.statusCode !== 200) {
+            unlink(tmpPath).catch(() => {});
             reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
             return;
           }
 
+          const file = createWriteStream(tmpPath);
           response.pipe(file);
 
           file.on('finish', () => {
@@ -169,7 +191,10 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
             unlink(tmpPath).catch(() => {});
             reject(err);
           });
-        }).on('error', reject);
+        }).on('error', (err) => {
+          unlink(tmpPath).catch(() => {});
+          reject(err);
+        });
       });
 
       // Parse CSV
