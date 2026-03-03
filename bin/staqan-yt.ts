@@ -31,7 +31,9 @@ import listCaptionsCommand = require('../commands/list-captions');
 import getCaptionCommand = require('../commands/get-caption');
 import getChannelAnalyticsCommand = require('../commands/get-channel-analytics');
 import listReportTypesCommand = require('../commands/list-report-types');
-import getReportCommand = require('../commands/get-report');
+import listReportJobsCommand = require('../commands/list-report-jobs');
+import getReportDataCommand = require('../commands/get-report-data');
+import downloadExpiringReportsCommand = require('../commands/download-expiring-reports');
 
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
 let version = '1.3.13'; // Fallback version for compiled binaries
@@ -308,15 +310,32 @@ program
   .action(listReportTypesCommand);
 
 program
-  .command('get-report')
-  .description('Download YouTube Reporting API bulk report (contains CTR, impressions, etc.)')
-  .requiredOption('--type <type>', 'Report type ID (e.g., channel_reach_basic_a1 for CTR data)')
+  .command('list-report-jobs')
+  .description('List YouTube Reporting API jobs with status and expiration warnings')
+  .option('--type <id>', 'Filter by report type ID (e.g., channel_reach_basic_a1)')
+  .option('--output <format>', 'Output format: json, table, text')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(listReportJobsCommand);
+
+program
+  .command('get-report-data')
+  .description('Get YouTube Reporting API report data (thumbnail impressions, CTR, etc.)')
+  .requiredOption('--type <id>', 'Report type ID (e.g., channel_reach_basic_a1 for thumbnail data)')
+  .option('--video-id <id>', 'Filter by video ID')
   .option('--start-date <date>', 'Start date (YYYY-MM-DD)')
   .option('--end-date <date>', 'End date (YYYY-MM-DD)')
-  .option('--latest', 'Download the most recent report')
-  .option('--output <format>', 'Output format: json, csv', 'csv')
+  .option('--output <format>', 'Output format: json, csv', 'json')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(getReportCommand);
+  .action(getReportDataCommand);
+
+program
+  .command('download-expiring-reports')
+  .description('Download reports expiring soon to prevent data loss')
+  .requiredOption('--type <id>', 'Report type ID (e.g., channel_reach_basic_a1)')
+  .option('--days <number>', 'Expiration threshold in days', '7')
+  .option('--output-dir <dir>', 'Output directory (default: ~/.staqan-yt/reports)')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(downloadExpiringReportsCommand);
 
 // Show help if no command provided
 if (!process.argv.slice(2).length) {

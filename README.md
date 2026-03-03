@@ -1463,100 +1463,181 @@ staqan-yt list-report-types
 staqan-yt list-report-types --output json
 ```
 
+---
+
+#### 19. List Report Jobs
+
+```bash
+staqan-yt list-report-jobs [options]
+```
+
+List YouTube Reporting API jobs with status, expiration warnings, and sliding window information.
+
+**Options:**
+- `--type <id>` - Filter by report type ID (e.g., `channel_reach_basic_a1`)
+- `--output <format>` - Output format: `json`, `table`, `text` (default: `table`)
+- `-v, --verbose` - Enable verbose output with debug information
+
+**Examples:**
+```bash
+# List all jobs
+staqan-yt list-report-jobs
+
+# List jobs for specific report type
+staqan-yt list-report-jobs --type=channel_reach_basic_a1
+```
+
 **Sample Output:**
 ```
-Available Report Types:
+Job ID:     39b972ed-68b3-470a-8521-5cd50adc7b43
+Report Type: channel_reach_basic_a1
+Name:       channel_reach_basic_a1 Report Job
+Created:    2026-02-20T17:43:35Z
+Status:     Active (11 days ago)
 
-ID:     channel_reach_basic_a1
-Name:   Reach basic
+  Reports: 47 available
+    Latest: 2026-03-02 to 2026-03-03 (created 2026-03-04T00:34:10Z)
+    Oldest: 2026-02-24 to 2026-02-25 (created 2026-02-26T06:53:07Z)
 
-ID:     channel_reach_combined_a1
-Name:   Reach combined
-
-ID:     channel_traffic_source_a3
-Name:   Traffic sources
-
-...
-Total: 20 report type(s)
+📊 Sliding window phase: Growing (will stabilize at 60 days around 2026-04-20)
+⚠️  Reports expire after 30 days (historical) or 60 days (regular)
+💡 Download reports before expiration to avoid data loss
 ```
 
 ---
 
-#### 19. Get Report (Bulk Data)
+#### 20. Get Report Data
 
 ```bash
-staqan-yt get-report --type <type> [options]
+staqan-yt get-report-data --type <id> [options]
 ```
 
-Download bulk reports from YouTube Reporting API (contains CTR, impressions, historical data).
+Get YouTube Reporting API report data (thumbnail impressions, CTR, etc.). Automatically creates jobs if needed.
 
 **Required:**
-- `--type <type>` - Report type ID (e.g., `channel_reach_basic_a1` for CTR/impressions)
+- `--type <id>` - Report type ID (e.g., `channel_reach_basic_a1` for thumbnail data)
 
 **Options:**
+- `--video-id <id>` - Filter by video ID
 - `--start-date <date>` - Start date (YYYY-MM-DD)
 - `--end-date <date>` - End date (YYYY-MM-DD)
-- `--latest` - Download the most recent report
-- `--output <format>` - Output format: `json`, `csv` (default: `csv`)
+- `--output <format>` - Output format: `json`, `csv` (default: `json`)
 - `-v, --verbose` - Enable verbose output with debug information
 
 **Common Report Types:**
 
 | Report Type | Contains | Use For |
 |-------------|----------|---------|
-| `channel_reach_basic_a1` | Thumbnail impressions, CTR | CTR analysis |
+| `channel_reach_basic_a1` | Thumbnail impressions, CTR | Thumbnail performance |
 | `channel_reach_combined_a1` | CTR + traffic sources + devices | Detailed CTR breakdown |
-| `channel_traffic_source_a3` | Traffic source metrics | Where views come from |
-| `channel_demographics_a1` | Age, gender demographics | Audience demographics |
 
 **Examples:**
 ```bash
-# Download latest CTR report
-staqan-yt get-report --type=channel_reach_basic_a1 --latest
+# Get latest data for all videos
+staqan-yt get-report-data --type=channel_reach_basic_a1
 
-# Download specific date range (JSON)
-staqan-yt get-report --type=channel_reach_basic_a1 \
-  --start-date=2026-01-01 \
-  --end-date=2026-01-31 \
-  --output json
+# Get data for specific video
+staqan-yt get-report-data --type=channel_reach_basic_a1 --video-id=eeYl2dxv57g
 
-# Download traffic source report
-staqan-yt get-report --type=channel_traffic_source_a3 --latest
+# Get date range
+staqan-yt get-report-data --type=channel_reach_basic_a1 \
+  --start-date=2026-02-24 \
+  --end-date=2026-03-02
+
+# CSV output
+staqan-yt get-report-data --type=channel_reach_basic_a1 --output csv
 ```
 
 **Sample Output:**
-```
-✓ Found existing job: channel_reach_basic_a1 Report Job
-✓ Found 31 report(s)
-
-Downloading report:
-  Period: 2026-01-01 to 2026-01-01
-  Created: 2026-01-03T00:00:00Z
-
-Downloaded to: /tmp/abc123.csv
-
-video_key,day,video_id,video_title,subscribed_status,country_code,video_thumbnail_impressions,video_thumbnail_impressions_ctr
-UCxxxxxxxxxx,2026-01-01,abc123xyz,"My Video",Subscribed,US,12345,8.5
-...
+```json
+[
+  {
+    "date": "20260228",
+    "channel_id": "UCBQQNUsrd9mgCjsrLogKW6Q",
+    "video_id": "eeYl2dxv57g",
+    "video_thumbnail_impressions": "18",
+    "video_thumbnail_impressions_ctr": "0"
+  }
+]
 ```
 
-**Important:**
-- **First report batch takes up to 48 hours** to generate after job creation
-  - YouTube generates ALL reports from scratch (historical + new) when job is created
-  - This bulk processing applies to ALL date ranges, including dates before job creation
-  - During this 48h window, no reports will be available (even for historical dates)
-- **After 48h window:** Reports are generated daily for 24-hour periods
-- **Historical data:** You can request reports from any date (before or after job creation), but they won't appear until the first batch completes (~48h)
-- **48h window warning:** Data for dates within 48 hours of job creation may be incomplete or unavailable
-- **Requires:** YouTube Reporting API enabled in Google Cloud Console
-- **Re-authentication required** after enabling Reporting API: `staqan-yt auth`
+**Important Notes:**
+
+⚠️ **48-Hour Initial Wait**
+- First-time job creation requires 48 hours for first report
+- After 48h: daily reports generated automatically
+- Job runs forever (no need to recreate)
+
+⚠️ **Data Expiration (Sliding Window)**
+- Historical reports: 30 days from creation
+- Regular reports: 60 days from creation
+- Once stable: 60-day rolling window
+- **Download before expiration or lose data forever**
+
+⚠️ **Date Range Limitations**
+- Cannot retrieve data older than 60 days (unless downloaded previously)
+- Expired data is permanently deleted from YouTube's servers
+- Error messages will indicate missing date ranges
 
 **Setup Steps:**
 1. Enable YouTube Reporting API: https://console.cloud.google.com/apis/library/youtubereporting.googleapis.com
 2. Re-authenticate: `staqan-yt auth`
-3. Run `staqan-yt get-report --type=channel_reach_basic_a1 --latest` to create reporting job
-4. **Wait up to 48 hours** for first batch of reports (historical + new) to generate
-5. After 48h window, both historical and daily reports will be available
+3. Run `staqan-yt get-report-data --type=channel_reach_basic_a1`
+4. **Wait 48 hours** for first report
+5. Run again to fetch data
+
+---
+
+#### 21. Download Expiring Reports
+
+```bash
+staqan-yt download-expiring-reports --type <id> [options]
+```
+
+Download reports expiring soon to prevent data loss. Archives to `~/.staqan-yt/reports/`.
+
+**Required:**
+- `--type <id>` - Report type ID (e.g., `channel_reach_basic_a1`)
+
+**Options:**
+- `--days <number>` - Expiration threshold in days (default: `7`)
+- `--output-dir <dir>` - Output directory (default: `~/.staqan-yt/reports`)
+- `-v, --verbose` - Enable verbose output with debug information
+
+**Examples:**
+```bash
+# Download reports expiring within 7 days
+staqan-yt download-expiring-reports --type=channel_reach_basic_a1
+
+# Download reports expiring within 14 days to custom directory
+staqan-yt download-expiring-reports --type=channel_reach_basic_a1 --days 14 --output-dir ~/backup/reports
+```
+
+**Sample Output:**
+```
+⚠️  Found 3 report(s) expiring within 7 days
+
+Downloading: channel_reach_basic_a1_2026-02-24_to_2026-02-25.csv (expires in 7 days)...
+  ✓ Downloaded: channel_reach_basic_a1_2026-02-24_to_2026-02-25.csv
+
+Downloading: channel_reach_basic_a1_2026-02-25_to_2026-02-26.csv (expires in 6 days)...
+  ✓ Downloaded: channel_reach_basic_a1_2026-02-25_to_2026-02-26.csv
+
+---
+Downloaded 2 report(s) to /Users/prog893/.staqan-yt/reports
+
+💡 Tip: Run this command weekly to stay ahead of expiration
+💡 Or use cron: 0 9 * * 0 staqan-yt download-expiring-reports --type=channel_reach_basic_a1
+```
+
+**Cron Setup (Optional):**
+```bash
+# Edit crontab
+crontab -e
+
+# Add weekly check (Sundays at 9 AM JST)
+0 9 * * 0 staqan-yt download-expiring-reports --type=channel_reach_basic_a1 >> ~/.staqan-yt/download.log 2>&1
+```
 
 ---
 ### Localization Features
