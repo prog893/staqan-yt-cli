@@ -13,6 +13,11 @@ const COMMAND_GROUPS: Record<string, string[]> = {
     'auth',
     'config',
   ],
+  'Channel': [
+    'get-channel',
+    'get-channel-analytics',
+    'list-playlists',
+  ],
   'Video Discovery': [
     'list-videos',
     'get-video',
@@ -33,9 +38,23 @@ const COMMAND_GROUPS: Record<string, string[]> = {
   ],
   'Analytics & Insights': [
     'get-video-analytics',
+    'get-video-retention',
     'get-search-terms',
     'get-traffic-sources',
-    'get-video-retention',
+  ],
+  'Reporting API': [
+    'list-report-types',
+    'list-report-jobs',
+    'get-report-data',
+  ],
+  'Playlist': [
+    'get-playlist',
+    'get-playlists',
+  ],
+  'Comments & Captions': [
+    'list-comments',
+    'list-captions',
+    'get-caption',
   ],
 };
 

@@ -304,7 +304,9 @@ staqan-yt list-playlists @channelname --limit 50 --output json
 
 ## Commands
 
-#### 1. Authentication
+### Setup & Configuration
+
+#### Authentication
 
 ```bash
 staqan-yt auth
@@ -322,7 +324,7 @@ Starting authentication process...
 
 ---
 
-#### 2. Configuration Management
+#### Configuration Management
 
 ```bash
 staqan-yt config [action] [key] [value]
@@ -372,706 +374,55 @@ staqan-yt config get default.channel
 - `pretty` - Colorful, human-friendly output with formatting (default)
 - `csv` - RFC 4180 CSV format for Excel and data analysis
 
-**Example Workflow:**
-```bash
-# Set up your defaults once
-staqan-yt config set default.channel @staqan
-staqan-yt config set default.output csv
-
-# Now these commands work without extra arguments
-staqan-yt list-videos --limit 5        # Uses @staqan from config, outputs CSV
-
-# Export to Excel
-staqan-yt list-videos --limit 50 > videos.csv
-
-# You can always override the format
-staqan-yt list-videos --limit 5 --output table  # Show as ASCII table instead
-staqan-yt search-videos "craft beer"   # Uses @staqan from config, outputs CSV
-
-# Override defaults when needed
-staqan-yt list-videos @otherChannel --limit 5  # Uses different channel
-```
-
 ---
 
-#### 3. List Channel Videos
+### Channel
+
+#### Get Channel Information
 
 ```bash
-staqan-yt list-videos [channelHandle] [options]
+staqan-yt get-channel [channelHandle] [options]
 ```
 
-List all videos from a YouTube channel.
+Get detailed metadata for a YouTube channel.
 
 **Arguments:**
 - `channelHandle` - (Optional) Channel @handle, username, or URL. Uses `default.channel` from config if not provided.
 
 **Options:**
-- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
-- `-l, --limit <number>` - Limit number of results (default: 50)
-
-**Examples:**
-
-```bash
-# Using @handle
-staqan-yt channel-videos @mkbhd
-
-# Using channel URL
-staqan-yt channel-videos https://www.youtube.com/@mkbhd
-
-# Limit results and JSON output
-staqan-yt channel-videos @mkbhd --limit 10 --output json
-```
-
-**Sample Output:**
-```
-✓ Found 50 video(s)
-
-[1] Amazing Tech Review
-  ID: dQw4w9WgXcQ
-  Published: Jan 15, 2024
-  URL: https://youtube.com/watch?v=dQw4w9WgXcQ
-
-[2] Another Great Video
-  ID: abc123xyz78
-  Published: Jan 10, 2024
-  URL: https://youtube.com/watch?v=abc123xyz78
-```
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`)
 
 ---
 
-#### 3. Get Video Information
+#### Get Channel Analytics
 
 ```bash
-staqan-yt video-info <videoIds...> [options]
+staqan-yt get-channel-analytics [channelHandle] [options]
 ```
 
-Get detailed metadata for one or more videos.
+Get channel-level analytics reports (demographics, devices, geography, traffic sources, subscription status).
 
 **Arguments:**
-- `videoIds` - One or more video IDs or URLs
+- `channelHandle` - (Optional) Channel @handle, username, or URL. Uses `default.channel` from config if not provided.
 
 **Options:**
-- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
+- `--report-type <type>` - Report type: `demographics`, `devices`, `geography`, `traffic-sources`, `subscription-status` (default: `demographics`)
+- `--start-date <date>` - Start date (YYYY-MM-DD, default: 30 days ago)
+- `--end-date <date>` - End date (YYYY-MM-DD, default: today)
+- `--output <format>` - Output format: `json`, `table`, `csv`, `text`, `pretty` (default: `pretty`)
 
-**Examples:**
-
+**Example:**
 ```bash
-# Single video
-staqan-yt video-info dQw4w9WgXcQ
+# View device type breakdown
+staqan-yt get-channel-analytics --report-type devices
 
-# Multiple videos
-staqan-yt video-info dQw4w9WgXcQ abc123xyz78
-
-# Using URLs
-staqan-yt video-info https://youtube.com/watch?v=dQw4w9WgXcQ
-
-# JSON output
-staqan-yt video-info dQw4w9WgXcQ --output json
-```
-
-**Sample Output:**
-```
-✓ Retrieved information for 1 video(s)
-
-Amazing Tech Review
-
-Video ID:     dQw4w9WgXcQ
-Channel:      TechChannel
-Published:    Jan 15, 2024
-Duration:     PT10M30S
-Privacy:      public
-
-Statistics:
-  Views:      1,234,567
-  Likes:      45,678
-  Comments:   1,234
-
-Tags:
-  tech, review, smartphone, 2024
-
-Description:
-  In this video, we review the latest smartphone...
-
-URL:          https://youtube.com/watch?v=dQw4w9WgXcQ
+# Geography data for last 90 days
+staqan-yt get-channel-analytics --report-type geography --start-date 2024-01-01 --output csv
 ```
 
 ---
 
-#### 4. Update Video Metadata
-
-```bash
-staqan-yt update-metadata <videoId> [options]
-```
-
-Update video title and/or description.
-
-**Arguments:**
-- `videoId` - Video ID or URL
-
-**Options:**
-- `-t, --title <title>` - New video title
-- `-d, --description <description>` - New video description
-- `--dry-run` - Preview changes without applying them
-- `-y, --yes` - Skip confirmation prompt
-
-**Examples:**
-
-```bash
-# Update title only
-staqan-yt update-metadata dQw4w9WgXcQ --title "New Title"
-
-# Update description only
-staqan-yt update-metadata dQw4w9WgXcQ --description "New description text"
-
-# Update both
-staqan-yt update-metadata dQw4w9WgXcQ \
-  --title "New Title" \
-  --description "New description"
-
-# Preview without applying
-staqan-yt update-metadata dQw4w9WgXcQ --title "Test" --dry-run
-
-# Skip confirmation
-staqan-yt update-metadata dQw4w9WgXcQ --title "New Title" --yes
-```
-
-**Sample Output:**
-```
-✓ Current metadata retrieved
-
-Current metadata:
-Title:       Old Video Title
-Description: Old description text...
-
-Proposed changes:
-Title:       New Video Title
-Description: (no change)
-
-Apply these changes? (y/N): y
-✓ Metadata updated successfully
-
-✓ Video updated: https://youtube.com/watch?v=dQw4w9WgXcQ
-```
-
----
-
-#### 5. Search Channel Videos
-
-```bash
-staqan-yt search-videos <query> [options]
-```
-
-Search for videos on YouTube or within a specific channel.
-
-**Arguments:**
-- `query` - Search query string
-
-**Options:**
-- `-g, --global` - Search all of YouTube (ignores channel filters)
-- `-c, --channel <handle>` - Search within a specific channel (overrides config default)
-- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
-- `-l, --limit <number>` - Limit number of results (default: 25)
-- `-v, --verbose` - Enable verbose output with debug information
-
-**Examples:**
-
-```bash
-# Global YouTube search
-staqan-yt search-videos "python tutorial" --global
-
-# Search within a specific channel
-staqan-yt search-videos "smartphone review" --channel @mkbhd
-
-# Search using default channel from config
-staqan-yt search-videos "smartphone review"
-
-# Limit results and output format
-staqan-yt search-videos "machine learning" --global --limit 10 --output json
-
-# Export search results to CSV
-staqan-yt search-videos "rust programming" --global --output csv > results.csv
-```
-
-**Sample Output:**
-```
-✓ Found 5 video(s)
-
-[1] Python Tutorial for Beginners
-  ID: dQw4w9WgXcQ
-  Channel: @programming
-  Published: Jan 15, 2024
-  URL: https://youtube.com/watch?v=dQw4w9WgXcQ
-
-[2] Learn Python in 1 Hour
-  ID: abc123xyz78
-  Channel: @codemaster
-  Published: Dec 20, 2023
-  URL: https://youtube.com/watch?v=abc123xyz78
-```
-
----
-
-#### 6. Get All Video Localizations
-
-```bash
-staqan-yt get-video-localizations <videoId> [options]
-```
-
-Get all video localizations including the main metadata language.
-
-**Arguments:**
-- `videoId` - Video ID or URL
-
-**Options:**
-- `--languages <langs>` - Comma-separated list of languages to filter (e.g., "en,ja,ru")
-- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
-
-**Examples:**
-
-```bash
-# Get all localizations
-staqan-yt get-video-localizations dQw4w9WgXcQ
-
-# Filter specific languages
-staqan-yt get-video-localizations dQw4w9WgXcQ --languages "ja,ru"
-
-# JSON output
-staqan-yt get-video-localizations dQw4w9WgXcQ --output json
-```
-
-**Sample Output:**
-```
-✓ Retrieved 2 localization(s)
-
-Localizations for video: dQw4w9WgXcQ
-
-[MAIN] English (en)
-  Title:      Original Video Title
-  Description: Original video description...
-
-[LOCALIZATION] Japanese (ja)
-  Title:      日本語タイトル
-  Description: 日本語の説明...
-```
-
----
-
-#### 7. Get Single Video Localization
-
-```bash
-staqan-yt get-video-localization <videoId> [options]
-```
-
-Get a specific language localization. Defaults to main metadata language if not specified.
-
-**Arguments:**
-- `videoId` - Video ID or URL
-
-**Options:**
-- `--language <lang>` - Language code (en, ja, ru) or name (English, Japanese, Russian)
-- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
-
-**Examples:**
-
-```bash
-# Get main metadata language (default)
-staqan-yt get-video-localization dQw4w9WgXcQ
-
-# Get Japanese localization
-staqan-yt get-video-localization dQw4w9WgXcQ --language ja
-
-# Case-insensitive language names
-staqan-yt get-video-localization dQw4w9WgXcQ --language JAPANESE
-
-# JSON output
-staqan-yt get-video-localization dQw4w9WgXcQ --language ja --output json
-```
-
-**Sample Output:**
-```
-✓ Localization retrieved successfully
-
-[LOCALIZATION] Japanese (ja)
-
-Title:
-日本語タイトル
-
-Description:
-日本語の説明文がここに表示されます...
-```
-
----
-
-#### 8. Create Video Localization
-
-```bash
-staqan-yt put-video-localization <videoId> --language <lang> --title <title> --description <desc>
-```
-
-Create a new localization for a video. Fails if localization already exists.
-
-**Arguments:**
-- `videoId` - Video ID or URL
-
-**Options (all required):**
-- `--language <lang>` - Language code or name (en/English, ja/Japanese, ru/Russian)
-- `--title <title>` - Localized title
-- `--description <desc>` - Localized description
-
-**Examples:**
-
-```bash
-# Create Japanese localization
-staqan-yt put-video-localization dQw4w9WgXcQ \
-  --language Japanese \
-  --title "日本語タイトル" \
-  --description "日本語の説明"
-
-# Using ISO code
-staqan-yt put-video-localization dQw4w9WgXcQ \
-  --language ja \
-  --title "タイトル" \
-  --description "説明文"
-```
-
-**Sample Output:**
-```
-✓ Successfully created Japanese (ja) localization
-
-Video ID: dQw4w9WgXcQ
-Title: 日本語タイトル
-```
-
-**Validation:**
-- Cannot create localization for main metadata language (use `update-video` instead)
-- Fails if localization already exists (use `update-video-localization` instead)
-- Main video must have title and description
-
----
-
-#### 9. Update Video Localization
-
-```bash
-staqan-yt update-video-localization <videoId> --language <lang> [--title <title>] [--description <desc>]
-```
-
-Update an existing localization or main metadata. Fails if localization doesn't exist.
-
-**Arguments:**
-- `videoId` - Video ID or URL
-
-**Options:**
-- `--language <lang>` (required) - Language code or name
-- `--title <title>` (optional) - New localized title
-- `--description <desc>` (optional) - New localized description
-
-**Examples:**
-
-```bash
-# Update title only
-staqan-yt update-video-localization dQw4w9WgXcQ \
-  --language ja \
-  --title "新しいタイトル"
-
-# Update description only
-staqan-yt update-video-localization dQw4w9WgXcQ \
-  --language Japanese \
-  --description "新しい説明"
-
-# Update both
-staqan-yt update-video-localization dQw4w9WgXcQ \
-  --language ja \
-  --title "新タイトル" \
-  --description "新説明"
-
-# Update main metadata (if language matches main)
-staqan-yt update-video-localization dQw4w9WgXcQ \
-  --language en \
-  --title "Updated English Title"
-```
-
-**Sample Output:**
-```
-✓ Successfully updated Japanese (ja) localization
-
-Video ID: dQw4w9WgXcQ
-New title: 新しいタイトル
-Description updated
-```
-
-**Note:** If the language matches the video's main metadata language, updates the main snippet instead of localizations.
-
----
-
-#### 10. Get Video Tags
-
-```bash
-staqan-yt get-video-tags <videoId> [options]
-```
-
-Retrieve all tags for a video. Tags are important for YouTube SEO and discoverability.
-
-**Arguments:**
-- `videoId` - Video ID or URL
-
-**Options:**
-- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
-
-**Examples:**
-
-```bash
-# Get tags
-staqan-yt get-video-tags dQw4w9WgXcQ
-
-# JSON output
-staqan-yt get-video-tags dQw4w9WgXcQ --output json
-```
-
-**Sample Output:**
-```
-✓ Retrieved 19 tag(s)
-
-【本当にすごい！日本のクラフトビール】第一回 うちゅうブルーイング
-Video ID: moYDTCX0GO8
-
-Tags (19):
-  1. STAQAN
-  2. うちゅうブルーイング
-  3. クラフトビール
-  4. craftbeer
-  5. beer
-  ...
-```
-
----
-
-#### 11. Update Video Tags
-
-```bash
-staqan-yt update-video-tags <videoId> [options]
-```
-
-Update video tags. You can replace all tags, add new tags, or remove specific tags.
-
-**Arguments:**
-- `videoId` - Video ID or URL
-
-**Options:**
-- `--tags <tags>` - Replace all tags with comma-separated list
-- `--add <tags>` - Add comma-separated tags (keeps existing)
-- `--remove <tags>` - Remove comma-separated tags
-- `--dry-run` - Preview changes without applying them
-- `-y, --yes` - Skip confirmation prompt
-
-**Examples:**
-
-```bash
-# Replace all tags
-staqan-yt update-video-tags dQw4w9WgXcQ \
-  --tags "music,video,awesome"
-
-# Add new tags (keeps existing)
-staqan-yt update-video-tags dQw4w9WgXcQ \
-  --add "tutorial,2024"
-
-# Remove specific tags
-staqan-yt update-video-tags dQw4w9WgXcQ \
-  --remove "old,deprecated"
-
-# Preview changes
-staqan-yt update-video-tags dQw4w9WgXcQ \
-  --tags "new,tags" --dry-run
-```
-
-**Sample Output:**
-```
-✓ Current tags retrieved
-
-【本当にすごい！日本のクラフトビール】第一回 うちゅうブルーイング
-Video ID: moYDTCX0GO8
-
-Current tags:
-  craftbeer
-  beer
-  japan
-
-New tags:
-  craftbeer
-  beer
-  japan
-  + tutorial
-  + 2024
-
-Apply these changes? (y/N): y
-✓ Tags updated successfully
-```
-
----
-
-#### 12. Get Video Thumbnail
-
-```bash
-staqan-yt get-thumbnail <videoId> [options]
-```
-
-Retrieve video thumbnail URLs in all available qualities.
-
-**Arguments:**
-- `videoId` - Video ID or URL
-
-**Options:**
-- `--quality <quality>` - Show specific quality only (default, medium, high, standard, maxres)
-- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
-
-**Examples:**
-
-```bash
-# Get all thumbnail sizes
-staqan-yt get-thumbnail dQw4w9WgXcQ
-
-# Get specific quality
-staqan-yt get-thumbnail dQw4w9WgXcQ --quality maxres
-
-# JSON output
-staqan-yt get-thumbnail dQw4w9WgXcQ --output json
-```
-
-**Sample Output:**
-```
-✓ Retrieved thumbnail information
-
-【本当にすごい！日本のクラフトビール】第一回 うちゅうブルーイング
-Video ID: moYDTCX0GO8
-
-Available Thumbnails:
-
-  DEFAULT:
-    URL:   https://i.ytimg.com/vi/moYDTCX0GO8/default.jpg
-    Size:  120x90
-
-  MEDIUM:
-    URL:   https://i.ytimg.com/vi/moYDTCX0GO8/mqdefault.jpg
-    Size:  320x180
-
-  HIGH:
-    URL:   https://i.ytimg.com/vi/moYDTCX0GO8/hqdefault.jpg
-    Size:  480x360
-
-  MAXRES:
-    URL:   https://i.ytimg.com/vi/moYDTCX0GO8/maxresdefault.jpg
-    Size:  1280x720
-```
-
----
-
-#### 13. Get Playlist (singular)
-
-```bash
-staqan-yt get-playlist <playlistId> [options]
-```
-
-Get detailed metadata for a single playlist.
-
-**Arguments:**
-- `playlistId` - Playlist ID or URL
-
-**Options:**
-- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
-- `-v, --verbose` - Enable verbose logging
-
-**Examples:**
-
-```bash
-# Get playlist details
-staqan-yt get-playlist PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO-
-
-# Using playlist URL
-staqan-yt get-playlist https://www.youtube.com/playlist?list=PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO-
-
-# JSON output
-staqan-yt get-playlist PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO- --output json
-```
-
-**Sample Output:**
-```
-✓ Retrieved playlist: My Awesome Playlist
-
-My Awesome Playlist
-
-Playlist ID:   PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO-
-Channel:       STAQAN (@staqan)
-Videos:        42
-Privacy:       public
-Published:     Jan 15, 2024
-
-Description:
-  A collection of my favorite videos about craft beer and brewing...
-
-URL:           https://youtube.com/playlist?list=PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO-
-```
-
----
-
-#### 14. Get Playlists (plural - batch operation)
-
-```bash
-staqan-yt get-playlists <playlistIds...> [options]
-```
-
-Get detailed metadata for multiple playlists at once.
-
-**Arguments:**
-- `playlistIds` - One or more playlist IDs or URLs
-
-**Options:**
-- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
-- `-v, --verbose` - Enable verbose logging
-
-**Examples:**
-
-```bash
-# Get multiple playlists
-staqan-yt get-playlists PLabc123 PLdef456 PLghi789
-
-# Using URLs
-staqan-yt get-playlists \
-  https://www.youtube.com/playlist?list=PLabc123 \
-  https://www.youtube.com/playlist?list=PLdef456
-
-# JSON output
-staqan-yt get-playlists PLabc123 PLdef456 --output json
-```
-
-**Sample Output:**
-```
-✓ Retrieved information for 2 playlist(s)
-
-[1] My Awesome Playlist
-
-Playlist ID:   PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO-
-Channel:       STAQAN (@staqan)
-Videos:        42
-Privacy:       public
-Published:     Jan 15, 2024
-
-URL:           https://youtube.com/playlist?list=PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO-
-
-────────────────────────────────────────────────────────────────────────────────
-
-[2] Another Great Playlist
-
-Playlist ID:   PLjkl012MNOP345
-Channel:       STAQAN (@staqan)
-Videos:        15
-Privacy:       public
-Published:     Dec 20, 2023
-
-URL:           https://youtube.com/playlist?list=PLjkl012MNOP345
-```
-
----
-
-#### 15. List Playlists
+#### List Channel Playlists
 
 ```bash
 staqan-yt list-playlists [channelHandle] [options]
@@ -1083,52 +434,431 @@ List all playlists from a YouTube channel.
 - `channelHandle` - (Optional) Channel @handle, username, or URL. Uses `default.channel` from config if not provided.
 
 **Options:**
-- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`)
 - `-l, --limit <number>` - Limit number of results (default: 50)
-- `-v, --verbose` - Enable verbose logging
+
+---
+
+### Video Discovery
+
+#### List Channel Videos
+
+```bash
+staqan-yt list-videos [channelHandle] [options]
+```
+
+List all videos from a YouTube channel.
+
+**Arguments:**
+- `channelHandle` - (Optional) Channel @handle, username, or URL. Uses `default.channel` from config if not provided.
+
+**Options:**
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`)
+- `-l, --limit <number>` - Limit number of results (default: 50)
 
 **Examples:**
 
 ```bash
-# List playlists for a channel
-staqan-yt list-playlists @mkbhd
+# Using @handle
+staqan-yt list-videos @mkbhd
 
-# Using default channel from config
-staqan-yt list-playlists
+# Using channel URL
+staqan-yt list-videos https://www.youtube.com/@mkbhd
 
-# Limit results
-staqan-yt list-playlists @mkbhd --limit 10
-
-# JSON output
-staqan-yt list-playlists @mkbhd --output json
-```
-
-**Sample Output:**
-```
-✓ Found 5 playlist(s)
-
-[1] MKBHD Videos
-  ID: PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO-
-  Videos: 500
-  Published: Jan 15, 2024
-  URL: https://youtube.com/playlist?list=PLrAXtmRdnEQy4NANFFH59wXOyi5Mk5cO-
-
-[2] MKBHD Shorts
-  ID: PLjkl012MNOP345
-  Videos: 150
-  Published: Dec 20, 2023
-  URL: https://youtube.com/playlist?list=PLjkl012MNOP345
-
-[3] MKBHD Reviews [Private]
-  ID: PLghi789xyz012
-  Videos: 25
-  Published: Nov 10, 2023
-  URL: https://youtube.com/playlist?list=PLghi789xyz012
+# Limit results and JSON output
+staqan-yt list-videos @mkbhd --limit 10 --output json
 ```
 
 ---
 
-#### 16. List Comments
+#### Get Video Information
+
+```bash
+staqan-yt get-video <videoId> [options]
+```
+
+Get detailed metadata for a single video.
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`)
+
+---
+
+#### Get Multiple Videos
+
+```bash
+staqan-yt get-videos <videoIds...> [options]
+```
+
+Get detailed metadata for multiple videos in batch.
+
+**Arguments:**
+- `videoIds` - One or more video IDs or URLs
+
+**Options:**
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`)
+
+---
+
+#### Search Videos
+
+```bash
+staqan-yt search-videos <query> [options]
+```
+
+Search for videos on YouTube or within a specific channel.
+
+**Arguments:**
+- `query` - Search query string
+
+**Options:**
+- `--global` - Search all of YouTube (instead of default channel)
+- `--channel <handle>` - Search within specific channel
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`)
+
+**Examples:**
+
+```bash
+# Global search (all of YouTube)
+staqan-yt search-videos "craft beer tutorial" --global
+
+# Channel-specific search
+staqan-yt search-videos "smartphone review" --channel @mkbhd
+
+# Using config default
+staqan-yt search-videos "smartphone review"  # Uses default.channel from config
+
+# With output format
+staqan-yt search-videos "python tutorial" --global --output json
+```
+
+---
+
+### Video Metadata
+
+#### Update Video
+
+```bash
+staqan-yt update-video <videoId> [options]
+```
+
+Update video title and/or description.
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--title <string>` - New video title
+- `--description <string>` - New video description
+- `--dry-run` - Validate without making changes
+
+**Example:**
+```bash
+staqan-yt update-video dQw4w9WgXcQ --title "New Title" --description "New Desc" --dry-run
+```
+
+---
+
+#### Get Video Tags
+
+```bash
+staqan-yt get-video-tags <videoId> [options]
+```
+
+Get video tags.
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--output <format>` - Output format: `json`, `text` (default: `text`)
+
+---
+
+#### Update Video Tags
+
+```bash
+staqan-yt update-video-tags <videoId> [options]
+```
+
+Update video tags (replace, add, or remove).
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--replace <tags>` - Replace all tags (comma-separated)
+- `--add <tags>` - Add tags (comma-separated)
+- `--remove <tags>` - Remove tags (comma-separated)
+- `--dry-run` - Validate without making changes
+
+**Examples:**
+```bash
+# Replace all tags
+staqan-yt update-video-tags dQw4w9WgXcQ --replace "tech,review,2024"
+
+# Add tags
+staqan-yt update-video-tags dQw4w9WgXcQ --add "new,tag"
+
+# Remove tags
+staqan-yt update-video-tags dQw4w9WgXcQ --remove "old,tag"
+```
+
+---
+
+#### Get Thumbnail
+
+```bash
+staqan-yt get-thumbnail <videoId> [options]
+```
+
+Get video thumbnail URLs.
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--output <format>` - Output format: `json`, `text` (default: `text`)
+
+---
+
+### Localizations
+
+#### Get Video Localizations
+
+```bash
+staqan-yt get-video-localizations <videoIds...> [options]
+```
+
+Get all video localizations including main metadata language. Supports multiple videos.
+
+**Arguments:**
+- `videoIds` - One or more video IDs or URLs
+
+**Options:**
+- `--languages <codes>` - Filter by languages (comma-separated, e.g., "en,es,ja")
+- `--output <format>` - Output format: `json`, `table`, `csv`, `text`, `pretty` (default: `pretty`)
+
+---
+
+#### Get Video Localization
+
+```bash
+staqan-yt get-video-localization <videoId> [options]
+```
+
+Get specific video localization (defaults to main metadata language).
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--lang <code>` - Language code (e.g., "en", "es", "ja")
+- `--output <format>` - Output format: `json`, `pretty` (default: `pretty`)
+
+---
+
+#### Put Video Localization
+
+```bash
+staqan-yt put-video-localization <videoId> [options]
+```
+
+Create new video localization (fails if already exists).
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--lang <code>` - Language code (required)
+- `--title <string>` - Localized title (required)
+- `--description <string>` - Localized description
+
+---
+
+#### Update Video Localization
+
+```bash
+staqan-yt update-video-localization <videoId> [options]
+```
+
+Update existing video localization (fails if does not exist).
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--lang <code>` - Language code (required)
+- `--title <string>` - Localized title
+- `--description <string>` - Localized description
+
+---
+
+### Analytics & Insights
+
+#### Get Video Analytics
+
+```bash
+staqan-yt get-video-analytics <videoId> [options]
+```
+
+Get video performance analytics (views, watch time, CTR, etc.).
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--start-date <date>` - Start date (YYYY-MM-DD, default: video publish date)
+- `--end-date <date>` - End date (YYYY-MM-DD, default: today)
+- `--metrics <list>` - Comma-separated metrics (default: views,estimatedMinutesWatched,etc.)
+- `--output <format>` - Output format: `json`, `table`, `csv`, `text`, `pretty` (default: `pretty`)
+
+---
+
+#### Get Video Retention
+
+```bash
+staqan-yt get-video-retention <videoId> [options]
+```
+
+Get audience retention curve (% of viewers at each point in video).
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--start-date <date>` - Start date (YYYY-MM-DD)
+- `--end-date <date>` - End date (YYYY-MM-DD)
+- `--output <format>` - Output format: `json`, `table`, `csv`, `text`, `pretty` (default: `pretty`)
+
+---
+
+#### Get Search Terms
+
+```bash
+staqan-yt get-search-terms <videoId> [options]
+```
+
+Get YouTube search terms that led viewers to this video.
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--output <format>` - Output format: `json`, `table`, `csv`, `text`, `pretty` (default: `pretty`)
+
+---
+
+#### Get Traffic Sources
+
+```bash
+staqan-yt get-traffic-sources <videoId> [options]
+```
+
+Get traffic source breakdown (search, suggested, external, etc.).
+
+**Arguments:**
+- `videoId` - Video ID or URL
+
+**Options:**
+- `--output <format>` - Output format: `json`, `table`, `csv`, `text`, `pretty` (default: `pretty`)
+
+---
+
+### Reporting API
+
+#### List Report Types
+
+```bash
+staqan-yt list-report-types [options]
+```
+
+List all available YouTube Reporting API report types.
+
+**Options:**
+- `--output <format>` - Output format: `json`, `table` (default: `table`)
+
+---
+
+#### List Report Jobs
+
+```bash
+staqan-yt list-report-jobs [options]
+```
+
+List YouTube Reporting API jobs with status and expiration warnings.
+
+**Options:**
+- `--output <format>` - Output format: `json`, `table` (default: `table`)
+
+---
+
+#### Get Report Data
+
+```bash
+staqan-yt get-report-data [options]
+```
+
+Get YouTube Reporting API report data (thumbnail impressions, CTR, etc.).
+
+**Options:**
+- `--type <id>` - Report type ID (e.g., `channel_reach_basic_a1`)
+- `--video-id <id>` - Filter by video ID
+- `--start-date <date>` - Start date (YYYY-MM-DD)
+- `--end-date <date>` - End date (YYYY-MM-DD)
+- `--output <format>` - Output format: `json`, `csv`, `text`, `pretty` (default: `pretty`)
+
+**Example:**
+```bash
+# Get CTR data for specific video
+staqan-yt get-report-data --type=channel_reach_basic_a1 --video-id=eeYl2dxv57g
+
+# Get all data for date range
+staqan-yt get-report-data --type=channel_reach_basic_a1 --start-date=2026-02-01 --end-date=2026-02-28
+```
+
+---
+
+### Playlist
+
+#### Get Playlist
+
+```bash
+staqan-yt get-playlist <playlistId> [options]
+```
+
+Get detailed metadata for a single playlist.
+
+**Arguments:**
+- `playlistId` - Playlist ID or URL
+
+**Options:**
+- `--output <format>` - Output format: `json`, `pretty` (default: `pretty`)
+
+---
+
+#### Get Playlists
+
+```bash
+staqan-yt get-playlists <playlistIds...> [options]
+```
+
+Get detailed metadata for multiple playlists in batch.
+
+**Arguments:**
+- `playlistIds` - One or more playlist IDs or URLs
+
+**Options:**
+- `--output <format>` - Output format: `json`, `pretty` (default: `pretty`)
+
+---
+
+### Comments & Captions
+
+#### List Comments
 
 ```bash
 staqan-yt list-comments <videoId> [options]
@@ -1140,479 +870,63 @@ List comments for a YouTube video.
 - `videoId` - Video ID or URL
 
 **Options:**
-- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
-- `-l, --limit <number>` - Limit number of results (default: 20)
-- `-s, --sort <order>` - Sort order: `top` (by relevance) or `new` (by recency, default: `top`)
-- `-v, --verbose` - Enable verbose logging
-
-**Examples:**
-
-```bash
-# List top 20 comments (default)
-staqan-yt list-comments dQw4w9WgXcQ
-
-# List 50 most recent comments
-staqan-yt list-comments dQw4w9WgXcQ --limit 50 --sort new
-
-# Export to CSV
-staqan-yt list-comments dQw4w9WgXcQ --output csv > comments.csv
-
-# JSON output
-staqan-yt list-comments dQw4w9WgXcQ --output json
-```
-
-**Sample Output:**
-```
-✔ Found 5 comment(s)
-
-[1] @YouTube
-  ID: Ugzge340dBgB75hWBm54AaABAg
-  can confirm: he never gave us up
-  ♥ Likes: 175045 | Replies: 1001
-  Posted: Apr 23, 2025
-
-[2] @Oatman69
-  ID: UgyEnXfdC-umwvTt8JF4AaABAg
-  Gonna flag this for nudity so I can rick roll the YouTube staff
-  ♥ Likes: 544998 | Replies: 587
-  Posted: Nov 23, 2019
-```
-
-**Use Cases:**
-- **Engagement monitoring** - See top comments on a video
-- **Moderation** - Review flagged comments
-- **Feedback analysis** - Export comments for sentiment analysis
-- **Community insights** - Understand audience response
-
-**Note:** This command fetches top-level comments only. Replies are counted but not expanded.
+- `--output <format>` - Output format: `json`, `table`, `csv`, `text`, `pretty` (default: `pretty`)
 
 ---
 
-#### 17. Get Video Analytics
+#### List Captions
 
 ```bash
-staqan-yt get-video-analytics <videoId> [options]
+staqan-yt list-captions <videoId> [options]
 ```
 
-Get comprehensive video performance analytics including views, watch time, and engagement metrics.
+List all caption tracks for a YouTube video.
 
 **Arguments:**
 - `videoId` - Video ID or URL
 
 **Options:**
-- `--start-date <date>` - Start date (YYYY-MM-DD), defaults to 30 days ago
-- `--end-date <date>` - End date (YYYY-MM-DD), defaults to today
-- `--metrics <metrics>` - Comma-separated list of metrics to fetch
-- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
-
-**Available Metrics:**
-- `views` - Number of views
-- `estimatedMinutesWatched` - Total watch time
-- `averageViewDuration` - Average view duration in seconds
-- `averageViewPercentage` - Average percentage watched
-- `likes`, `dislikes`, `comments`, `shares` - Engagement metrics
-
-**Examples:**
-
-```bash
-# Get last 30 days of analytics
-staqan-yt get-video-analytics dQw4w9WgXcQ
-
-# Custom date range
-staqan-yt get-video-analytics dQw4w9WgXcQ \
-  --start-date 2024-12-01 \
-  --end-date 2025-01-06
-
-# Specific metrics only
-staqan-yt get-video-analytics dQw4w9WgXcQ \
-  --metrics "views,likes,comments"
-
-# JSON output
-staqan-yt get-video-analytics dQw4w9WgXcQ --output json
-```
-
-**Sample Output:**
-```
-✓ Analytics data retrieved
-
-【本当にすごい！日本のクラフトビール】第一回 うちゅうブルーイング
-Video ID: moYDTCX0GO8
-Date Range: 2024-12-07 to 2025-01-06
-
-Analytics Metrics:
-
-  Views: 51
-  Estimated Minutes Watched: 423
-  Average View Duration: 498.5
-  Average View Percentage: 52.8%
-  Likes: 12
-  Comments: 3
-```
-
-**Note:** Requires YouTube Analytics API to be enabled and re-authentication with `staqan-yt auth`
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`)
 
 ---
 
-#### 14. Get Search Terms
+#### Get Caption
 
 ```bash
-staqan-yt get-search-terms <videoId> [options]
+staqan-yt get-caption <captionId> [options]
 ```
 
-Get YouTube search terms that led viewers to your video. Critical for SEO optimization.
+Download caption content to stdout (get caption ID from list-captions).
 
 **Arguments:**
-- `videoId` - Video ID or URL
+- `captionId` - Caption track ID
 
 **Options:**
-- `-l, --limit <number>` - Limit number of results (default: 50)
-- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
-
-**Examples:**
-
-```bash
-# Get top 50 search terms
-staqan-yt get-search-terms dQw4w9WgXcQ
-
-# Get top 10 search terms
-staqan-yt get-search-terms dQw4w9WgXcQ --limit 10
-
-# JSON output
-staqan-yt get-search-terms dQw4w9WgXcQ --output json
-```
-
-**Sample Output:**
-```
-✓ Search terms data retrieved
-
-【本当にすごい！日本のクラフトビール】第一回 うちゅうブルーイング
-Video ID: moYDTCX0GO8
-Date Range: 2025-12-07 to 2026-01-06
-
-Top Search Terms (1):
-
-  1. 宇宙ビール
-      2 views
-
-Total views from search: 2
-```
-
-**Use Case:** Analyze which search queries are driving traffic to optimize titles, descriptions, and tags.
+- `--format <srt|vtt>` - Output format (default: `srt`)
 
 ---
 
-#### 15. Get Traffic Sources
+### Other Commands
+
+#### MCP Server
 
 ```bash
-staqan-yt get-traffic-sources <videoId> [options]
+staqan-yt mcp
 ```
 
-Get traffic source breakdown showing how viewers found your video.
-
-**Arguments:**
-- `videoId` - Video ID or URL
-
-**Options:**
-- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`, or from config)
-
-**Examples:**
-
-```bash
-# Get traffic sources
-staqan-yt get-traffic-sources dQw4w9WgXcQ
-
-# JSON output
-staqan-yt get-traffic-sources dQw4w9WgXcQ --output json
-```
-
-**Sample Output:**
-```
-✓ Traffic sources data retrieved
-
-【本当にすごい！日本のクラフトビール】第一回 うちゅうブルーイング
-Video ID: moYDTCX0GO8
-Date Range: 2025-12-07 to 2026-01-06
-
-Traffic Sources:
-
-  YouTube Search:
-    Views:      32
-    Percentage: 62.75%
-
-  Suggested Videos:
-    Views:      4
-    Percentage: 7.84%
-
-  Channel Page:
-    Views:      8
-    Percentage: 15.69%
-
-  Subscriber Feed:
-    Views:      5
-    Percentage: 9.80%
-
-Total Views: 51
-```
-
-**Traffic Source Types:**
-- **YouTube Search** - Found via YouTube search
-- **Suggested Videos** - Recommended alongside other videos
-- **External** - Links from external websites
-- **Browse Features** - YouTube homepage, trending, etc.
-- **Channel Page** - Direct channel visits
-- **Playlists** - Found in playlists
-- **Notifications** - Push notifications
-- **Subscriber Feed** - Subscriber home feed
+Start MCP server for AI assistant integration.
 
 ---
 
-#### 16. Get Channel Analytics
+#### Help
+
 ```bash
-staqan-yt get-channel-analytics [channelHandle] [options]
+staqan-yt help [command]
 ```
 
-Get channel-level analytics reports from YouTube Analytics API (demographics, devices, geography, etc.).
-
-**Arguments:**
-- `channelHandle` - (Optional) Channel @handle, username, or URL. Uses `default.channel` from config if not provided.
-
-**Options:**
-- `--report <type>` - Predefined report type: `demographics`, `devices`, `geography`, `traffic-sources`, or `subscription-status`
-- `--start-date <date>` - Start date (YYYY-MM-DD), defaults to 30 days ago
-- `--end-date <date>` - End date (YYYY-MM-DD), defaults to today
-- `--dimensions <dims>` - Custom dimensions (comma-separated, requires `--metrics`)
-- `--metrics <metrics>` - Custom metrics (comma-separated, requires `--dimensions`)
-- `--output <format>` - Output format: `json`, `table`, `text`, `pretty` (default: `pretty`), or from config
-- `-v, --verbose` - Enable verbose output with debug information
-
-**Predefined Report Types:**
-
-| Report Type | Dimensions | Metrics |
-|-------------|------------|---------|
-| demographics | ageGroup,gender | views,estimatedMinutesWatched |
-| devices | deviceType,operatingSystem | views,estimatedMinutesWatched |
-| geography | country | views,estimatedMinutesWatched |
-| traffic-sources | insightTrafficSourceType | views,estimatedMinutesWatched |
-| subscription-status | subscribedStatus | views,estimatedMinutesWatched |
-
-**Examples:**
-```bash
-# Predefined reports
-staqan-yt get-channel-analytics @channel --report demographics
-staqan-yt get-channel-analytics @channel --report devices --output csv
-
-# Custom query
-staqan-yt get-channel-analytics @channel \
-  --dimensions "deviceType,operatingSystem" \
-  --metrics "views,estimatedMinutesWatched" \
-  --start-date 2025-01-01 \
-  --end-date 2025-01-31
-
-# Using config default channel
-staqan-yt get-channel-analytics --report geography
-```
-
-**Sample Output:**
-```
-✓ Analytics data retrieved
-
-My Channel
-Channel ID: UCxxxxxxxxxxxxxxxxxx
-Report Type: demographics
-Date Range: 2025-01-13 to 2026-02-13
-
-Age Group:    age13-17
-Views:        12,345
-Watch Time:    234,567
-
-Age Group:    age18-24
-Views:        45,678
-Watch Time:    890,123
-
-...
-Total: 10 result(s)
-```
-
-**Important:**
-- Requires YouTube Analytics API to be enabled in Google Cloud Console
-- Requires re-authentication after enabling analytics API: `staqan-yt auth`
-- Channel must have sufficient views and activity to report analytics
-- **Demographic Limitation:** The `demographics` report type (age, gender) requires channel owner permissions and may not be available for all channels, especially smaller or newer channels. If unavailable, try: `devices`, `geography`, `traffic-sources`, or `subscription-status`.
----
+Display help for a specific command.
 
 ---
-
-#### 18. List Report Types
-
-```bash
-staqan-yt list-report-types [options]
-```
-
-List all available YouTube Reporting API report types for bulk data downloads.
-
-**Options:**
-- `--output <format>` - Output format: `json`, `table`, `text` (default: `table`)
-- `-v, --verbose` - Enable verbose output with debug information
-
-**Examples:**
-```bash
-# List all report types
-staqan-yt list-report-types
-
-# JSON output
-staqan-yt list-report-types --output json
-```
-
----
-
-#### 19. List Report Jobs
-
-```bash
-staqan-yt list-report-jobs [options]
-```
-
-List YouTube Reporting API jobs with status, expiration warnings, and sliding window information.
-
-**Options:**
-- `--type <id>` - Filter by report type ID (e.g., `channel_reach_basic_a1`)
-- `--output <format>` - Output format: `json`, `table`, `text` (default: `table`)
-- `-v, --verbose` - Enable verbose output with debug information
-
-**Examples:**
-```bash
-# List all jobs
-staqan-yt list-report-jobs
-
-# List jobs for specific report type
-staqan-yt list-report-jobs --type=channel_reach_basic_a1
-```
-
-**Sample Output:**
-```
-Job ID:     39b972ed-68b3-470a-8521-5cd50adc7b43
-Report Type: channel_reach_basic_a1
-Name:       channel_reach_basic_a1 Report Job
-Created:    2026-02-20T17:43:35Z
-Status:     Active (11 days ago)
-
-  Reports: 47 available
-    Latest: 2026-03-02 to 2026-03-03 (created 2026-03-04T00:34:10Z)
-    Oldest: 2026-02-24 to 2026-02-25 (created 2026-02-26T06:53:07Z)
-
-📊 Sliding window phase: Growing (will stabilize at 60 days around 2026-04-20)
-⚠️  Reports expire after 30 days (historical) or 60 days (regular)
-💡 Download reports before expiration to avoid data loss
-```
-
----
-
-#### 20. Get Report Data
-
-```bash
-staqan-yt get-report-data --type <id> [options]
-```
-
-Get YouTube Reporting API report data (thumbnail impressions, CTR, etc.). Automatically creates jobs if needed.
-
-**Required:**
-- `--type <id>` - Report type ID (e.g., `channel_reach_basic_a1` for thumbnail data)
-
-**Options:**
-- `--video-id <id>` - Filter by video ID
-- `--start-date <date>` - Start date (YYYY-MM-DD)
-- `--end-date <date>` - End date (YYYY-MM-DD)
-- `--output <format>` - Output format: `json`, `csv` (default: `json`)
-- `-v, --verbose` - Enable verbose output with debug information
-
-**Common Report Types:**
-
-| Report Type | Contains | Use For |
-|-------------|----------|---------|
-| `channel_reach_basic_a1` | Thumbnail impressions, CTR | Thumbnail performance |
-| `channel_reach_combined_a1` | CTR + traffic sources + devices | Detailed CTR breakdown |
-
-**Examples:**
-```bash
-# Get latest data for all videos
-staqan-yt get-report-data --type=channel_reach_basic_a1
-
-# Get data for specific video
-staqan-yt get-report-data --type=channel_reach_basic_a1 --video-id=eeYl2dxv57g
-
-# Get date range
-staqan-yt get-report-data --type=channel_reach_basic_a1 \
-  --start-date=2026-02-24 \
-  --end-date=2026-03-02
-
-# CSV output
-staqan-yt get-report-data --type=channel_reach_basic_a1 --output csv
-```
-
-**Sample Output:**
-```json
-[
-  {
-    "date": "20260228",
-    "channel_id": "UCBQQNUsrd9mgCjsrLogKW6Q",
-    "video_id": "eeYl2dxv57g",
-    "video_thumbnail_impressions": "18",
-    "video_thumbnail_impressions_ctr": "0"
-  }
-]
-```
-
-**Important Notes:**
-
-⚠️ **48-Hour Initial Wait**
-- First-time job creation requires 48 hours for first report
-- After 48h: daily reports generated automatically
-- Job runs forever (no need to recreate)
-
-⚠️ **Data Expiration (Sliding Window)**
-- Historical reports: 30 days from creation
-- Regular reports: 60 days from creation
-- Once stable: 60-day rolling window
-- **Download before expiration or lose data forever**
-
-⚠️ **Date Range Limitations**
-- Cannot retrieve data older than 60 days (unless downloaded previously)
-- Expired data is permanently deleted from YouTube's servers
-- Error messages will indicate missing date ranges
-
-**Setup Steps:**
-1. Enable YouTube Reporting API: https://console.cloud.google.com/apis/library/youtubereporting.googleapis.com
-2. Re-authenticate to add Reporting API scope: `staqan-yt auth`
-3. Run `staqan-yt get-report-data --type=channel_reach_basic_a1`
-4. **Wait 48 hours** for first report
-5. Run again to fetch data
-
-**Important:** You must re-run `staqan-yt auth` after enabling the Reporting API to add the required OAuth scopes.
-
----
-### Localization Features
-
-**Supported Languages:**
-- English (en, English, english, eng)
-- Japanese (ja, Japanese, japanese, jpn, jp)
-- Russian (ru, Russian, russian, rus)
-
-**Language Input:**
-- Case-insensitive: `Japanese`, `JAPANESE`, `japanese` all work
-- Accepts ISO codes: `ja`, `en`, `ru`
-- Accepts full names: `Japanese`, `English`, `Russian`
-
-**Main Metadata vs Localizations:**
-- Main metadata: The video's primary title/description (stored in `snippet`)
-- Localizations: Additional language versions (stored in `localizations`)
-- The main metadata language is detected automatically from `snippet.defaultLanguage`
-
----
-
-### Global Options
-
-All commands support:
-- `-h, --help` - Display help information
-- `-V, --version` - Display version number
 
 ## Use Cases
 
@@ -1728,8 +1042,34 @@ staqan-yt-cli/
 ├── package.json
 ├── tsconfig.json                       # TypeScript configuration
 ├── CLAUDE.md                           # Development guidelines
+├── docs/
+│   └── CLI_PATTERNS.md                 # CLI patterns and conventions
 └── README.md
 ```
+
+### Code Patterns and Conventions
+
+When contributing new commands or features, follow the established patterns documented in **[docs/CLI_PATTERNS.md](docs/CLI_PATTERNS.md)**:
+
+- **Spinner Progress** - Use ora spinner with counter for multi-item operations
+- **Output Formatting** - Support json, csv, table, text, and pretty formats
+- **Error Handling** - Use spinner.fail() with descriptive messages
+- **Verbose Mode** - Support --verbose flag with debug() logging
+- **Date Chunking** - Handle API date limits with chunkDateRange()
+
+Example:
+```typescript
+const spinner = ora('Processing...').start();
+
+for (let i = 0; i < items.length; i++) {
+  spinner.text = `Processing ${i + 1}/${items.length}...`;
+  // ... work ...
+}
+
+spinner.succeed(`Processed ${items.length} item(s)`);
+```
+
+See **[docs/CLI_PATTERNS.md](docs/CLI_PATTERNS.md)** for detailed patterns and examples.
 
 ## API Rate Limits
 

@@ -2,7 +2,7 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, setVerbose, debug, progress, convertToCSV, chunkDateRange, retryWithBackoff, parseDuration, formatTimestamp } from '../lib/utils';
+import { parseVideoId, error, setVerbose, debug, convertToCSV, chunkDateRange, retryWithBackoff, parseDuration, formatTimestamp } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { RetentionOptions } from '../types';
@@ -47,14 +47,11 @@ async function getRetentionCommand(videoId: string, options: RetentionOptions): 
       process.exit(1);
     }
 
-    spinner.succeed('Video information retrieved');
-
     // Calculate date range (default: full historical data)
     const endDate = new Date().toISOString().split('T')[0];
     const startDate = publishedAt.split('T')[0];
 
     debug(`Date range: ${startDate} to ${endDate}`);
-    progress(`Fetching retention data from ${startDate} to ${endDate}...`);
 
     // Chunk date range into 90-day periods
     const dateChunks = chunkDateRange(startDate, endDate);
@@ -66,7 +63,7 @@ async function getRetentionCommand(videoId: string, options: RetentionOptions): 
 
     for (let i = 0; i < dateChunks.length; i++) {
       const chunk = dateChunks[i];
-      progress(`Fetching chunk ${i + 1}/${dateChunks.length} (${chunk.start} to ${chunk.end})...`);
+      spinner.text = `Fetching chunk ${i + 1}/${dateChunks.length} (${chunk.start} to ${chunk.end})...`;
 
       const retentionResponse = await retryWithBackoff(async () => {
         return await youtubeAnalytics.reports.query({
@@ -91,7 +88,7 @@ async function getRetentionCommand(videoId: string, options: RetentionOptions): 
       }
     }
 
-    progress(`✓ Retrieved ${allRows.length} retention data point(s)`);
+    spinner.succeed(`Retrieved ${allRows.length} retention data point(s)`);
 
     // Output results
     const outputFormat = await getOutputFormat(options.output);

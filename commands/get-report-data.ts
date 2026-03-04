@@ -1,10 +1,14 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '../lib/auth';
-import { error, info, progress, success, setVerbose, debug } from '../lib/utils';
+import { error, setVerbose, debug } from '../lib/utils';
+import { getOutputFormat } from '../lib/config';
+import { formatJson, formatTable, formatCsv, formatText } from '../lib/formatters';
 import https from 'https';
 import { createWriteStream, unlinkSync } from 'fs';
 import { unlink } from 'fs/promises';
 import path from 'path';
+import ora from 'ora';
+import chalk from 'chalk';
 
 interface ReportDataOptions {
   type: string;
@@ -26,12 +30,13 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
     debug('Verbose mode enabled');
   }
 
+  const spinner = ora('Checking for existing reporting job...').start();
+
   const auth = await getAuthenticatedClient();
   const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
 
   try {
     // Step 1: Find or create reporting job
-    progress('Checking for existing reporting job...\n');
 
     const jobsResponse = await youtubeReporting.jobs.list({
       onBehalfOfContentOwner: undefined,
@@ -47,7 +52,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       debug(`Found existing job: ${jobId}`);
     } else {
       // Create new job
-      progress(`Creating new reporting job for type: ${options.type}\n`);
+      spinner.text = `Creating new reporting job for type: ${options.type}...`;
 
       const createResponse = await youtubeReporting.jobs.create({
         requestBody: {
@@ -60,16 +65,19 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       const jobCreated = new Date(createResponse.data.createTime || '');
       const readyAt = new Date(jobCreated.getTime() + 48 * 60 * 60 * 1000);
 
-      console.error(`\n⏳  Created new job: ${jobId}`);
-      console.error(`⏳  First report available: ${readyAt.toISOString()}`);
-      console.error(`⏳  Local time: ${readyAt.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })}`);
-      console.error(`⏳  Run this command again after ${readyAt.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })}\n`);
+      spinner.succeed(`Created new job: ${jobId}`);
+      console.log('');
+      console.log(chalk.gray('First report available:') + ' ' + chalk.cyan(readyAt.toISOString()));
+      console.log(chalk.gray('Local time:') + ' ' + chalk.cyan(readyAt.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })));
+      console.log('');
+      console.log(chalk.yellow('Run this command again after:') + ' ' + chalk.cyan(readyAt.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })));
+      console.log('');
 
       process.exit(0);
     }
 
     // Step 2: Check if reports are available
-    progress('Fetching available reports...\n');
+    spinner.text = 'Fetching available reports...';
 
     const reportsResponse = await youtubeReporting.jobs.reports.list({
       jobId,
@@ -85,16 +93,16 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       const now = new Date();
       const hoursUntilReady = Math.max(0, Math.ceil((readyAt.getTime() - now.getTime()) / (1000 * 60 * 60)));
 
-      console.error(`\n⏳  Job exists but no reports yet`);
-      console.error(`⏳  Created: ${matchingJob!.createTime}`);
-      console.error(`⏳  Ready: ${readyAt.toISOString()}`);
-      console.error(`⏳  Local time: ${readyAt.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })}`);
-      console.error(`⏳  Wait: ${hoursUntilReady} hours remaining\n`);
+      spinner.succeed('Job exists but no reports yet');
+      console.log('');
+      console.log(chalk.gray('Created:') + ' ' + matchingJob!.createTime);
+      console.log(chalk.gray('Ready:') + ' ' + chalk.cyan(readyAt.toISOString()));
+      console.log(chalk.gray('Local time:') + ' ' + chalk.cyan(readyAt.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })));
+      console.log(chalk.yellow('Wait:') + ' ' + chalk.cyan(`${hoursUntilReady} hours remaining`));
+      console.log('');
 
       process.exit(0);
     }
-
-    success(`Found ${reports.length} report(s)\n`);
 
     // Step 3: Validate date range
     const minDate = reports[reports.length - 1].startTime; // Oldest
@@ -105,24 +113,31 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
     // Check if requested range is available
     if (!minDate || !maxDate || !requestedStart || !requestedEnd) {
+      spinner.fail('Unable to determine date range');
+      console.log('');
       error('Unable to determine date range');
       process.exit(1);
     }
 
     if (requestedStart < minDate || requestedEnd > maxDate) {
+      spinner.fail('Data not available for requested date range');
+      console.log('');
       error(`Data not available for requested date range`);
-      info(`Available: ${minDate} to ${maxDate}`);
-      info(`Requested: ${requestedStart} to ${requestedEnd}`);
+      console.log(chalk.gray('Available:') + ` ${minDate} to ${maxDate}`);
+      console.log(chalk.gray('Requested:') + ` ${requestedStart} to ${requestedEnd}`);
+      console.log('');
 
       if (requestedStart < minDate) {
         const missingDays = Math.ceil((new Date(minDate).getTime() - new Date(requestedStart).getTime()) / (24 * 60 * 60 * 1000));
-        error(`\nMissing: ${requestedStart} to ${minDate} (${missingDays} days, expired and deleted)`);
-        error(`💡 Download reports before expiration to avoid data loss`);
-        error(`💡 Run 'staqan-yt download-expiring-reports --type=${options.type}'`);
+        console.log(chalk.red('Missing:') + ` ${requestedStart} to ${minDate} (${missingDays} days, expired and deleted)`);
+        console.log(chalk.yellow('Tip:') + ' Download reports before expiration to avoid data loss');
+        console.log(chalk.yellow('Tip:') + ` Run 'staqan-yt download-expiring-reports --type=${options.type}'`);
+        console.log('');
       }
 
       if (requestedEnd > maxDate) {
-        error(`\nFuture dates not available: ${maxDate} to ${requestedEnd}`);
+        console.log(chalk.red('Future dates not available:') + ` ${maxDate} to ${requestedEnd}`);
+        console.log('');
       }
 
       process.exit(1);
@@ -134,26 +149,30 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
     });
 
     if (reports.length === 0) {
+      spinner.fail('No reports match the specified date range');
+      console.log('');
       error('No reports match the specified date range.');
       process.exit(1);
     }
 
     // Step 5: Download all matching reports
-    info(`Downloading ${reports.length} report(s)...\n`);
-
     const allData: any[] = [];
     const tmpDir = '/tmp';
 
-    for (const report of reports) {
+    for (let i = 0; i < reports.length; i++) {
+      const report = reports[i];
       const tmpPath = path.join(tmpDir, `${report.id}.csv`);
 
-      progress(`  Downloading: ${report.startTime} to ${report.endTime}...\n`);
+      spinner.text = `Downloading report ${i + 1}/${reports.length}...`;
 
       // Get access token for authenticated request
-      const accessToken = await auth.getAccessToken();
+      const credentials = await auth.getAccessToken();
+      const accessToken = credentials.token;
 
       await new Promise<void>((resolve, reject) => {
         const url = new URL(report.downloadUrl!);
+
+        debug(`Downloading from: ${report.downloadUrl}`);
 
         const options = {
           hostname: url.hostname,
@@ -164,14 +183,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
         };
 
         https.get(options, (response) => {
-          if (response.statusCode === 401 || response.statusCode === 403) {
-            unlink(tmpPath).catch(() => {});
-            error(`HTTP ${response.statusCode}: Unauthorized`);
-            error(`\nYour access token may lack the required scope for YouTube Reporting API.`);
-            error(`Please run: staqan-yt auth`);
-            error(`This will re-authenticate and add the necessary permissions.`);
-            process.exit(1);
-          }
+          debug(`Response status: ${response.statusCode}`);
           
           if (response.statusCode !== 200) {
             unlink(tmpPath).catch(() => {});
@@ -221,8 +233,11 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
         // Ignore cleanup errors
       }
 
-      success(`  ✓ Downloaded: ${report.startTime} to ${report.endTime}\n`);
+      debug(`Downloaded: ${report.startTime} to ${report.endTime}`);
     }
+
+    spinner.succeed(`Downloaded ${reports.length} report(s)`);
+    console.log('');
 
     // Step 6: Filter by video ID if specified
     let filteredData = allData;
@@ -230,31 +245,59 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       filteredData = allData.filter(row => row.video_id === options.videoId);
 
       if (filteredData.length === 0) {
+        spinner.fail('No data found for video ID');
+        console.log('');
         error(`No data found for video ID: ${options.videoId}`);
-        info(`Available video IDs in this date range:`);
+        console.log('');
+        console.log(chalk.gray('Available video IDs in this date range:'));
         const uniqueVideoIds = [...new Set(allData.map(row => row.video_id))];
         uniqueVideoIds.forEach((vid, i) => {
-          if (i < 10) info(`  - ${vid}`);
+          if (i < 10) console.log('  ' + chalk.cyan(vid));
         });
         if (uniqueVideoIds.length > 10) {
-          info(`  ... and ${uniqueVideoIds.length - 10} more`);
+          console.log(chalk.gray(`  ... and ${uniqueVideoIds.length - 10} more`));
         }
+        console.log('');
         process.exit(1);
       }
     }
 
     // Step 7: Output based on format
-    if (options.output === 'json') {
-      console.log(JSON.stringify(filteredData, null, 2));
-    } else {
-      // Output as CSV
-      if (filteredData.length > 0) {
-        const headers = Object.keys(filteredData[0]);
-        console.log(headers.join(','));
-        filteredData.forEach(row => {
-          console.log(headers.map(h => row[h]).join(','));
-        });
-      }
+    const outputFormat = await getOutputFormat(options.output);
+
+    switch (outputFormat) {
+      case 'json':
+        console.log(formatJson(filteredData));
+        break;
+
+      case 'csv':
+        console.log(formatCsv(filteredData));
+        break;
+
+      case 'text':
+        console.log(formatText(filteredData));
+        break;
+
+      case 'table':
+        console.log(formatTable(filteredData));
+        break;
+
+      case 'pretty':
+      default:
+        // Human-readable output
+        if (filteredData.length === 0) {
+          console.log(chalk.gray('No data found'));
+        } else {
+          filteredData.forEach((row, idx) => {
+            if (idx > 0) console.log(chalk.gray('─'.repeat(80)));
+            console.log(chalk.bold.cyan(`Date: ${row.date}`));
+            console.log(chalk.gray('Video ID:') + ' ' + chalk.yellow(row.video_id || 'N/A'));
+            console.log(chalk.gray('Impressions:') + ' ' + chalk.yellow(row.video_thumbnail_impressions || '0'));
+            console.log(chalk.gray('CTR:') + ' ' + chalk.yellow(row.video_thumbnail_impressions_ctr || '0'));
+            console.log('');
+          });
+        }
+        break;
     }
 
     // Step 8: Show expiration warning for the reports used
@@ -269,22 +312,28 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       const daysUntilExpiration = Math.ceil((expiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
 
       if (daysUntilExpiration <= 7) {
-        console.error(`\n⚠️  Expiration Notice:`);
-        console.error(`  This data is from report: ${report.startTime} to ${report.endTime}`);
-        console.error(`  Report expires: ${expiresAt.toISOString().split('T')[0]} (${daysUntilExpiration} days remaining)`);
-        console.error(`  Run 'staqan-yt download-expiring-reports --type=${options.type}' to archive it\n`);
+        console.log('');
+        console.log(chalk.yellow('⚠️  Expiration Notice:'));
+        console.log(chalk.gray('  Report:') + ` ${report.startTime} to ${report.endTime}`);
+        console.log(chalk.gray('  Expires:') + ' ' + chalk.red(`${expiresAt.toISOString().split('T')[0]} (${daysUntilExpiration} days remaining)`));
+        console.log(chalk.yellow('  Tip:') + ` Run 'staqan-yt download-expiring-reports --type=${options.type}' to archive it`);
+        console.log('');
       }
     }
 
-    success(`\n✓ Fetched ${filteredData.length} row(s)\n`);
+    console.log(chalk.green(`✓ Fetched ${filteredData.length} row(s)`));
+    console.log('');
 
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
+    spinner.fail('Failed to fetch report data');
+    console.log('');
     error(`Failed to fetch report data: ${message}`);
 
     if (message.includes('API not enabled')) {
-      error('\nYouTube Reporting API is not enabled.');
-      error('Enable it at: https://console.developers.google.com/apis/api/youtubereporting.googleapis.com');
+      console.log('');
+      console.log(chalk.red('YouTube Reporting API is not enabled.'));
+      console.log(chalk.gray('Enable it at:') + ' https://console.developers.google.com/apis/api/youtubereporting.googleapis.com');
     }
 
     process.exit(1);
