@@ -1,4 +1,6 @@
 import chalk from 'chalk';
+import ora from 'ora';
+import type { Ora } from 'ora';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
@@ -283,6 +285,38 @@ function chunkDateRange(startDate: string, endDate: string): { start: string; en
 }
 
 /**
+ * Initialize a command: enable verbose mode if requested.
+ * Call at the top of every command before any async work.
+ */
+function initCommand(options: { verbose?: boolean }): void {
+  if (options.verbose) {
+    setVerbose(true);
+    debug('Verbose mode enabled');
+  }
+}
+
+/**
+ * Run an async function wrapped in an ora spinner.
+ * On success the caller is responsible for calling spinner.succeed() inside fn.
+ * On error: stops the spinner with failMessage, prints the error, and exits 1.
+ */
+async function withSpinner<T>(
+  message: string,
+  failMessage: string,
+  fn: (spinner: Ora) => Promise<T>
+): Promise<T> {
+  const spinner = ora(message).start();
+  try {
+    return await fn(spinner);
+  } catch (err) {
+    spinner.fail(failMessage);
+    console.log('');
+    error((err as Error).message);
+    process.exit(1);
+  }
+}
+
+/**
  * Sleep for specified milliseconds
  */
 async function sleep(ms: number): Promise<void> {
@@ -322,6 +356,8 @@ async function retryWithBackoff<T>(
 }
 
 export {
+  initCommand,
+  withSpinner,
   CONFIG_DIR,
   CREDENTIALS_PATH,
   TOKEN_PATH,

@@ -1,35 +1,27 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { getChannelInfo } from '../lib/youtube';
-import { formatDate, formatNumber, error, setVerbose, debug } from '../lib/utils';
-import { getConfigValue, getOutputFormat } from '../lib/config';
+import { formatDate, formatNumber, error, debug, initCommand, withSpinner } from '../lib/utils';
+import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { OutputOption, VerboseOption } from '../types';
 
 async function getChannelCommand(channelHandle: string | undefined, options: OutputOption & VerboseOption): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
-  // Use default channel from config if not provided
-  let handleOrId = channelHandle;
-  if (!handleOrId) {
-    handleOrId = await getConfigValue('default.channel');
-    if (!handleOrId) {
-      error('No channel handle provided and no default.channel configured');
-      console.log('');
-      console.log(chalk.gray('Usage:') + ' staqan-yt get-channel [channelHandle]');
-      console.log(chalk.gray('Or set default:') + ' staqan-yt config set default.channel @yourchannel');
-      process.exit(1);
-    }
-    debug(`Using default channel from config: ${handleOrId}`);
-  }
-
-  const spinner = ora('Fetching channel information...').start();
-
+  // Resolve channel before spinner (may need to error before spinner starts)
+  let handleOrId: string;
   try {
+    handleOrId = await requireChannel(channelHandle);
+    debug(`Using channel: ${handleOrId}`);
+  } catch (err) {
+    error((err as Error).message);
+    console.log('');
+    console.log(chalk.gray('Usage:') + ' staqan-yt get-channel [channelHandle]');
+    console.log(chalk.gray('Or set default:') + ' staqan-yt config set default.channel @yourchannel');
+    process.exit(1);
+  }
+
+  await withSpinner('Fetching channel information...', 'Failed to fetch channel information', async (spinner) => {
     debug(`Fetching channel: ${handleOrId}`);
     const channel = await getChannelInfo(handleOrId);
 
@@ -156,12 +148,7 @@ async function getChannelCommand(channelHandle: string | undefined, options: Out
         console.log('');
         break;
     }
-  } catch (err) {
-    spinner.fail('Failed to fetch channel information');
-    console.log('');
-    error((err as Error).message);
-    process.exit(1);
-  }
+  });
 }
 
 export = getChannelCommand;

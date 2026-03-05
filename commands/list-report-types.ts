@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '../lib/auth';
-import { error, info, success, setVerbose, debug } from '../lib/utils';
+import { error, info, success, initCommand } from '../lib/utils';
 
 interface ReportTypesOptions {
   output?: 'json' | 'table' | 'text';
@@ -11,11 +11,7 @@ interface ReportTypesOptions {
  * List available YouTube Reporting API report types
  */
 async function listReportTypesCommand(options: ReportTypesOptions): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
   const auth = await getAuthenticatedClient();
   const youtubeReporting = google.youtubereporting({ version: 'v1', auth });

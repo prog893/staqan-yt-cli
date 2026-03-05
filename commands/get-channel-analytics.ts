@@ -1,11 +1,11 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseChannelHandle, error, setVerbose, debug, formatNumber } from '../lib/utils';
-import { getConfigValue } from '../lib/config';
+import { parseChannelHandle, error, debug, formatNumber, initCommand, withSpinner } from '../lib/utils';
+import { requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ChannelAnalyticsOptions } from '../types';
+import ora from 'ora';
 
 // Predefined report type mappings
 const REPORT_TYPES: Record<string, { dimensions: string; metrics: string }> = {
@@ -32,36 +32,13 @@ const REPORT_TYPES: Record<string, { dimensions: string; metrics: string }> = {
 };
 
 async function getChannelAnalyticsCommand(channelHandle: string | undefined, options: ChannelAnalyticsOptions): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
-  const spinner = ora('Fetching channel analytics...').start();
-
-  try {
+  await withSpinner('Fetching channel analytics...', 'Failed to fetch channel analytics', async (spinner) => {
     // Determine channel ID
-    let channelId = channelHandle;
+    const channelId = await requireChannel(channelHandle);
+    debug(`Using channel: ${channelId}`);
 
-    if (!channelId) {
-      // Try to get from config
-      const defaultChannel = await getConfigValue('default.channel');
-      if (!defaultChannel) {
-        spinner.fail('Channel not specified');
-        error('No channel provided and no default channel configured.');
-        console.log('');
-        console.log('Provide a channel handle:');
-        console.log('  staqan-yt get-channel-analytics @channel');
-        console.log('');
-        console.log('Or set a default channel:');
-        console.log('  staqan-yt config set default.channel @channel');
-        process.exit(1);
-      }
-      channelId = defaultChannel;
-    }
-
-    debug('Channel ID', channelId);
     const parsedChannel = parseChannelHandle(channelId);
     debug('Parsed channel', parsedChannel);
 
@@ -312,12 +289,7 @@ async function getChannelAnalyticsCommand(channelHandle: string | undefined, opt
 
       process.exit(1);
     }
-  } catch (err) {
-    spinner.fail('Failed to fetch channel analytics');
-    console.log('');
-    error((err as Error).message);
-    process.exit(1);
-  }
+  });
 }
 
 export = getChannelAnalyticsCommand;

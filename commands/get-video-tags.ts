@@ -1,22 +1,15 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, setVerbose, debug } from '../lib/utils';
+import { parseVideoId, error, debug, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { GetTagsOptions } from '../types';
 
 async function getVideoTagsCommand(videoId: string, options: GetTagsOptions): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
-  const spinner = ora('Fetching video tags...').start();
-
-  try {
+  await withSpinner('Fetching video tags...', 'Failed to fetch video tags', async (spinner) => {
     const parsedId = parseVideoId(videoId);
     debug('Parsed video ID', parsedId);
 
@@ -79,12 +72,7 @@ async function getVideoTagsCommand(videoId: string, options: GetTagsOptions): Pr
         console.log('');
         break;
     }
-  } catch (err) {
-    spinner.fail('Failed to fetch video tags');
-    console.log('');
-    error((err as Error).message);
-    process.exit(1);
-  }
+  });
 }
 
 export = getVideoTagsCommand;

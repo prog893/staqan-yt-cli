@@ -1,22 +1,15 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, setVerbose, debug, formatNumber, convertToCSV, chunkDateRange, retryWithBackoff } from '../lib/utils';
+import { parseVideoId, error, debug, formatNumber, convertToCSV, chunkDateRange, retryWithBackoff, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { AnalyticsOptions } from '../types';
 
 async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptions): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
-  const spinner = ora('Fetching video information...').start();
-
-  try {
+  await withSpinner('Fetching video information...', 'Failed to fetch analytics', async (spinner) => {
     const parsedId = parseVideoId(videoId);
     debug('Parsed video ID', parsedId);
 
@@ -103,7 +96,7 @@ async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptio
 
       let total = 0;
       allRows.forEach(row => {
-        const value = row[index];
+        const value = (row as unknown[])[index];
         if (typeof value === 'number') {
           total += value;
         }
@@ -196,25 +189,7 @@ async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptio
         console.log('');
         break;
     }
-  } catch (err) {
-    spinner.fail('Failed to fetch analytics');
-    console.log('');
-
-    const errorMessage = (err as Error).message || '';
-
-    // Handle common errors
-    if (errorMessage.includes('403') || errorMessage.includes('insufficient')) {
-      error('Analytics API access denied. Make sure you have:');
-      console.log('  1. Enabled YouTube Analytics API in Google Cloud Console');
-      console.log('  2. Re-authenticated with: staqan-yt auth');
-    } else if (errorMessage.includes('400')) {
-      error('Invalid analytics request. Check your date range and metrics.');
-    } else {
-      error(errorMessage);
-    }
-
-    process.exit(1);
-  }
+  });
 }
 
 export = getVideoAnalyticsCommand;

@@ -1,15 +1,11 @@
 import ora from 'ora';
 import chalk from 'chalk';
 import { getVideoInfo, updateVideoMetadata } from '../lib/youtube';
-import { parseVideoId, confirm, success, error, warning, info, setVerbose, debug } from '../lib/utils';
+import { parseVideoId, confirm, success, error, warning, info, debug, initCommand } from '../lib/utils';
 import { UpdateVideoOptions } from '../types';
 
 async function updateMetadataCommand(videoId: string, options: UpdateVideoOptions): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
   try {
     debug(`Video ID input: ${videoId}`);

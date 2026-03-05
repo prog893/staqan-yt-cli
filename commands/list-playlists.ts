@@ -1,33 +1,16 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { listChannelPlaylists } from '../lib/youtube';
-import { formatDate, formatNumber, error, setVerbose, debug } from '../lib/utils';
-import { getConfigValue, getOutputFormat } from '../lib/config';
+import { formatDate, formatNumber, debug, initCommand, withSpinner } from '../lib/utils';
+import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { OutputOption, LimitOption, VerboseOption } from '../types';
 
 async function listPlaylistsCommand(channelHandle: string | undefined, options: OutputOption & LimitOption & VerboseOption): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
-  const spinner = ora('Fetching channel playlists...').start();
-
-  try {
-    // Use provided channelHandle or load from config
-    let channel = channelHandle;
-    if (!channel) {
-      channel = await getConfigValue('default.channel');
-      if (!channel) {
-        spinner.fail('No channel specified');
-        console.log('');
-        error('Please provide a channel handle or set a default: staqan-yt config set default.channel @yourChannel');
-        process.exit(1);
-      }
-      debug(`Using default channel from config: ${channel}`);
-    }
+  await withSpinner('Fetching channel playlists...', 'Failed to fetch playlists', async (spinner) => {
+    const channel = await requireChannel(channelHandle);
+    debug(`Using channel: ${channel}`);
 
     const limit = parseInt(options.limit || '50');
     debug(`Channel handle: ${channel}, limit: ${limit}`);
@@ -92,12 +75,7 @@ async function listPlaylistsCommand(channelHandle: string | undefined, options: 
         });
         break;
     }
-  } catch (err) {
-    spinner.fail('Failed to fetch playlists');
-    console.log('');
-    error((err as Error).message);
-    process.exit(1);
-  }
+  });
 }
 
 export = listPlaylistsCommand;

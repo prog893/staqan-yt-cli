@@ -1,21 +1,14 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { getAllVideoLocalizations } from '../lib/youtube';
-import { parseVideoId, error, setVerbose, debug } from '../lib/utils';
+import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { LocalizationOptions, VideoLocalization } from '../types';
 
 async function getVideoLocalizations(videoIds: string[], options: LocalizationOptions): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
-  const spinner = ora('Fetching video localizations...').start();
-
-  try {
+  await withSpinner('Fetching video localizations...', 'Failed to fetch video localizations', async (spinner) => {
     debug(`Parsing ${videoIds.length} video ID(s)`, videoIds);
     const parsedIds = videoIds.map(parseVideoId);
     debug('Parsed video IDs', parsedIds);
@@ -117,12 +110,7 @@ async function getVideoLocalizations(videoIds: string[], options: LocalizationOp
         });
         break;
     }
-  } catch (err) {
-    spinner.fail('Failed to fetch video localizations');
-    console.log('');
-    error((err as Error).message);
-    process.exit(1);
-  }
+  });
 }
 
 export = getVideoLocalizations;

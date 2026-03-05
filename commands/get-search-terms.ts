@@ -1,22 +1,15 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, setVerbose, debug, formatNumber, convertToCSV } from '../lib/utils';
+import { parseVideoId, error, debug, formatNumber, convertToCSV, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { SearchTermsOptions } from '../types';
 
 async function getSearchTermsCommand(videoId: string, options: SearchTermsOptions): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
-  const spinner = ora('Fetching search terms...').start();
-
-  try {
+  await withSpinner('Fetching search terms...', 'Failed to fetch search terms', async (spinner) => {
     const parsedId = parseVideoId(videoId);
     debug('Parsed video ID', parsedId);
 
@@ -140,22 +133,7 @@ async function getSearchTermsCommand(videoId: string, options: SearchTermsOption
         console.log('');
         break;
     }
-  } catch (err) {
-    spinner.fail('Failed to fetch search terms');
-    console.log('');
-
-    const errorMessage = (err as Error).message || '';
-
-    if (errorMessage.includes('403') || errorMessage.includes('insufficient')) {
-      error('Analytics API access denied. Make sure you have:');
-      console.log('  1. Enabled YouTube Analytics API in Google Cloud Console');
-      console.log('  2. Re-authenticated with: staqan-yt auth');
-    } else {
-      error(errorMessage);
-    }
-
-    process.exit(1);
-  }
+  });
 }
 
 export = getSearchTermsCommand;

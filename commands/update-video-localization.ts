@@ -1,16 +1,11 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { updateVideoLocalization } from '../lib/youtube';
-import { parseVideoId, error, setVerbose, debug } from '../lib/utils';
+import { parseVideoId, error, debug, initCommand, withSpinner } from '../lib/utils';
 import { normalizeLanguage, getLanguageName } from '../lib/language';
 import { UpdateLocalizationOptions } from '../types';
 
 async function updateVideoLocalizationCommand(videoId: string, options: UpdateLocalizationOptions): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
   const { language, title, description } = options;
 
@@ -32,9 +27,7 @@ async function updateVideoLocalizationCommand(videoId: string, options: UpdateLo
   if (title) debug(`New title length: ${title.length} chars`);
   if (description) debug(`New description length: ${description.length} chars`);
 
-  const spinner = ora(`Updating ${langName} localization...`).start();
-
-  try {
+  await withSpinner(`Updating ${langName} localization...`, 'Failed to update localization', async (spinner) => {
     debug(`Video ID input: ${videoId}`);
     const parsedId = parseVideoId(videoId);
     debug(`Parsed video ID: ${parsedId}`);
@@ -51,12 +44,7 @@ async function updateVideoLocalizationCommand(videoId: string, options: UpdateLo
     if (description) {
       console.log(chalk.gray(`Description updated`));
     }
-  } catch (err) {
-    spinner.fail('Failed to update localization');
-    console.log('');
-    error((err as Error).message);
-    process.exit(1);
-  }
+  });
 }
 
 export = updateVideoLocalizationCommand;

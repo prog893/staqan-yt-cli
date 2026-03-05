@@ -1,7 +1,6 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { searchChannelVideos, searchVideosGlobal } from '../lib/youtube';
-import { formatDate, error, setVerbose, debug } from '../lib/utils';
+import { formatDate, error, debug, initCommand, withSpinner } from '../lib/utils';
 import { getConfigValue, getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { SearchVideosOptions } from '../types';
@@ -10,11 +9,7 @@ async function searchVideosCommand(
   query: string,
   options: SearchVideosOptions
 ): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
   // Determine search mode
   const isGlobal = options.global === true;
@@ -62,13 +57,11 @@ async function searchVideosCommand(
     debug(`Channel search mode with config default: ${targetChannel}`);
   }
 
-  const spinner = ora(
-    searchMode === 'global'
-      ? `Searching YouTube for "${query}"...`
-      : `Searching ${targetChannel} for "${query}"...`
-  ).start();
+  const spinnerMessage = searchMode === 'global'
+    ? `Searching YouTube for "${query}"...`
+    : `Searching ${targetChannel} for "${query}"...`;
 
-  try {
+  await withSpinner(spinnerMessage, 'Search failed', async (spinner) => {
     const limit = parseInt(options.limit || '25');
     debug(`Search mode: ${searchMode}, query: "${query}", limit: ${limit}`);
 
@@ -152,12 +145,7 @@ async function searchVideosCommand(
         });
         break;
     }
-  } catch (err) {
-    spinner.fail('Search failed');
-    console.log('');
-    error((err as Error).message);
-    process.exit(1);
-  }
+  });
 }
 
 export = searchVideosCommand;

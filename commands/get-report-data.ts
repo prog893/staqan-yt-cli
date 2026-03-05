@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '../lib/auth';
-import { error, setVerbose, debug } from '../lib/utils';
+import { error, debug, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv, formatText } from '../lib/formatters';
 import {
@@ -15,7 +15,6 @@ import https from 'https';
 import { createWriteStream, unlinkSync } from 'fs';
 import { unlink } from 'fs/promises';
 import path from 'path';
-import ora from 'ora';
 import chalk from 'chalk';
 
 interface ReportDataOptions {
@@ -93,18 +92,12 @@ async function downloadReport(
  * WITH CACHING SUPPORT
  */
 async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
-  const spinner = ora('Checking for existing reporting job...').start();
+  await withSpinner('Checking for existing reporting job...', 'Failed to fetch report data', async (spinner) => {
+    const auth = await getAuthenticatedClient();
+    const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
 
-  const auth = await getAuthenticatedClient();
-  const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
-
-  try {
     // Step 1: Find or create reporting job
 
     const jobsResponse = await youtubeReporting.jobs.list({
@@ -434,21 +427,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
     console.log(chalk.green(`✓ Fetched ${filteredData.length} row(s)`));
     console.log('');
-
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    spinner.fail('Failed to fetch report data');
-    console.log('');
-    error(`Failed to fetch report data: ${message}`);
-
-    if (message.includes('API not enabled')) {
-      console.log('');
-      console.log(chalk.red('YouTube Reporting API is not enabled.'));
-      console.log(chalk.gray('Enable it at:') + ' https://console.developers.google.com/apis/api/youtubereporting.googleapis.com');
-    }
-
-    process.exit(1);
-  }
+  });
 }
 
 export = getReportDataCommand;
