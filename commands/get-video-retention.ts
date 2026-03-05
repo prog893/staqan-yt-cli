@@ -1,22 +1,15 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, setVerbose, debug, convertToCSV, chunkDateRange, retryWithBackoff, parseDuration, formatTimestamp } from '../lib/utils';
+import { parseVideoId, error, debug, convertToCSV, chunkDateRange, retryWithBackoff, parseDuration, formatTimestamp, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { RetentionOptions } from '../types';
 
 async function getRetentionCommand(videoId: string, options: RetentionOptions): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
-  const spinner = ora('Fetching video information...').start();
-
-  try {
+  await withSpinner('Fetching video information...', 'Failed to fetch retention data', async (spinner) => {
     const parsedId = parseVideoId(videoId);
     debug('Parsed video ID', parsedId);
 
@@ -117,9 +110,9 @@ async function getRetentionCommand(videoId: string, options: RetentionOptions): 
         // Convert rows to table format with readable timestamps
         const totalSeconds = parseDuration(duration);
         const tableData = allRows.map(row => ({
-          timestamp: formatTimestamp(row[0] as number * totalSeconds),
-          retentionPercent: ((row[1] as number) * 100).toFixed(1) + '%',
-          relativePerformance: (row[2] as number).toFixed(2),
+          timestamp: formatTimestamp((row as unknown[])[0] as number * totalSeconds),
+          retentionPercent: (((row as unknown[])[1] as number) * 100).toFixed(1) + '%',
+          relativePerformance: ((row as unknown[])[2] as number).toFixed(2),
         }));
         console.log(formatTable(tableData));
         break;
@@ -130,9 +123,9 @@ async function getRetentionCommand(videoId: string, options: RetentionOptions): 
         const totalSeconds = parseDuration(duration);
         allRows.forEach(row => {
           console.log([
-            formatTimestamp(row[0] as number * totalSeconds),
-            ((row[1] as number) * 100).toFixed(1),
-            (row[2] as number).toFixed(2)
+            formatTimestamp((row as unknown[])[0] as number * totalSeconds),
+            (((row as unknown[])[1] as number) * 100).toFixed(1),
+            ((row as unknown[])[2] as number).toFixed(2)
           ].join('\t'));
         });
         break;
@@ -163,9 +156,9 @@ async function getRetentionCommand(videoId: string, options: RetentionOptions): 
         console.log(chalk.gray('─'.repeat(60)));
 
         allRows.forEach(row => {
-          const timeRatio = row[0] as number; // 0.0 to 1.0
-          const watchRatio = row[1] as number; // Percentage still watching
-          const relativePerformance = row[2] as number; // vs similar videos
+          const timeRatio = (row as unknown[])[0] as number; // 0.0 to 1.0
+          const watchRatio = (row as unknown[])[1] as number; // Percentage still watching
+          const relativePerformance = (row as unknown[])[2] as number; // vs similar videos
 
           // Convert time ratio to actual timestamp
           const elapsedSeconds = timeRatio * totalSeconds;
@@ -198,26 +191,7 @@ async function getRetentionCommand(videoId: string, options: RetentionOptions): 
         break;
       }
     }
-  } catch (err) {
-    spinner.fail('Failed to fetch retention data');
-    console.log('');
-
-    const errorMessage = (err as Error).message || '';
-
-    if (errorMessage.includes('403') || errorMessage.includes('insufficient')) {
-      error('Analytics API access denied. Make sure you have:');
-      console.log('  1. Enabled YouTube Analytics API in Google Cloud Console');
-      console.log('  2. Re-authenticated with: staqan-yt auth');
-    } else if (errorMessage.includes('400')) {
-      error('Invalid retention request. This might be due to:');
-      console.log('  - Video is too new (retention data has 48-hour delay)');
-      console.log('  - Video has too few views to generate retention data');
-    } else {
-      error(errorMessage);
-    }
-
-    process.exit(1);
-  }
+  });
 }
 
 export = getRetentionCommand;

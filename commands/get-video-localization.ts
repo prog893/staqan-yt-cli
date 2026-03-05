@@ -1,25 +1,18 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { getVideoLocalization } from '../lib/youtube';
-import { parseVideoId, error, setVerbose, debug } from '../lib/utils';
+import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { LocalizationOptions } from '../types';
 
 async function getVideoLocalizationCommand(videoId: string, options: LocalizationOptions): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
   const language = options.language; // Can be undefined, will default to main metadata language
   const langDisplay = language || 'main metadata language';
   debug(`Requested language: ${langDisplay}`);
 
-  const spinner = ora(`Fetching ${langDisplay} localization...`).start();
-
-  try {
+  await withSpinner(`Fetching ${langDisplay} localization...`, 'Failed to fetch localization', async (spinner) => {
     debug(`Video ID input: ${videoId}`);
     const parsedId = parseVideoId(videoId);
     debug(`Parsed video ID: ${parsedId}`);
@@ -80,12 +73,7 @@ async function getVideoLocalizationCommand(videoId: string, options: Localizatio
         console.log('');
         break;
     }
-  } catch (err) {
-    spinner.fail('Failed to fetch localization');
-    console.log('');
-    error((err as Error).message);
-    process.exit(1);
-  }
+  });
 }
 
 export = getVideoLocalizationCommand;

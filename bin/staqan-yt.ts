@@ -4,11 +4,12 @@ import { program, Command } from 'commander';
 import chalk from 'chalk';
 import * as path from 'path';
 import { GroupedHelp } from '../lib/customHelp';
+import { OutputOption, VerboseOption, ChannelAnalyticsOptions } from '../types';
 import authCommand = require('../commands/auth');
-import channelVideosCommand = require('../commands/channel-videos');
-import videoInfoCommand = require('../commands/video-info');
-import updateMetadataCommand = require('../commands/update-metadata');
-import searchChannelCommand = require('../commands/search-channel');
+import listVideosCommand = require('../commands/list-videos');
+import getVideoCommand = require('../commands/get-video');
+import updateVideoCommand = require('../commands/update-video');
+import searchVideosCommand = require('../commands/search-videos');
 import getVideoLocalizations = require('../commands/get-video-localizations');
 import getVideoLocalization = require('../commands/get-video-localization');
 import putVideoLocalization = require('../commands/put-video-localization');
@@ -37,6 +38,8 @@ import getReportDataCommand = require('../commands/get-report-data');
 import fetchReportsCommand = require('../commands/fetch-reports');
 
 // Helper function to wrap command actions to handle "help" as an argument
+// Note: Using any[] here is pragmatic - we only check for "help" string,
+// then forward args to the properly-typed command function
 function withHelpWrapper(commandName: string, actionFn: (...args: any[]) => Promise<void> | void) {
   return async (...args: any[]) => {
     // Check if any argument is "help" (but not in options)
@@ -114,7 +117,7 @@ program
   .option('-l, --limit <number>', 'Limit number of results', '50')
   .option('-t, --type <type>', 'Filter by video type (short or regular)')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(withHelpWrapper('list-videos', channelVideosCommand));
+  .action(withHelpWrapper('list-videos', listVideosCommand));
 
 // Get single video command
 program
@@ -122,7 +125,7 @@ program
   .description('Get detailed metadata for a single video')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(withHelpWrapper('get-video', (videoId: string, options: { output?: 'json' | 'table' | 'text' | 'pretty' | 'csv'; verbose?: boolean }) => videoInfoCommand([videoId], options)));
+  .action(withHelpWrapper('get-video', (videoId: string, options: OutputOption & VerboseOption) => getVideoCommand([videoId], options)));
 
 // Get multiple videos command (batch operation)
 program
@@ -130,7 +133,7 @@ program
   .description('Get detailed metadata for multiple videos')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(withHelpWrapper('get-videos', videoInfoCommand));
+  .action(withHelpWrapper('get-videos', getVideoCommand));
 
 // Update video command
 program
@@ -142,7 +145,7 @@ program
   .option('-y, --yes', 'Skip confirmation prompt')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(withHelpWrapper('update-video', updateMetadataCommand));
+  .action(withHelpWrapper('update-video', updateVideoCommand));
 
 // Search videos command
 program
@@ -153,7 +156,7 @@ program
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-l, --limit <number>', 'Limit number of results', '25')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(withHelpWrapper('search-videos', searchChannelCommand));
+  .action(withHelpWrapper('search-videos', searchVideosCommand));
 
 // Get all video localizations (plural - returns multiple)
 program
@@ -347,7 +350,7 @@ program
   .option('--metrics <metrics>', 'Custom metrics (comma-separated, requires --dimensions)')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(withHelpWrapper('get-channel-analytics', (channelHandle: string | undefined, options: { report?: 'demographics' | 'devices' | 'geography' | 'traffic-sources' | 'subscription-status'; startDate?: string; endDate?: string; dimensions?: string; metrics?: string; output?: 'json' | 'table' | 'text' | 'pretty' | 'csv'; verbose?: boolean }) => {
+  .action(withHelpWrapper('get-channel-analytics', (channelHandle: string | undefined, options: ChannelAnalyticsOptions) => {
     // Commander v12+ automatically converts kebab-case to camelCase
     getChannelAnalyticsCommand(channelHandle, options);
   }));

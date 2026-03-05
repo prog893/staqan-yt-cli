@@ -109,6 +109,19 @@ export async function getConfig(): Promise<Config> {
 }
 
 /**
+ * Resolve the channel to use for a command.
+ * Uses `provided` if given, otherwise falls back to `default.channel` from config.
+ * Throws if neither is available — callers should let this propagate to withSpinner.
+ */
+export async function requireChannel(provided?: string): Promise<string> {
+  const channel = provided || await getConfigValue('default.channel');
+  if (!channel) {
+    throw new Error('No channel specified. Please provide a channel handle or set a default: staqan-yt config set default.channel @yourChannel');
+  }
+  return channel;
+}
+
+/**
  * Get the output format to use
  * CLI flag takes precedence over config
  */

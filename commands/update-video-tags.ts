@@ -2,15 +2,11 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, confirm, success, error, warning, info, setVerbose, debug } from '../lib/utils';
+import { parseVideoId, confirm, success, error, warning, info, debug, initCommand } from '../lib/utils';
 import { UpdateTagsOptions } from '../types';
 
 async function updateVideoTagsCommand(videoId: string, options: UpdateTagsOptions): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
   try {
     const parsedId = parseVideoId(videoId);

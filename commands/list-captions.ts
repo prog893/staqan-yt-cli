@@ -1,21 +1,14 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { listCaptions } from '../lib/youtube';
-import { error, setVerbose, debug } from '../lib/utils';
+import { debug, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { OutputOption, VerboseOption } from '../types';
 
 async function listCaptionsCommand(videoId: string, options: OutputOption & VerboseOption): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
-  const spinner = ora('Fetching captions...').start();
-
-  try {
+  await withSpinner('Fetching captions...', 'Failed to fetch captions', async (spinner) => {
     debug(`Fetching captions for video: ${videoId}`);
     const captions = await listCaptions(videoId);
 
@@ -88,12 +81,7 @@ async function listCaptionsCommand(videoId: string, options: OutputOption & Verb
         });
         break;
     }
-  } catch (err) {
-    spinner.fail('Failed to fetch captions');
-    console.log('');
-    error((err as Error).message);
-    process.exit(1);
-  }
+  });
 }
 
 export = listCaptionsCommand;

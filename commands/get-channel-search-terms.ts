@@ -1,9 +1,8 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseChannelHandle, error, setVerbose, debug, formatNumber, convertToCSV } from '../lib/utils';
-import { getConfigValue, getOutputFormat } from '../lib/config';
+import { parseChannelHandle, error, debug, formatNumber, convertToCSV, initCommand, withSpinner } from '../lib/utils';
+import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ChannelSearchTermsOptions } from '../types';
 
@@ -31,31 +30,12 @@ const MAX_VIDEO_IDS = 500;
 const YOUTUBE_START_DATE = '2005-02-14';
 
 async function getChannelSearchTermsCommand(channelHandle: string | undefined, options: ChannelSearchTermsOptions): Promise<void> {
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
-  const spinner = ora('Resolving channel...').start();
-
-  try {
+  await withSpinner('Resolving channel...', 'Failed to fetch channel search terms', async (spinner) => {
     // Resolve channel from arg or config default
-    let channelArg = channelHandle;
-    if (!channelArg) {
-      const defaultChannel = await getConfigValue('default.channel');
-      if (!defaultChannel) {
-        spinner.fail('Channel not specified');
-        error('No channel provided and no default channel configured.');
-        console.log('');
-        console.log('Provide a channel handle:');
-        console.log('  staqan-yt get-channel-search-terms @channel');
-        console.log('');
-        console.log('Or set a default channel:');
-        console.log('  staqan-yt config set default.channel @channel');
-        process.exit(1);
-      }
-      channelArg = defaultChannel;
-    }
+    const channelArg = await requireChannel(channelHandle);
+    debug(`Using channel: ${channelArg}`);
 
     const parsedChannel = parseChannelHandle(channelArg);
     debug('Parsed channel', parsedChannel);
@@ -293,26 +273,7 @@ async function getChannelSearchTermsCommand(channelHandle: string | undefined, o
         break;
       }
     }
-  } catch (err) {
-    spinner.fail('Failed to fetch channel search terms');
-    console.log('');
-
-    const errorMessage = (err as Error).message || '';
-
-    // Always show the raw API error so nothing is hidden during debugging
-    error(errorMessage);
-
-    if (errorMessage.includes('403') || errorMessage.includes('insufficient')) {
-      console.log('');
-      console.log('Analytics API access denied. Make sure you have:');
-      console.log('  1. Enabled YouTube Analytics API in Google Cloud Console');
-      console.log('  2. Re-authenticated with: staqan-yt auth');
-      console.log('');
-      console.log('Required scope: https://www.googleapis.com/auth/yt-analytics.readonly');
-    }
-
-    process.exit(1);
-  }
+  });
 }
 
 export = getChannelSearchTermsCommand;

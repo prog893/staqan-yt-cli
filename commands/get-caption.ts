@@ -1,7 +1,7 @@
 import ora from 'ora';
 import chalk from 'chalk';
 import { downloadCaption } from '../lib/youtube';
-import { error, setVerbose, debug } from '../lib/utils';
+import { error, debug, initCommand } from '../lib/utils';
 import { CaptionFormat, VerboseOption } from '../types';
 
 interface GetCaptionOptions extends VerboseOption {
@@ -9,11 +9,7 @@ interface GetCaptionOptions extends VerboseOption {
 }
 
 async function getCaptionCommand(captionId: string, options: GetCaptionOptions): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
   // Note: For caption metadata, use list-captions <videoId>
   // This command focuses on downloading caption content

@@ -1,21 +1,14 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { getPlaylistInfo } from '../lib/youtube';
-import { formatDate, formatNumber, error, setVerbose, debug, parsePlaylistId } from '../lib/utils';
+import { formatDate, formatNumber, debug, parsePlaylistId, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { OutputOption, VerboseOption } from '../types';
 
 async function getPlaylistCommand(playlistId: string, options: OutputOption & VerboseOption): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
-  const spinner = ora('Fetching playlist information...').start();
-
-  try {
+  await withSpinner('Fetching playlist information...', 'Failed to fetch playlist information', async (spinner) => {
     const parsedId = parsePlaylistId(playlistId);
     debug(`Fetching playlist: ${parsedId} (parsed from: ${playlistId})`);
     const playlist = await getPlaylistInfo(parsedId);
@@ -93,12 +86,7 @@ async function getPlaylistCommand(playlistId: string, options: OutputOption & Ve
         console.log('');
         break;
     }
-  } catch (err) {
-    spinner.fail('Failed to fetch playlist information');
-    console.log('');
-    error((err as Error).message);
-    process.exit(1);
-  }
+  });
 }
 
 export = getPlaylistCommand;

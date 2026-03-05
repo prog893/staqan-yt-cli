@@ -9,8 +9,7 @@ import {
   getChannelVideos,
   getVideoInfo,
   updateVideoMetadata,
-  searchChannelVideos,
-  searchVideosGlobal,
+  searchVideos,
   getVideoLocalization,
   getAllVideoLocalizations,
   putVideoLocalization,
@@ -18,8 +17,8 @@ import {
 } from '../lib/youtube';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, chunkDateRange, retryWithBackoff } from '../lib/utils';
-import { getConfigValue } from '../lib/config';
+import { parseVideoId, chunkDateRange, retryWithBackoff, initCommand } from '../lib/utils';
+import { requireChannel } from '../lib/config';
 
 // Tool definitions
 const TOOLS: Tool[] = [
@@ -540,20 +539,11 @@ async function handleToolCall(name: string, args: any) {
     case 'youtube_search_videos': {
       const { query, channelHandle, global, maxResults = 25 } = args;
 
-      let results;
-      if (global === true) {
-        results = await searchVideosGlobal(query, maxResults);
-      } else if (channelHandle) {
-        results = await searchChannelVideos(channelHandle, query, maxResults);
-      } else {
-        const defaultChannel = await getConfigValue('default.channel');
-        if (!defaultChannel) {
-          throw new Error(
-            'No channel specified. Either provide channelHandle, set global=true, or configure default.channel'
-          );
-        }
-        results = await searchChannelVideos(defaultChannel, query, maxResults);
+      let resolvedChannel: string | undefined;
+      if (global !== true) {
+        resolvedChannel = channelHandle || await requireChannel(undefined);
       }
+      const results = await searchVideos(query, { channelHandle: resolvedChannel, maxResults });
 
       return {
         content: [
@@ -654,13 +644,7 @@ async function handleToolCall(name: string, args: any) {
       const youtube = google.youtube({ version: 'v3', auth });
 
       // Resolve channel ID
-      let channelId = args.channelHandle;
-      if (!channelId) {
-        channelId = await getConfigValue('default.channel');
-      }
-      if (!channelId) {
-        throw new Error('No channel specified and no default channel configured.');
-      }
+      const channelId = await requireChannel(args.channelHandle);
 
       const parsedChannel = channelId.startsWith('@')
         ? { type: 'handle', value: channelId }
@@ -846,13 +830,7 @@ async function handleToolCall(name: string, args: any) {
 
     case 'youtube_get_channel_search_terms': {
       // Resolve channel
-      let channelArg = args.channelHandle;
-      if (!channelArg) {
-        channelArg = await getConfigValue('default.channel');
-      }
-      if (!channelArg) {
-        throw new Error('No channel specified and no default channel configured.');
-      }
+      const channelArg = await requireChannel(args.channelHandle);
 
       // Resolve handle → uploads playlist ID
       let uploadsPlaylistId = '';
@@ -1265,7 +1243,8 @@ async function handleToolCall(name: string, args: any) {
 }
 
 // Main MCP command
-async function mcpCommand(): Promise<void> {
+async function mcpCommand(options: { verbose?: boolean } = {}): Promise<void> {
+  initCommand(options);
   const server = new Server(
     {
       name: 'staqan-yt-mcp',

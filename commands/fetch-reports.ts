@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '../lib/auth';
-import { error, setVerbose, debug, success, warning } from '../lib/utils';
+import { error, debug, success, warning, initCommand, withSpinner } from '../lib/utils';
 import {
   findCachedReports,
   saveReportToCache,
@@ -12,7 +12,6 @@ import https from 'https';
 import { createWriteStream, unlinkSync } from 'fs';
 import { unlink } from 'fs/promises';
 import path from 'path';
-import ora from 'ora';
 import chalk from 'chalk';
 
 interface FetchReportsOptions {
@@ -97,18 +96,12 @@ async function downloadReport(
  * Fetch and archive all available report data
  */
 async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
-  const spinner = ora('Initializing...').start();
+  await withSpinner('Initializing...', 'Failed to fetch reports', async (spinner) => {
+    const auth = await getAuthenticatedClient();
+    const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
 
-  const auth = await getAuthenticatedClient();
-  const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
-
-  try {
     // Step 1: Discover report types
     spinner.text = 'Discovering report types...';
 
@@ -324,21 +317,7 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
     console.log('');
 
     success('Fetch complete!');
-
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    spinner.fail('Failed to fetch reports');
-    console.log('');
-    error(`Failed to fetch reports: ${message}`);
-
-    if (message.includes('API not enabled')) {
-      console.log('');
-      console.log(chalk.red('YouTube Reporting API is not enabled.'));
-      console.log(chalk.gray('Enable it at:') + ' https://console.developers.google.com/apis/api/youtubereporting.googleapis.com');
-    }
-
-    process.exit(1);
-  }
+  });
 }
 
 export = fetchReportsCommand;

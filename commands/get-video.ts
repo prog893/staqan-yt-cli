@@ -1,21 +1,14 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { getVideoInfo } from '../lib/youtube';
-import { parseVideoId, formatDate, formatNumber, error, setVerbose, debug } from '../lib/utils';
+import { parseVideoId, formatDate, formatNumber, debug, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { OutputOption, VerboseOption } from '../types';
 
 async function videoInfoCommand(videoIds: string[], options: OutputOption & VerboseOption): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
-  const spinner = ora('Fetching video information...').start();
-
-  try {
+  await withSpinner('Fetching video information...', 'Failed to fetch video information', async (spinner) => {
     debug(`Parsing ${videoIds.length} video ID(s)`, videoIds);
     const parsedIds = videoIds.map(parseVideoId);
     debug('Parsed video IDs', parsedIds);
@@ -121,12 +114,7 @@ async function videoInfoCommand(videoIds: string[], options: OutputOption & Verb
         });
         break;
     }
-  } catch (err) {
-    spinner.fail('Failed to fetch video information');
-    console.log('');
-    error((err as Error).message);
-    process.exit(1);
-  }
+  });
 }
 
 export = videoInfoCommand;

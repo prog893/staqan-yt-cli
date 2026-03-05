@@ -1,17 +1,12 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { listVideoComments } from '../lib/youtube';
-import { formatDate, error, setVerbose, debug, parseVideoId } from '../lib/utils';
+import { formatDate, error, debug, parseVideoId, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ListCommentsOptions } from '../types';
 
 async function listCommentsCommand(videoId: string, options: ListCommentsOptions = {}): Promise<void> {
-  // Enable verbose mode if requested
-  if (options.verbose) {
-    setVerbose(true);
-    debug('Verbose mode enabled');
-  }
+  initCommand(options);
 
   // Parse video ID from URL or raw ID
   videoId = parseVideoId(videoId);
@@ -28,9 +23,7 @@ async function listCommentsCommand(videoId: string, options: ListCommentsOptions
 
   debug(`Fetching comments for video: ${videoId}, limit: ${limit}, sort: ${sortOrder}`);
 
-  const spinner = ora(`Fetching comments for video ${videoId}...`).start();
-
-  try {
+  await withSpinner(`Fetching comments for video ${videoId}...`, 'Failed to fetch comments', async (spinner) => {
     const comments = await listVideoComments(videoId, limit, sortOrder);
 
     spinner.succeed(`Found ${comments.length} comment(s)`);
@@ -103,12 +96,7 @@ async function listCommentsCommand(videoId: string, options: ListCommentsOptions
         });
         break;
     }
-  } catch (err) {
-    spinner.fail('Failed to fetch comments');
-    console.log('');
-    error((err as Error).message);
-    process.exit(1);
-  }
+  });
 }
 
 export = listCommentsCommand;
