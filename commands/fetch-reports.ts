@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '../lib/auth';
-import { error, debug, success, warning, initCommand, withSpinner } from '../lib/utils';
+import { error, debug, success, warning, initCommand, withSpinner, formatTimestampWithTimezone } from '../lib/utils';
 import {
   findCachedReports,
   saveReportToCache,
@@ -173,8 +173,9 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
         const now = new Date();
         const hoursUntilReady = Math.max(0, Math.ceil((readyAt.getTime() - now.getTime()) / (1000 * 60 * 60)));
 
+        const formatted = formatTimestampWithTimezone(readyAt);
         warning(`New job created for ${reportTypeId}`);
-        console.log(chalk.gray('  First report available:') + ' ' + chalk.cyan(readyAt.toISOString()));
+        console.log(chalk.gray('  First report available:') + ' ' + chalk.cyan(`${formatted.local} (${formatted.timezone})`));
         console.log(chalk.gray('  Wait:') + ' ' + chalk.cyan(`${hoursUntilReady} hours remaining`));
         console.log('');
 

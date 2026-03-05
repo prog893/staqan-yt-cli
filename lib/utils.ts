@@ -355,6 +355,47 @@ async function retryWithBackoff<T>(
   throw lastError || new Error('Max retries exceeded');
 }
 
+/**
+ * Get the user's local timezone
+ * Returns the IANA timezone identifier (e.g., 'America/New_York', 'Asia/Tokyo')
+ */
+function getLocalTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    // Fallback to UTC if timezone detection fails
+    return 'UTC';
+  }
+}
+
+/**
+ * Format a date with timezone information
+ * Returns both ISO string and localized string with timezone
+ */
+function formatTimestampWithTimezone(dateInput: string | Date): {
+  iso: string;
+  local: string;
+  timezone: string;
+} {
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  const timezone = getLocalTimeZone();
+
+  return {
+    iso: date.toISOString(),
+    local: date.toLocaleString('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }),
+    timezone,
+  };
+}
+
 export {
   initCommand,
   withSpinner,
@@ -372,6 +413,8 @@ export {
   success,
   error,
   warning,
+  getLocalTimeZone,
+  formatTimestampWithTimezone,
   info,
   confirm,
   setVerbose,
