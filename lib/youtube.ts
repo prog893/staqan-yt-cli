@@ -2,7 +2,9 @@ import { google, youtube_v3 } from 'googleapis';
 import { getAuthenticatedClient } from './auth';
 import { normalizeLanguage, getLanguageName } from './language';
 import { VideoInfo, VideoListItem, VideoLocalization, VideoType, PlaylistInfo, PlaylistListItem, CommentInfo, ChannelInfo, CaptionInfo, CaptionFormat } from '../types';
-import { debug } from './utils';
+import { debug, warning } from './utils';
+
+// ─── Client ──────────────────────────────────────────────────────────────────
 
 /**
  * Check if a video is a YouTube Short by checking if the shorts URL redirects
@@ -19,7 +21,8 @@ async function checkIfShort(videoId: string): Promise<boolean> {
     // If status is 303 or 302, it redirects to /watch?v= (regular video)
     return response.status === 200;
   } catch {
-    // On error, default to regular video
+    // On network error, default to regular video (non-blocking)
+    debug(`checkIfShort failed for ${videoId}, defaulting to regular`);
     return false;
   }
 }
@@ -40,12 +43,14 @@ async function checkVideoTypes(videoIds: string[]): Promise<Map<string, VideoTyp
 }
 
 /**
- * Get YouTube API client
+ * Get authenticated YouTube API client
  */
 async function getYouTubeClient(): Promise<youtube_v3.Youtube> {
   const auth = await getAuthenticatedClient();
   return google.youtube({ version: 'v3', auth });
 }
+
+// ─── Channels ─────────────────────────────────────────────────────────────────
 
 /**
  * Get channel ID from handle or username
@@ -207,6 +212,8 @@ async function getChannelVideos(channelHandle: string, maxResults = 50): Promise
   }));
 }
 
+// ─── Videos ───────────────────────────────────────────────────────────────────
+
 /**
  * Get detailed video information
  */
@@ -361,6 +368,8 @@ async function searchVideosGlobal(query: string, maxResults = 25): Promise<Video
   }));
 }
 
+// ─── Localizations ────────────────────────────────────────────────────────────
+
 /**
  * Get video with localizations
  * @param videoId - YouTube video ID
@@ -370,23 +379,19 @@ async function getVideoWithLocalizations(videoId: string): Promise<youtube_v3.Sc
   debug(`Fetching video with localizations: ${videoId}`);
   const youtube = await getYouTubeClient();
 
-  try {
-    const response = await youtube.videos.list({
-      part: ['snippet', 'localizations'],
-      id: [videoId],
-    });
+  const response = await youtube.videos.list({
+    part: ['snippet', 'localizations'],
+    id: [videoId],
+  });
 
-    if (!response.data.items || response.data.items.length === 0) {
-      throw new Error(`Video not found: ${videoId}`);
-    }
-
-    const video = response.data.items[0];
-    const localizationCount = Object.keys(video.localizations || {}).length;
-    debug(`Retrieved video with ${localizationCount} localization(s)`);
-    return video;
-  } catch (error) {
-    throw new Error(`Failed to fetch video with localizations: ${(error as Error).message}`);
+  if (!response.data.items || response.data.items.length === 0) {
+    throw new Error(`Video not found: ${videoId}`);
   }
+
+  const video = response.data.items[0];
+  const localizationCount = Object.keys(video.localizations || {}).length;
+  debug(`Retrieved video with ${localizationCount} localization(s)`);
+  return video;
 }
 
 /**
@@ -403,7 +408,7 @@ async function getVideoLocalization(videoId: string, language?: string): Promise
   if (!language) {
     langCode = video.snippet!.defaultLanguage || 'en';
     if (!video.snippet!.defaultLanguage) {
-      console.warn('Warning: Video does not specify default language, assuming English (en)');
+      warning('Video does not specify default language, assuming English (en)');
     }
   } else {
     const normalized = normalizeLanguage(language);
@@ -537,27 +542,23 @@ async function putVideoLocalization(videoId: string, language: string, title: st
   const newLocalizations = video.localizations || {};
   newLocalizations[langCode] = { title, description };
 
-  try {
-    debug('Sending create localization request to YouTube API');
-    // Always update both snippet and localizations to ensure defaultLanguage is set
-    const response = await youtube.videos.update({
-      part: ['snippet', 'localizations'],
-      requestBody: {
-        id: videoId,
-        snippet: {
-          ...video.snippet,
-          defaultLanguage: defaultLanguage,
-          categoryId: video.snippet!.categoryId,
-        },
-        localizations: newLocalizations,
+  debug('Sending create localization request to YouTube API');
+  // Always update both snippet and localizations to ensure defaultLanguage is set
+  const response = await youtube.videos.update({
+    part: ['snippet', 'localizations'],
+    requestBody: {
+      id: videoId,
+      snippet: {
+        ...video.snippet,
+        defaultLanguage: defaultLanguage,
+        categoryId: video.snippet!.categoryId,
       },
-    });
+      localizations: newLocalizations,
+    },
+  });
 
-    debug('Localization created successfully');
-    return response.data;
-  } catch (error) {
-    throw new Error(`Failed to create localization: ${(error as Error).message}`);
-  }
+  debug('Localization created successfully');
+  return response.data;
 }
 
 /**
@@ -595,18 +596,14 @@ async function updateVideoLocalization(videoId: string, language: string, title:
       },
     };
 
-    try {
-      debug('Sending main metadata update request to YouTube API');
-      const response = await youtube.videos.update({
-        part: ['snippet'],
-        requestBody: updateData,
-      });
+    debug('Sending main metadata update request to YouTube API');
+    const response = await youtube.videos.update({
+      part: ['snippet'],
+      requestBody: updateData,
+    });
 
-      debug('Main metadata updated successfully');
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to update main metadata: ${(error as Error).message}`);
-    }
+    debug('Main metadata updated successfully');
+    return response.data;
   }
 
   // Updating localization
@@ -624,22 +621,20 @@ async function updateVideoLocalization(videoId: string, language: string, title:
   };
   debug('Built updated localizations object');
 
-  try {
-    debug('Sending localization update request to YouTube API');
-    const response = await youtube.videos.update({
-      part: ['localizations'],
-      requestBody: {
-        id: videoId,
-        localizations: updatedLocalizations,
-      },
-    });
+  debug('Sending localization update request to YouTube API');
+  const response = await youtube.videos.update({
+    part: ['localizations'],
+    requestBody: {
+      id: videoId,
+      localizations: updatedLocalizations,
+    },
+  });
 
-    debug('Localization updated successfully');
-    return response.data;
-  } catch (error) {
-    throw new Error(`Failed to update localization: ${(error as Error).message}`);
-  }
+  debug('Localization updated successfully');
+  return response.data;
 }
+
+// ─── Playlists ────────────────────────────────────────────────────────────────
 
 /**
  * Get detailed playlist information
@@ -760,6 +755,8 @@ async function listChannelPlaylists(channelHandle: string, maxResults = 50): Pro
   return playlists;
 }
 
+// ─── Comments ─────────────────────────────────────────────────────────────────
+
 /**
  * List comments for a video
  * @param videoId - YouTube video ID
@@ -814,6 +811,8 @@ async function listVideoComments(videoId: string, maxResults = 20, order: 'relev
   debug(`Total comments retrieved: ${comments.length}`);
   return comments;
 }
+
+// ─── Captions ─────────────────────────────────────────────────────────────────
 
 /**
  * List all captions for a video
