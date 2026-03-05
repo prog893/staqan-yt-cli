@@ -82,6 +82,30 @@ search-videos <ch> <query> # Search multiple videos
 
 ### TypeScript Guidelines
 
+**⚠️ ZERO `any` TOLERANCE**
+
+`any` is banned. It silences TypeScript and hides bugs. Never use it:
+
+```typescript
+// ❌ Never
+function process(...args: any[]): any { ... }
+const result: any = apiCall();
+
+// ✅ Use specific types
+function process(videoId: string, options: VideoOptions): Promise<VideoInfo> { ... }
+
+// ✅ Truly unknown input → use `unknown` + type guard
+function handle(input: unknown): string {
+  if (typeof input !== 'string') throw new Error('Expected string');
+  return input;
+}
+
+// ✅ Untyped external data → define a minimal interface
+interface RawApiItem { id?: string; snippet?: { title?: string } }
+```
+
+If `npm run lint` reports `any` warnings, fix them before submitting.
+
 **1. Use strict types:**
 ```typescript
 // Good - explicit types

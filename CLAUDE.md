@@ -278,6 +278,30 @@ npm run dev           # Development mode with tsx
 
 ### Type Safety Guidelines
 
+**⚠️ ZERO `any` TOLERANCE**
+
+**Never use `any` type.** It defeats TypeScript's entire purpose. This is a hard rule:
+
+```typescript
+// ❌ NEVER
+function handler(...args: any[]): any { ... }
+const data: any = response;
+
+// ✅ Use specific types
+function handler(videoId: string, options: VideoOptions): Promise<void> { ... }
+const data: VideoInfo = response;
+
+// ✅ If type is truly unknown, use `unknown` + type guard
+function handler(input: unknown): void {
+  if (typeof input === 'string') { ... }
+}
+
+// ✅ For external/untyped data, use a specific interface even if partial
+interface ApiResponse { items?: Item[] }
+```
+
+If you find yourself reaching for `any`, use `unknown` with a type guard, or define a proper interface.
+
 **1. Use strict types everywhere:**
 ```typescript
 // Good - explicit types
