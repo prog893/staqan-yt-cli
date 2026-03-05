@@ -298,55 +298,29 @@ async function updateVideoMetadata(videoId: string, updates: { title?: string; d
 }
 
 /**
- * Search videos in a channel
- */
-async function searchChannelVideos(channelHandle: string, query: string, maxResults = 25): Promise<VideoListItem[]> {
-  const youtube = await getYouTubeClient();
-  const channelId = await getChannelId(channelHandle);
-
-  const response = await youtube.search.list({
-    part: ['snippet'],
-    channelId,
-    q: query,
-    type: ['video'],
-    maxResults,
-    order: 'date',
-  });
-
-  const items = response.data.items || [];
-  const rawVideos = items.map(item => ({
-    id: item.id!.videoId!,
-    title: item.snippet!.title!,
-    description: item.snippet!.description!,
-    publishedAt: item.snippet!.publishedAt!,
-    thumbnail: item.snippet!.thumbnails!.default!.url!,
-  }));
-
-  // Check video types for all videos
-  const videoTypes = await checkVideoTypes(rawVideos.map(v => v.id));
-
-  return rawVideos.map(video => ({
-    ...video,
-    videoType: videoTypes.get(video.id) || 'regular',
-  }));
-}
-
-/**
- * Search videos globally on YouTube (not restricted to a channel)
+ * Search videos — optionally scoped to a channel.
  * @param query - Search query string
- * @param maxResults - Maximum number of results (default: 25)
+ * @param options.channelHandle - Restrict to this channel (handle or ID); omit for global search
+ * @param options.maxResults - Maximum number of results (default: 25)
  * @returns Array of video list items with channel info
  */
-async function searchVideosGlobal(query: string, maxResults = 25): Promise<VideoListItem[]> {
-  debug(`Global search for: ${query}, maxResults: ${maxResults}`);
+async function searchVideos(
+  query: string,
+  options: { channelHandle?: string; maxResults?: number } = {}
+): Promise<VideoListItem[]> {
+  const { channelHandle, maxResults = 25 } = options;
+  debug(`Search: query="${query}", channel=${channelHandle ?? 'global'}, maxResults=${maxResults}`);
   const youtube = await getYouTubeClient();
+
+  const channelId = channelHandle ? await getChannelId(channelHandle) : undefined;
 
   const response = await youtube.search.list({
     part: ['snippet'],
+    ...(channelId ? { channelId } : {}),
     q: query,
     type: ['video'],
     maxResults,
-    order: 'relevance',
+    order: channelId ? 'date' : 'relevance',
   });
 
   const items = response.data.items || [];
@@ -886,8 +860,7 @@ export {
   getChannelVideos,
   getVideoInfo,
   updateVideoMetadata,
-  searchChannelVideos,
-  searchVideosGlobal,
+  searchVideos,
   getVideoWithLocalizations,
   getVideoLocalization,
   getAllVideoLocalizations,

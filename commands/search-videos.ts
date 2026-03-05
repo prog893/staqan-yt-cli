@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { searchChannelVideos, searchVideosGlobal } from '../lib/youtube';
+import { searchVideos } from '../lib/youtube';
 import { formatDate, error, debug, initCommand, withSpinner } from '../lib/utils';
 import { getConfigValue, getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
@@ -65,12 +65,10 @@ async function searchVideosCommand(
     const limit = parseInt(options.limit || '25');
     debug(`Search mode: ${searchMode}, query: "${query}", limit: ${limit}`);
 
-    let videos;
-    if (searchMode === 'global') {
-      videos = await searchVideosGlobal(query, limit);
-    } else {
-      videos = await searchChannelVideos(targetChannel!, query, limit);
-    }
+    const videos = await searchVideos(query, {
+      channelHandle: searchMode === 'channel' ? targetChannel : undefined,
+      maxResults: limit,
+    });
 
     spinner.succeed(`Found ${videos.length} video(s)`);
     console.log('');

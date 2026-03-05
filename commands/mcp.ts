@@ -9,8 +9,7 @@ import {
   getChannelVideos,
   getVideoInfo,
   updateVideoMetadata,
-  searchChannelVideos,
-  searchVideosGlobal,
+  searchVideos,
   getVideoLocalization,
   getAllVideoLocalizations,
   putVideoLocalization,
@@ -540,15 +539,11 @@ async function handleToolCall(name: string, args: any) {
     case 'youtube_search_videos': {
       const { query, channelHandle, global, maxResults = 25 } = args;
 
-      let results;
-      if (global === true) {
-        results = await searchVideosGlobal(query, maxResults);
-      } else if (channelHandle) {
-        results = await searchChannelVideos(channelHandle, query, maxResults);
-      } else {
-        const defaultChannel = await requireChannel(undefined);
-        results = await searchChannelVideos(defaultChannel, query, maxResults);
+      let resolvedChannel: string | undefined;
+      if (global !== true) {
+        resolvedChannel = channelHandle || await requireChannel(undefined);
       }
+      const results = await searchVideos(query, { channelHandle: resolvedChannel, maxResults });
 
       return {
         content: [
