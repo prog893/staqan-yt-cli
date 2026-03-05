@@ -28,6 +28,15 @@ class StaqanYt < Formula
 
     # Install the compiled binary
     bin.install "staqan-yt"
+
+    # Install shell completions (zsh is default on macOS)
+    # Generate zsh completion
+    zsh_completion = Utils.popen_read("#{bin}/staqan-yt", "config", "completion", "zsh", "--print")
+    zsh_completion.install "_staqan-yt" => "_staqan-yt"
+
+    # Generate bash completion
+    bash_completion = Utils.popen_read("#{bin}/staqan-yt", "config", "completion", "bash", "--print")
+    (share/"bash-completion/completions").install "staqan-yt.bash" => "staqan-yt"
   end
 
   def caveats
@@ -38,6 +47,11 @@ class StaqanYt < Formula
       2. Download the credentials.json file
       3. Place it in: ~/.staqan-yt-cli/credentials.json
       4. Run: staqan-yt auth
+
+      Shell completions have been installed for zsh (default) and bash.
+      To enable completions, reload your shell or run:
+        source ~/.zshrc  # for zsh
+        source ~/.bashrc # for bash
 
       For detailed setup instructions, visit:
       https://github.com/prog893/staqan-yt-cli#setup

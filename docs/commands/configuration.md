@@ -85,11 +85,13 @@ staqan-yt config [action] [key] [value]
 - `show` - Show all configuration settings
 - `set` - Set a configuration value
 - `get` - Get a specific configuration value
-- `delete` - Delete a configuration value
+- `completion` - Generate or install shell completions
 
 ### Options
 
 - `--show` - Show all configuration settings (same as `show` action)
+- `--install` - Install shell completion to appropriate location (for `completion` action)
+- `--print` - Print completion script to stdout (for `completion` action)
 - `--output <format>` - Output format: json, table, text, pretty, csv
 - `-v, --verbose` - Enable verbose output with debug information
 - `-h, --help` - Show help
@@ -146,6 +148,90 @@ staqan-yt config delete default.channel
 1. **CLI flags** - Highest priority (e.g., `--output json`)
 2. **Configuration** - Used if no flag provided
 3. **Defaults** - Built-in defaults if no config
+
+### Shell Completions
+
+The `config completion` action generates shell completion scripts for bash and zsh.
+
+#### Usage
+
+```bash
+# Auto-detect shell and install
+staqan-yt config completion auto --install
+
+# Specify shell explicitly
+staqan-yt config completion zsh --install
+staqan-yt config completion bash --install
+
+# Print completion script to stdout
+staqan-yt config completion zsh --print > ~/.zsh/completion/_staqan-yt
+staqan-yt config completion bash --print > ~/.bash_completion.d/staqan-yt.bash
+```
+
+#### Arguments
+
+- `<shell>` - Shell type: `bash`, `zsh`, or `auto` (auto-detect)
+
+#### Options
+
+- `--install` - Install completion to the appropriate system directory
+- `--print` - Print completion script to stdout (default behavior)
+
+#### Auto-Installation Paths
+
+**Zsh:**
+- Homebrew: `$(brew --prefix)/share/zsh/site-functions/_staqan-yt`
+- User-specific: `~/.zsh/completion/_staqan-yt`
+
+**Bash:**
+- XDG-compliant: `${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion/completions/staqan-yt`
+
+#### Examples
+
+```bash
+# Install zsh completion (auto-detected)
+staqan-yt config completion zsh --install
+source ~/.zshrc
+
+# Install bash completion
+staqan-yt config completion bash --install
+source ~/.bashrc
+
+# Use tab completion
+staqan-yt ge<Tab>              # Shows: get-video, get-videos, get-channel, etc.
+staqan-yt get-video --<Tab>    # Shows: --output, --verbose
+```
+
+#### Enabling Completions
+
+After installation, reload your shell:
+
+**Zsh:**
+```bash
+source ~/.zshrc
+```
+
+**Bash:**
+```bash
+source ~/.bashrc
+```
+
+Or add to your shell startup file:
+
+**Zsh (`~/.zshrc`):**
+```bash
+# Add zsh completion directory to fpath
+fpath=($(brew --prefix)/share/zsh/site-functions $fpath)
+autoload -U compinit && compinit
+```
+
+**Bash (`~/.bashrc`):**
+```bash
+# Load bash completions
+if [[ -d /usr/local/share/bash-completion/completions ]]; then
+  source /usr/local/share/bash-completion/completions/staqan-yt
+fi
+```
 
 ---
 

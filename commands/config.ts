@@ -2,14 +2,17 @@ import chalk from 'chalk';
 import { getConfig, setConfigValue } from '../lib/config';
 import { success, error, info } from '../lib/utils';
 import { ConfigKey } from '../types';
+import { installCompletion, detectShell } from '../lib/completion';
 
 interface ConfigOptions {
   show?: boolean;
+  install?: boolean;
+  print?: boolean;
 }
 
 /**
  * Config command handler
- * Supports: config set <key> <value>, config get <key>, config list
+ * Supports: config set <key> <value>, config get <key>, config list, config completion <shell>
  */
 async function configCommand(
   action?: string,
@@ -75,6 +78,39 @@ async function configCommand(
       return;
     }
 
+    // Handle 'completion' action
+    if (action === 'completion') {
+      // Determine shell type
+      let shell: 'bash' | 'zsh';
+      if (key && ['bash', 'zsh'].includes(key)) {
+        shell = key as 'bash' | 'zsh';
+      } else if (key === 'auto' || !key) {
+        const detected = detectShell();
+        if (detected === 'auto') {
+          error('Could not detect shell type. Please specify bash or zsh.');
+          process.exit(1);
+        }
+        shell = detected;
+        info(`Auto-detected shell: ${shell}`);
+      } else {
+        error(`Invalid shell type: ${key}`);
+        console.log('');
+        console.log('Usage: staqan-yt config completion <bash|zsh|auto> [--install|--print]');
+        process.exit(1);
+      }
+
+      const install = options?.install || false;
+      options?.print || false; // Reserved for future use
+
+      try {
+        await installCompletion(shell, !install);
+      } catch (err) {
+        error((err as Error).message);
+        process.exit(1);
+      }
+      return;
+    }
+
     // Invalid action
     error(`Unknown action: ${action}`);
     console.log('');
@@ -82,6 +118,7 @@ async function configCommand(
     console.log('  staqan-yt config list              - Show all configuration');
     console.log('  staqan-yt config set <key> <value> - Set a configuration value');
     console.log('  staqan-yt config get <key>         - Get a configuration value');
+    console.log('  staqan-yt config completion <bash|zsh|auto> [--install|--print]');
     process.exit(1);
   } catch (err) {
     error((err as Error).message);
