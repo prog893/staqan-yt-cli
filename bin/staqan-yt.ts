@@ -102,7 +102,7 @@ program
   .option('--show', 'Show all configuration settings')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(configCommand);
+  .action(withHelpWrapper('config', configCommand));
 
 // List videos command
 program
@@ -120,7 +120,7 @@ program
   .description('Get detailed metadata for a single video')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action((videoId: string, options: { output?: 'json' | 'table' | 'text' | 'pretty' | 'csv'; verbose?: boolean }) => videoInfoCommand([videoId], options));
+  .action(withHelpWrapper('get-video', (videoId: string, options: { output?: 'json' | 'table' | 'text' | 'pretty' | 'csv'; verbose?: boolean }) => videoInfoCommand([videoId], options)));
 
 // Get multiple videos command (batch operation)
 program
@@ -128,7 +128,7 @@ program
   .description('Get detailed metadata for multiple videos')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(videoInfoCommand);
+  .action(withHelpWrapper('get-videos', videoInfoCommand));
 
 // Update video command
 program
@@ -140,7 +140,7 @@ program
   .option('-y, --yes', 'Skip confirmation prompt')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(updateMetadataCommand);
+  .action(withHelpWrapper('update-video', updateMetadataCommand));
 
 // Search videos command
 program
@@ -160,7 +160,7 @@ program
   .option('--languages <langs>', 'Comma-separated list of languages (e.g., "en,ja,ru")')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(getVideoLocalizations);
+  .action(withHelpWrapper('get-video-localizations', getVideoLocalizations));
 
 // Get single video localization (singular - returns one)
 program
@@ -169,7 +169,7 @@ program
   .option('--language <lang>', 'Language code or name (e.g., "ja", "Japanese")')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(getVideoLocalization);
+  .action(withHelpWrapper('get-video-localization', getVideoLocalization));
 
 // Create new localization (PUT - fail if exists)
 program
@@ -180,7 +180,7 @@ program
   .requiredOption('--description <desc>', 'Localized description')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(putVideoLocalization);
+  .action(withHelpWrapper('put-video-localization', putVideoLocalization));
 
 // Update existing localization (UPDATE - fail if doesn't exist)
 program
@@ -191,7 +191,7 @@ program
   .option('--description <desc>', 'New localized description')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(updateVideoLocalization);
+  .action(withHelpWrapper('update-video-localization', updateVideoLocalization));
 
 // Analytics commands
 program
@@ -202,7 +202,7 @@ program
   .option('--metrics <metrics>', 'Comma-separated list of metrics to fetch')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(getVideoAnalytics);
+  .action(withHelpWrapper('get-video-analytics', getVideoAnalytics));
 
 program
   .command('get-search-terms <videoId>')
@@ -210,21 +210,21 @@ program
   .option('-l, --limit <number>', 'Limit number of results', '50')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(getSearchTerms);
+  .action(withHelpWrapper('get-search-terms', getSearchTerms));
 
 program
   .command('get-traffic-sources <videoId>')
   .description('Get traffic source breakdown (search, suggested, external, etc.)')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(getTrafficSources);
+  .action(withHelpWrapper('get-traffic-sources', getTrafficSources));
 
 program
   .command('get-video-retention <videoId>')
   .description('Get audience retention curve (% of viewers at each point in video)')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(getVideoRetention);
+  .action(withHelpWrapper('get-video-retention', getVideoRetention));
 
 // Tags commands
 program
@@ -232,7 +232,7 @@ program
   .description('Get video tags')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(getVideoTags);
+  .action(withHelpWrapper('get-video-tags', getVideoTags));
 
 program
   .command('update-video-tags <videoId>')
@@ -244,7 +244,7 @@ program
   .option('-y, --yes', 'Skip confirmation prompt')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(updateVideoTags);
+  .action(withHelpWrapper('update-video-tags', updateVideoTags));
 
 // Thumbnail commands
 program
@@ -253,7 +253,7 @@ program
   .option('--quality <quality>', 'Specific quality (default, medium, high, standard, maxres)')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(getThumbnail);
+  .action(withHelpWrapper('get-thumbnail', getThumbnail));
 
 // MCP server command
 program
@@ -268,7 +268,7 @@ program
   .description('Get detailed metadata for a single playlist')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(getPlaylistCommand);
+  .action(withHelpWrapper('get-playlist', getPlaylistCommand));
 
 // Get multiple playlists command (plural - batch operation)
 program
@@ -276,7 +276,7 @@ program
   .description('Get detailed metadata for multiple playlists')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(getPlaylistsCommand);
+  .action(withHelpWrapper('get-playlists', getPlaylistsCommand));
 
 // List playlists command (plural - list collection)
 program
@@ -295,7 +295,7 @@ program
   .option('-l, --limit <number>', 'Limit number of results', '20')
   .option('-s, --sort <order>', 'Sort order: top or new', 'top')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(listCommentsCommand);
+  .action(withHelpWrapper('list-comments', listCommentsCommand));
 
 // Get channel command (singular - single item)
 program
@@ -312,7 +312,7 @@ program
   .description('List all caption tracks for a YouTube video')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(listCaptionsCommand);
+  .action(withHelpWrapper('list-captions', listCaptionsCommand));
 
 // Get single caption command (singular)
 program
@@ -320,7 +320,7 @@ program
   .description('Download caption content to stdout (get caption ID from list-captions)')
   .option('--format <format>', 'Caption format: srt, vtt, sbv, srv2, ttml, json (default: json)', 'json')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(getCaptionCommand);
+  .action(withHelpWrapper('get-caption', getCaptionCommand));
 
 // Channel search terms command — top keywords from YouTube Search traffic
 program
