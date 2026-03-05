@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { program } from 'commander';
+import { program, Command } from 'commander';
 import chalk from 'chalk';
 import * as path from 'path';
 import { GroupedHelp } from '../lib/customHelp';
@@ -36,6 +36,26 @@ import listReportJobsCommand = require('../commands/list-report-jobs');
 import getReportDataCommand = require('../commands/get-report-data');
 import fetchReportsCommand = require('../commands/fetch-reports');
 
+// Helper function to wrap command actions to handle "help" as an argument
+function withHelpWrapper(commandName: string, actionFn: (...args: any[]) => Promise<void> | void) {
+  return async (...args: any[]) => {
+    // Check if any argument is "help" (but not in options)
+    for (const arg of args) {
+      // Only check string arguments that aren't part of options object
+      if (typeof arg === 'string' && arg === 'help') {
+        // Find the command and show its help
+        const cmd = program.commands.find((c: Command) => c.name() === commandName);
+        if (cmd) {
+          cmd.help();
+        }
+        return;
+      }
+    }
+    // Otherwise, execute the original action
+    return actionFn(...args);
+  };
+}
+
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
 let version = '1.3.15'; // Fallback version for compiled binaries
 try {
@@ -49,7 +69,23 @@ program
   .name('staqan-yt')
   .description('CLI tool for managing YouTube videos and metadata')
   .version(version)
+  .helpOption(false) // Disable automatic -h, --help flags (use 'help' command instead)
+  .configureOutput({
+    writeErr: (_str) => {
+      // Suppress Commander's default error output
+      // We'll display user-friendly errors in exitOverride below
+    },
+    writeOut: (str) => process.stdout.write(str)
+  })
   .createHelp = () => new GroupedHelp();
+
+// Help command (AWS-style: just 'help' for main help)
+program
+  .command('help')
+  .description('Show help information')
+  .action(() => {
+    program.help();
+  });
 
 // Auth command
 program
@@ -76,7 +112,7 @@ program
   .option('-l, --limit <number>', 'Limit number of results', '50')
   .option('-t, --type <type>', 'Filter by video type (short or regular)')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(channelVideosCommand);
+  .action(withHelpWrapper('list-videos', channelVideosCommand));
 
 // Get single video command
 program
@@ -115,7 +151,7 @@ program
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-l, --limit <number>', 'Limit number of results', '25')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(searchChannelCommand);
+  .action(withHelpWrapper('search-videos', searchChannelCommand));
 
 // Get all video localizations (plural - returns multiple)
 program
@@ -249,7 +285,7 @@ program
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-l, --limit <number>', 'Limit number of results', '50')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(listPlaylistsCommand);
+  .action(withHelpWrapper('list-playlists', listPlaylistsCommand));
 
 // List comments command (plural - list collection)
 program
@@ -267,7 +303,7 @@ program
   .description('Get detailed metadata for a YouTube channel')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(getChannelCommand);
+  .action(withHelpWrapper('get-channel', getChannelCommand));
 
 // Caption commands
 // List captions command (plural - list collection)
@@ -296,7 +332,7 @@ program
   .option('--end-date <date>', 'End date (YYYY-MM-DD), defaults to today')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(getChannelSearchTermsCommand);
+  .action(withHelpWrapper('get-channel-search-terms', getChannelSearchTermsCommand));
 
 // Channel analytics command (singular - single channel report)
 program
@@ -309,10 +345,10 @@ program
   .option('--metrics <metrics>', 'Custom metrics (comma-separated, requires --dimensions)')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action((channelHandle: string | undefined, options: { report?: 'demographics' | 'devices' | 'geography' | 'traffic-sources' | 'subscription-status'; startDate?: string; endDate?: string; dimensions?: string; metrics?: string; output?: 'json' | 'table' | 'text' | 'pretty' | 'csv'; verbose?: boolean }) => {
+  .action(withHelpWrapper('get-channel-analytics', (channelHandle: string | undefined, options: { report?: 'demographics' | 'devices' | 'geography' | 'traffic-sources' | 'subscription-status'; startDate?: string; endDate?: string; dimensions?: string; metrics?: string; output?: 'json' | 'table' | 'text' | 'pretty' | 'csv'; verbose?: boolean }) => {
     // Commander v12+ automatically converts kebab-case to camelCase
     getChannelAnalyticsCommand(channelHandle, options);
-  });
+  }));
 
 // YouTube Reporting API commands
 program
@@ -360,10 +396,15 @@ if (!process.argv.slice(2).length) {
 }
 
 // Graceful shutdown handler (Ctrl+C)
-process.on('SIGINT', () => {
-  console.log(chalk.yellow('\nOperation cancelled by user'));
+// Handle multiple signal types for better cross-platform compatibility
+const shutdownHandler = (signal: string) => {
+  console.log(chalk.yellow(`\nOperation cancelled by user (${signal})`));
+  // Exit with success code to prevent npm/pnpm ELIFECYCLE errors
   process.exit(0);
-});
+};
+
+process.on('SIGINT', () => shutdownHandler('SIGINT'));
+process.on('SIGTERM', () => shutdownHandler('SIGTERM'));
 
 // Error handling: suppress stack traces, show only user-friendly messages
 // Use configureOutput to prevent Commander from writing errors to stderr
@@ -384,15 +425,15 @@ program.exitOverride((err) => {
   // Handle all error cases with user-friendly messages
   if (error.code === 'commander.unknownOption') {
     console.error(chalk.red(`Error: ${cleanMessage}`));
-    console.log(chalk.yellow('\nUse --help to see available options'));
+    console.log(chalk.yellow("\nUse 'staqan-yt help' to see available options"));
     process.exit(1);
   } else if (error.code === 'commander.unknownCommand') {
     console.error(chalk.red(`Error: ${cleanMessage}`));
-    console.log(chalk.yellow('\nUse --help to see available commands'));
+    console.log(chalk.yellow("\nUse 'staqan-yt help' to see available commands"));
     process.exit(1);
   } else if (error.code === 'commander.missingArgument') {
     console.error(chalk.red(`Error: ${cleanMessage}`));
-    console.log(chalk.yellow('\nUse --help for usage information'));
+    console.log(chalk.yellow("\nUse 'staqan-yt help <command>' for usage information"));
     process.exit(1);
   } else if (error.code === 'commander.help' || error.code === 'commander.helpDisplayed' || error.code === 'commander.version') {
     // Help or version was displayed, exit normally
