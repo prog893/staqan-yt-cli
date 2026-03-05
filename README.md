@@ -175,7 +175,8 @@ The MCP server exposes **15 operations** covering all CLI functionality:
 **Analytics:**
 - `youtube_get_channel_analytics` - Get channel-level analytics reports (demographics, devices, geography, etc.)
 - `youtube_get_video_analytics` - Get performance metrics (views, watch time, engagement)
-- `youtube_get_search_terms` - Get YouTube search terms that led to video
+- `youtube_get_search_terms` - Get YouTube search terms that led to a specific video
+- `youtube_get_channel_search_terms` - Get top search keywords driving traffic across an entire channel
 - `youtube_get_traffic_sources` - Get traffic source breakdown
 - `youtube_get_video_retention` - Get audience retention curve
 
@@ -917,6 +918,83 @@ List comments for a YouTube video.
 ---
 
 #### List Captions
+#### 15. Get Channel Search Terms
+
+```bash
+staqan-yt get-channel-search-terms [channelHandle] [options]
+```
+
+Get the top YouTube search keywords driving traffic across an **entire channel** (aggregated across all videos). Shows lifetime data by default.
+
+**Arguments:**
+- `channelHandle` - Channel handle (e.g. `@staqan`) or channel ID. Uses `default.channel` config if omitted.
+
+**Options:**
+- `-l, --limit <number>` - Number of results (max 25, API restriction, default: 25)
+- `--content-type <type>` - Filter by content type: `all` (default), `video` (non-shorts), `shorts`
+- `--start-date <date>` - Start date (YYYY-MM-DD). Defaults to all-time (`2005-02-14`)
+- `--end-date <date>` - End date (YYYY-MM-DD). Defaults to today
+- `--output <format>` - Output format: `json`, `table`, `text`, `pretty`, `csv` (default: `pretty`, or from config)
+- `-v, --verbose` - Enable verbose output with debug information
+
+**Examples:**
+
+```bash
+# Top 25 lifetime search terms for a channel
+staqan-yt get-channel-search-terms @staqan
+
+# Use default channel from config
+staqan-yt get-channel-search-terms
+
+# Narrow to a specific year
+staqan-yt get-channel-search-terms @staqan --start-date 2024-01-01 --end-date 2024-12-31
+
+# Only regular videos (exclude Shorts)
+staqan-yt get-channel-search-terms @staqan --content-type video
+
+# Only Shorts
+staqan-yt get-channel-search-terms @staqan --content-type shorts
+
+# Export to CSV
+staqan-yt get-channel-search-terms @staqan --output csv > channel-search-terms.csv
+
+# JSON for scripting
+staqan-yt get-channel-search-terms @staqan --output json
+```
+
+**Sample Output:**
+```
+✓ Search terms data retrieved
+
+staqan
+Channel ID: UCxxxxxxxxxxxxxxxxxxxxxx
+Period:         Lifetime
+Content type:   All content
+Traffic source: YouTube Search
+Videos covered: 47
+
+Top Search Terms (25 (47 videos)):
+
+  1. craft beer japan
+      Views:      1,234 (18.5% of search traffic)
+      Watch time: 412h
+
+  2. japanese craft beer
+      Views:      987 (14.8% of search traffic)
+      Watch time: 298h
+
+  ...
+
+Total views from search: 6,678
+```
+
+**How it works:** The YouTube Analytics API requires individual video IDs for search term queries (no channel-wide endpoint exists in the public API). This command fetches all video IDs from the channel's uploads playlist (up to 500) and passes them in a single Analytics API call, giving you the aggregated view that matches what YouTube Studio shows.
+
+**Use Case:** Understand which search queries drive the most traffic to your channel for SEO strategy, content planning, and identifying topics your audience searches for.
+
+---
+
+#### 16. Get Traffic Sources
 
 ```bash
 staqan-yt list-captions <videoId> [options]
@@ -934,6 +1012,7 @@ List all caption tracks for a YouTube video.
 
 #### Get Caption
 
+#### 17. Get Channel Analytics
 ```bash
 staqan-yt get-caption <captionId> [options]
 ```

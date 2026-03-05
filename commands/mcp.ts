@@ -280,6 +280,39 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    name: 'youtube_get_channel_search_terms',
+    description: 'Get top YouTube search keywords driving traffic to an entire channel (aggregated across all videos). Returns up to 25 terms due to API limit. Defaults to lifetime data.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        channelHandle: {
+          type: 'string',
+          description: 'Channel handle (e.g. @staqan) or channel ID. Uses default.channel config if omitted.',
+        },
+        startDate: {
+          type: 'string',
+          description: 'Start date in YYYY-MM-DD format. Defaults to all-time (2005-02-14).',
+        },
+        endDate: {
+          type: 'string',
+          description: 'End date in YYYY-MM-DD format. Defaults to today.',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of search terms to return (max 25, API restriction). Default: 25.',
+          minimum: 1,
+          maximum: 25,
+        },
+        contentType: {
+          type: 'string',
+          enum: ['all', 'video', 'shorts'],
+          description: 'Filter by content type: all (default), video (non-shorts only), shorts (Shorts only).',
+        },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'youtube_get_traffic_sources',
     description: 'Get traffic source breakdown showing where viewers came from (YouTube search, suggested videos, external websites, etc.)',
     inputSchema: {
@@ -806,6 +839,100 @@ async function handleToolCall(name: string, args: any) {
           {
             type: 'text',
             text: JSON.stringify(analyticsResponse.data, null, 2),
+          },
+        ],
+      };
+    }
+
+    case 'youtube_get_channel_search_terms': {
+      // Resolve channel
+      let channelArg = args.channelHandle;
+      if (!channelArg) {
+        channelArg = await getConfigValue('default.channel');
+      }
+      if (!channelArg) {
+        throw new Error('No channel specified and no default channel configured.');
+      }
+
+      // Resolve handle → uploads playlist ID
+      let uploadsPlaylistId = '';
+      if (channelArg.startsWith('@')) {
+        const channelResponse = await youtube.channels.list({
+          part: ['contentDetails'],
+          forHandle: channelArg.replace('@', ''),
+        });
+        uploadsPlaylistId = channelResponse.data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads || '';
+      } else {
+        const channelResponse = await youtube.channels.list({
+          part: ['contentDetails'],
+          id: [channelArg],
+        });
+        uploadsPlaylistId = channelResponse.data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads || '';
+      }
+
+      if (!uploadsPlaylistId) {
+        throw new Error(`Could not find uploads playlist for channel: ${channelArg}`);
+      }
+
+      // Collect up to 500 video IDs from the uploads playlist
+      const videoIds: string[] = [];
+      let nextPageToken: string | undefined;
+      do {
+        const playlistResponse = await youtube.playlistItems.list({
+          part: ['contentDetails'],
+          playlistId: uploadsPlaylistId,
+          maxResults: 50,
+          pageToken: nextPageToken,
+        });
+        for (const item of playlistResponse.data.items || []) {
+          const vid = item.contentDetails?.videoId;
+          if (vid) videoIds.push(vid);
+        }
+        nextPageToken = playlistResponse.data.nextPageToken || undefined;
+      } while (nextPageToken && videoIds.length < 500);
+
+      if (videoIds.length === 0) {
+        throw new Error('No videos found for this channel.');
+      }
+
+      const endDate = args.endDate || new Date().toISOString().split('T')[0];
+      const startDate = args.startDate || '2005-02-14';
+      const limit = Math.min(args.limit || 25, 25);
+      const CONTENT_TYPE_FILTERS: Record<string, string> = {
+        video: 'creatorContentType==LONG_FORM_CONTENT',
+        shorts: 'creatorContentType==SHORT_FORM_CONTENT',
+      };
+      const contentTypeFilter = args.contentType && args.contentType !== 'all'
+        ? CONTENT_TYPE_FILTERS[args.contentType]
+        : undefined;
+
+      const videoFilter = `video==${videoIds.join(',')}`;
+      const sourceFilter = 'insightTrafficSourceType==YT_SEARCH';
+      const filters = contentTypeFilter
+        ? `${videoFilter};${sourceFilter};${contentTypeFilter}`
+        : `${videoFilter};${sourceFilter}`;
+
+      const analyticsResponse = await youtubeAnalytics.reports.query({
+        ids: 'channel==MINE',
+        startDate,
+        endDate,
+        metrics: 'views,estimatedMinutesWatched',
+        dimensions: 'insightTrafficSourceDetail',
+        filters,
+        sort: '-views',
+        maxResults: limit,
+      });
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              channelHandle: channelArg,
+              videosAnalyzed: videoIds.length,
+              dateRange: { startDate, endDate },
+              ...analyticsResponse.data,
+            }, null, 2),
           },
         ],
       };
