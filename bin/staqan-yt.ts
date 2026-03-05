@@ -98,8 +98,10 @@ program
 // Config command
 program
   .command('config [action] [key] [value]')
-  .description('Manage CLI configuration (set defaults, view settings)')
+  .description('Manage CLI configuration (set defaults, view settings, install completions)')
   .option('--show', 'Show all configuration settings')
+  .option('--install', 'Install shell completion to appropriate location')
+  .option('--print', 'Print completion script to stdout')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('config', configCommand));

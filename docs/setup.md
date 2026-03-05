@@ -5,6 +5,7 @@ Complete installation and setup guide for staqan-yt-cli.
 ## Table of Contents
 
 - [Installation](#installation)
+- [Shell Completions](#shell-completions)
 - [OAuth Setup](#oauth-setup)
 - [Authentication](#authentication)
 - [Verification](#verification)
@@ -76,6 +77,75 @@ sudo mv staqan-yt /usr/local/bin/
 ```bash
 staqan-yt --version
 staqan-yt --help
+```
+
+## Shell Completions
+
+Shell completions are automatically installed when using Homebrew. For manual installations or to reinstall completions:
+
+### Auto-Install Completions
+
+The CLI can automatically detect your shell and install completions to the correct location:
+
+```bash
+# Auto-detect shell and install
+staqan-yt config completion auto --install
+
+# Or specify shell explicitly
+staqan-yt config completion zsh --install  # For zsh (default on macOS)
+staqan-yt config completion bash --install # For bash
+```
+
+### Print Completion Script
+
+To print the completion script to stdout (for custom installation):
+
+```bash
+# Print bash completion
+staqan-yt config completion bash --print > ~/.bash_completion.d/staqan-yt.bash
+
+# Print zsh completion
+staqan-yt config completion zsh --print > ~/.zsh/completion/_staqan-yt
+```
+
+### Enable Completions
+
+After installation, reload your shell or run:
+
+**For zsh:**
+```bash
+source ~/.zshrc
+```
+
+**For bash:**
+```bash
+source ~/.bashrc
+```
+
+### Manual Installation Locations
+
+If you prefer to install completions manually:
+
+**Zsh completion locations:**
+- Homebrew: `$(brew --prefix)/share/zsh/site-functions/_staqan-yt`
+- User-specific: `~/.zsh/completion/_staqan-yt`
+
+**Bash completion location:**
+- XDG-compliant: `${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion/completions/staqan-yt`
+
+### Using Completions
+
+Once enabled, you can use tab completion:
+
+```bash
+# Complete commands
+staqan-yt ge<Tab>          # Completes to: get-video, get-videos, get-channel, etc.
+
+# Complete options
+staqan-yt get-video --<Tab>  # Shows: --output, --verbose
+
+# Complete output formats
+staqan-yt get-video --out<Tab>  # Shows: json, table, text, pretty, csv
 ```
 
 ## OAuth Setup

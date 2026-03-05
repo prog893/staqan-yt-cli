@@ -9,6 +9,7 @@ A powerful command-line interface for managing YouTube videos and metadata using
 - **Thumbnail CTR Data** - Get thumbnail impressions and click-through rates
 - **Report Archival** - Cache reports to prevent data loss from YouTube's 30-60 day expiration
 - **Multiple Output Formats** - JSON, CSV, table, text, or pretty output
+- **Shell Completions** - Tab completion for bash and zsh
 - **MCP Server** - Integrate with AI assistants like Claude Desktop
 
 ## Installation
@@ -82,6 +83,30 @@ staqan-yt config set default.output csv
 staqan-yt list-videos --limit 5  # Uses @yourchannel
 ```
 
+## Shell Completions
+
+Enable tab completion for commands and options:
+
+```bash
+# Auto-install completions (detects zsh or bash)
+staqan-yt config completion auto --install
+
+# Or specify shell explicitly
+staqan-yt config completion zsh --install
+staqan-yt config completion bash --install
+
+# Reload your shell
+source ~/.zshrc  # or source ~/.bashrc
+```
+
+Once enabled, use tab completion:
+```bash
+staqan-yt ge<Tab>          # Shows: get-video, get-videos, get-channel, etc.
+staqan-yt get-video --<Tab> # Shows: --output, --verbose
+```
+
+**Note:** Shell completions are automatically installed when using Homebrew.
+
 ## MCP Server Integration
 
 Connect with Claude Desktop for natural language YouTube management:
@@ -137,6 +162,7 @@ staqan-yt fetch-reports --verify
 
 **Key Documentation:**
 - [Setup & Installation](docs/setup.md) - Detailed installation instructions
+- [Shell Completions](docs/setup.md#shell-completions) - Enable tab completion
 - [Command Reference](docs/README.md#commands) - All commands organized by purpose
 - [Output Formats](docs/output-formats.md) - JSON, CSV, table, text, pretty
 - [Troubleshooting](docs/troubleshooting.md) - Common issues and solutions
