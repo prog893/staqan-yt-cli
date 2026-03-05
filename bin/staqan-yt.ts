@@ -33,6 +33,7 @@ import getChannelAnalyticsCommand = require('../commands/get-channel-analytics')
 import listReportTypesCommand = require('../commands/list-report-types');
 import listReportJobsCommand = require('../commands/list-report-jobs');
 import getReportDataCommand = require('../commands/get-report-data');
+import fetchReportsCommand = require('../commands/fetch-reports');
 
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
 let version = '1.3.13'; // Fallback version for compiled binaries
@@ -326,6 +327,18 @@ program
   .option('--output <format>', 'Output format: json, csv', 'json')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(getReportDataCommand);
+
+program
+  .command('fetch-reports')
+  .description('Download and cache all available report data (archival)')
+  .option('-t, --type <id>', 'Fetch specific report type')
+  .option('-T, --types <ids>', 'Fetch multiple report types (comma-separated)')
+  .option('--start-date <date>', 'Filter by start date (YYYY-MM-DD)')
+  .option('--end-date <date>', 'Filter by end date (YYYY-MM-DD)')
+  .option('-f, --force', 'Re-download even if cached')
+  .option('--verify', 'Verify cached file completeness')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(fetchReportsCommand);
 
 // Show help if no command provided
 if (!process.argv.slice(2).length) {

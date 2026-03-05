@@ -14,6 +14,10 @@ export const VALID_OUTPUT_FORMATS: OutputFormat[] = ['json', 'table', 'text', 'p
  * Default configuration
  */
 const DEFAULT_CONFIG: Config = {
+  cache: {
+    enabled: true,
+    verifyOnLoad: false,
+  },
   default: {
     channel: undefined,
     output: 'pretty',
@@ -43,6 +47,10 @@ export async function loadConfig(): Promise<Config> {
 
     // Merge with defaults to ensure all keys exist
     return {
+      cache: {
+        ...DEFAULT_CONFIG.cache,
+        ...config.cache,
+      },
       default: {
         ...DEFAULT_CONFIG.default,
         ...config.default,

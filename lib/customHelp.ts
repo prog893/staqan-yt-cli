@@ -46,6 +46,7 @@ const COMMAND_GROUPS: Record<string, string[]> = {
     'list-report-types',
     'list-report-jobs',
     'get-report-data',
+    'fetch-reports',
   ],
   'Playlist': [
     'get-playlist',
