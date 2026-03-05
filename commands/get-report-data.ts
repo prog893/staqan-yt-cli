@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '../lib/auth';
-import { error, debug, initCommand, withSpinner } from '../lib/utils';
+import { error, debug, initCommand, withSpinner, formatTimestampWithTimezone } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv, formatText } from '../lib/formatters';
 import {
@@ -126,13 +126,13 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       jobId = createResponse.data.id!;
       const jobCreated = new Date(createResponse.data.createTime || '');
       const readyAt = new Date(jobCreated.getTime() + 48 * 60 * 60 * 1000);
+      const formatted = formatTimestampWithTimezone(readyAt);
 
       spinner.succeed(`Created new job: ${jobId}`);
       console.log('');
-      console.log(chalk.gray('First report available:') + ' ' + chalk.cyan(readyAt.toISOString()));
-      console.log(chalk.gray('Local time:') + ' ' + chalk.cyan(readyAt.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })));
+      console.log(chalk.gray('First report available:') + ' ' + chalk.cyan(`${formatted.local} (${formatted.timezone})`));
       console.log('');
-      console.log(chalk.yellow('Run this command again after:') + ' ' + chalk.cyan(readyAt.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })));
+      console.log(chalk.yellow('Run this command again after:') + ' ' + chalk.cyan(`${formatted.local} (${formatted.timezone})`));
       console.log('');
 
       process.exit(0);
@@ -154,12 +154,12 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       const readyAt = new Date(jobCreated.getTime() + 48 * 60 * 60 * 1000);
       const now = new Date();
       const hoursUntilReady = Math.max(0, Math.ceil((readyAt.getTime() - now.getTime()) / (1000 * 60 * 60)));
+      const formatted = formatTimestampWithTimezone(readyAt);
 
       spinner.succeed('Job exists but no reports yet');
       console.log('');
       console.log(chalk.gray('Created:') + ' ' + matchingJob!.createTime);
-      console.log(chalk.gray('Ready:') + ' ' + chalk.cyan(readyAt.toISOString()));
-      console.log(chalk.gray('Local time:') + ' ' + chalk.cyan(readyAt.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })));
+      console.log(chalk.gray('Ready:') + ' ' + chalk.cyan(`${formatted.local} (${formatted.timezone})`));
       console.log(chalk.yellow('Wait:') + ' ' + chalk.cyan(`${hoursUntilReady} hours remaining`));
       console.log('');
 

@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '../lib/auth';
-import { error, info, success, debug, initCommand } from '../lib/utils';
+import { error, info, success, debug, initCommand, formatTimestampWithTimezone } from '../lib/utils';
 
 interface ListReportJobsOptions {
   type?: string;
@@ -69,10 +69,10 @@ async function listReportJobsCommand(options: ListReportJobsOptions): Promise<vo
         if (reports.length === 0) {
           const readyAt = new Date(jobCreated.getTime() + 48 * 60 * 60 * 1000);
           const hoursUntilReady = Math.max(0, Math.ceil((readyAt.getTime() - now.getTime()) / (1000 * 60 * 60)));
+          const formatted = formatTimestampWithTimezone(readyAt);
 
           console.log('  ⏳  No reports yet (within 48-hour window)');
-          console.log(`      Ready: ${readyAt.toISOString()}`);
-          console.log(`      Local: ${readyAt.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })}`);
+          console.log(`      Ready: ${formatted.local} (${formatted.timezone})`);
           console.log(`      Wait:  ${hoursUntilReady} hours remaining\n`);
         } else {
           // Calculate expiration warnings
