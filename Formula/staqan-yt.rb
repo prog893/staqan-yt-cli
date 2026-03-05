@@ -1,7 +1,7 @@
 class StaqanYt < Formula
   desc "CLI tool for managing YouTube videos and metadata using the YouTube Data API v3"
   homepage "https://github.com/prog893/staqan-yt-cli"
-  version "1.3.15"
+  version "1.3.17"
   license "MIT"
 
   # Source-based installation from GitHub repo
@@ -28,15 +28,6 @@ class StaqanYt < Formula
 
     # Install the compiled binary
     bin.install "staqan-yt"
-
-    # Install shell completions (zsh is default on macOS)
-    # Generate zsh completion
-    zsh_completion = Utils.popen_read("#{bin}/staqan-yt", "config", "completion", "zsh", "--print")
-    zsh_completion.install "_staqan-yt" => "_staqan-yt"
-
-    # Generate bash completion
-    bash_completion = Utils.popen_read("#{bin}/staqan-yt", "config", "completion", "bash", "--print")
-    (share/"bash-completion/completions").install "staqan-yt.bash" => "staqan-yt"
   end
 
   def caveats
@@ -48,10 +39,10 @@ class StaqanYt < Formula
       3. Place it in: ~/.staqan-yt-cli/credentials.json
       4. Run: staqan-yt auth
 
-      Shell completions have been installed for zsh (default) and bash.
-      To enable completions, reload your shell or run:
-        source ~/.zshrc  # for zsh
-        source ~/.bashrc # for bash
+      To enable shell completions:
+        staqan-yt config completion zsh --install  # for zsh
+        staqan-yt config completion bash --install # for bash
+      Then reload your shell or run: source ~/.zshrc
 
       For detailed setup instructions, visit:
       https://github.com/prog893/staqan-yt-cli#setup

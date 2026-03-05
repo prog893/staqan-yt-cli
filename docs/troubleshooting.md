@@ -4,12 +4,49 @@ Common issues and solutions for staqan-yt-cli.
 
 ## Table of Contents
 
+- [Installation Issues](#installation-issues)
 - [Authentication Issues](#authentication-issues)
 - [API Issues](#api-issues)
 - [Configuration Issues](#configuration-issues)
 - [Output Issues](#output-issues)
 - [Performance Issues](#performance-issues)
 - [MCP Issues](#mcp-issues)
+
+---
+
+## Installation Issues
+
+### Homebrew "JSON::Ext::ParserConfig" Error
+
+**Symptom:**
+```
+Error: uninitialized constant JSON::Ext::ParserConfig
+```
+
+**Cause:** Homebrew's bundled Ruby gems got corrupted (often caused by `brew bump-formula-pr` or similar commands upgrading incompatible gem versions).
+
+**Solution:** Reset Homebrew's vendor directory and reinstall gems:
+```bash
+cd /opt/homebrew/Library/Homebrew
+rm -rf vendor
+git checkout .
+brew update
+brew doctor
+```
+
+Then reinstall staqan-yt:
+```bash
+brew install staqan-yt
+```
+
+**Prevention:** Avoid using `brew bump-formula-pr` for testing. Use manual formula testing instead:
+```bash
+# Clone and test formula locally
+git clone https://github.com/prog893/staqan-yt-cli.git /tmp/test
+cd /tmp/test
+bun install && bun build ./bin/staqan-yt.ts --compile --outfile staqan-yt
+./staqan-yt --version
+```
 
 ---
 

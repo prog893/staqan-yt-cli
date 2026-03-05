@@ -37,6 +37,7 @@ dist-bin/
 release/
 build/
 *.tsbuildinfo
+*.bun-build
 staqan-yt
 staqan-yt-*
 
