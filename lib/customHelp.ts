@@ -9,30 +9,27 @@ import { Help, Command } from 'commander';
  * Maps category names to command names
  */
 const COMMAND_GROUPS: Record<string, string[]> = {
-  'Setup & Configuration': [
+  'Configuration': [
     'auth',
     'config',
+    'mcp',
   ],
-  'Channel': [
+  'Channel Operations': [
     'get-channel',
     'get-channel-analytics',
+    'get-channel-search-terms',
+    'list-videos',
     'list-playlists',
   ],
   'Video Discovery': [
-    'list-videos',
     'get-video',
     'get-videos',
     'search-videos',
   ],
-  'Video Metadata': [
+  'Metadata Management': [
     'update-video',
-    'get-video-tags',
-    'update-video-tags',
-    'get-thumbnail',
-  ],
-  'Localizations': [
-    'get-video-localizations',
     'get-video-localization',
+    'get-video-localizations',
     'put-video-localization',
     'update-video-localization',
   ],
@@ -48,11 +45,14 @@ const COMMAND_GROUPS: Record<string, string[]> = {
     'get-report-data',
     'fetch-reports',
   ],
-  'Playlist': [
+  'Content Management': [
     'get-playlist',
     'get-playlists',
+    'get-thumbnail',
+    'get-video-tags',
+    'update-video-tags',
   ],
-  'Comments & Captions': [
+  'Engagement': [
     'list-comments',
     'list-captions',
     'get-caption',
