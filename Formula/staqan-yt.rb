@@ -28,6 +28,16 @@ class StaqanYt < Formula
 
     # Install the compiled binary
     bin.install "staqan-yt"
+
+    # Generate and install shell completions
+    # Generate zsh completion
+    zsh_comp = Utils.popen_read("#{bin}/staqan-yt", "config", "completion", "zsh", "--print")
+    (buildpath/"_staqan-yt").write zsh_comp
+    zsh_completion.install buildpath/"_staqan-yt"
+
+    # Generate bash completion
+    bash_comp = Utils.popen_read("#{bin}/staqan-yt", "config", "completion", "bash", "--print")
+    (share/"bash-completion/completions"/"staqan-yt").write bash_comp
   end
 
   def caveats
@@ -39,10 +49,10 @@ class StaqanYt < Formula
       3. Place it in: ~/.staqan-yt-cli/credentials.json
       4. Run: staqan-yt auth
 
-      To enable shell completions:
-        staqan-yt config completion zsh --install  # for zsh
-        staqan-yt config completion bash --install # for bash
-      Then reload your shell or run: source ~/.zshrc
+      Shell completions have been installed for zsh (default) and bash.
+      To enable completions, reload your shell or run:
+        source ~/.zshrc  # for zsh
+        source ~/.bashrc # for bash
 
       For detailed setup instructions, visit:
       https://github.com/prog893/staqan-yt-cli#setup
