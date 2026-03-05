@@ -38,6 +38,8 @@ import getReportDataCommand = require('../commands/get-report-data');
 import fetchReportsCommand = require('../commands/fetch-reports');
 
 // Helper function to wrap command actions to handle "help" as an argument
+// Note: Using any[] here is pragmatic - we only check for "help" string,
+// then forward args to the properly-typed command function
 function withHelpWrapper(commandName: string, actionFn: (...args: any[]) => Promise<void> | void) {
   return async (...args: any[]) => {
     // Check if any argument is "help" (but not in options)
