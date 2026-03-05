@@ -359,23 +359,56 @@ if (!process.argv.slice(2).length) {
   process.exit(0);
 }
 
-// Error handling
-program.exitOverride();
+// Graceful shutdown handler (Ctrl+C)
+process.on('SIGINT', () => {
+  console.log(chalk.yellow('\nOperation cancelled by user'));
+  process.exit(0);
+});
+
+// Error handling: suppress stack traces, show only user-friendly messages
+// Use configureOutput to prevent Commander from writing errors to stderr
+program.configureOutput({
+  writeErr: (_str) => {
+    // Suppress Commander's default error output
+    // We'll display user-friendly errors in exitOverride below
+  },
+  writeOut: (str) => process.stdout.write(str)
+});
+
+program.exitOverride((err) => {
+  const error = err as { code?: string; message?: string; exitCode?: number };
+
+  // Extract clean message (remove Commander's "error: " prefix if present)
+  const cleanMessage = error.message?.replace(/^error:\s*/, '') || 'An unknown error occurred';
+
+  // Handle all error cases with user-friendly messages
+  if (error.code === 'commander.unknownOption') {
+    console.error(chalk.red(`Error: ${cleanMessage}`));
+    console.log(chalk.yellow('\nUse --help to see available options'));
+    process.exit(1);
+  } else if (error.code === 'commander.unknownCommand') {
+    console.error(chalk.red(`Error: ${cleanMessage}`));
+    console.log(chalk.yellow('\nUse --help to see available commands'));
+    process.exit(1);
+  } else if (error.code === 'commander.missingArgument') {
+    console.error(chalk.red(`Error: ${cleanMessage}`));
+    console.log(chalk.yellow('\nUse --help for usage information'));
+    process.exit(1);
+  } else if (error.code === 'commander.help' || error.code === 'commander.helpDisplayed' || error.code === 'commander.version') {
+    // Help or version was displayed, exit normally
+    process.exit(0);
+  } else {
+    // For any other error, show just the message
+    console.error(chalk.red(`Error: ${cleanMessage}`));
+    process.exit(error.exitCode || 1);
+  }
+});
 
 try {
   program.parse(process.argv);
 } catch (err) {
   const error = err as { code?: string; message?: string };
-  if (error.code === 'commander.missingArgument') {
-    console.error(chalk.red(`Error: ${error.message}`));
-    console.log(chalk.yellow('\nUse --help for usage information'));
-    process.exit(1);
-  } else if (error.code === 'commander.help' || error.code === 'commander.helpDisplayed') {
-    // Help was displayed, exit normally
-    process.exit(0);
-  } else if (error.code === 'commander.version') {
-    // Version was displayed, exit normally
-    process.exit(0);
-  }
-  throw err;
+  // Show only the error message, not the stack trace
+  console.error(chalk.red(`Error: ${error.message || 'An unexpected error occurred'}`));
+  process.exit(1);
 }
