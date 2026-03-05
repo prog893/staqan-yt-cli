@@ -18,6 +18,7 @@ const SCOPES = [
   'https://www.googleapis.com/auth/youtube.readonly',
   'https://www.googleapis.com/auth/youtube.force-ssl',
   'https://www.googleapis.com/auth/yt-analytics.readonly',
+  'https://www.googleapis.com/auth/yt-analytics-monetary.readonly',
 ];
 
 /**
@@ -134,19 +135,34 @@ async function authenticate(): Promise<OAuth2Client> {
         const queryParams = url.parse(req.url!, true).query;
 
         if (queryParams.code) {
-          res.writeHead(200, { 'Content-Type': 'text/html' });
+          res.writeHead(200, { 'Content-Type': 'text/html', 'Connection': 'close' });
           res.end('<h1>Authentication successful!</h1><p>You can close this window and return to the terminal.</p>');
-
-          server.close();
 
           const { tokens } = await oauth2Client.getToken(queryParams.code as string);
           await saveToken(tokens as OAuth2Token);
 
-          resolve(oauth2Client);
+          // Close all connections and server
+          server.closeAllConnections();
+          server.close((err) => {
+            if (err) {
+              // Ignore close errors
+            }
+            resolve(oauth2Client);
+          });
         }
       } catch (err) {
+        server.closeAllConnections();
+        server.close();
         reject(err);
       }
+    });
+
+    // Configure server to prevent hanging
+    server.keepAliveTimeout = 1; // Short keep-alive timeout
+    server.headersTimeout = 5; // Short headers timeout
+    server.setTimeout(5000, () => {
+      server.closeAllConnections();
+      server.close();
     });
 
     server.listen(3000, () => {

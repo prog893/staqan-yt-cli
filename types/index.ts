@@ -294,9 +294,67 @@ export interface Config {
     channel?: string;
     output?: OutputFormat;
   };
+  cache?: {
+    enabled?: boolean;
+    directory?: string;
+    verifyOnLoad?: boolean;
+  };
 }
 
 export type ConfigKey = 'default.channel' | 'default.output';
+
+// Cache-related types
+export interface CacheIndexEntry {
+  reportId: string;
+  reportTypeId: string;
+  startTime: string;          // YYYY-MM-DD
+  endTime: string;            // YYYY-MM-DD
+  downloadedAt: string;       // ISO 8601 timestamp
+  expiresAt: string;          // ISO 8601 timestamp
+  fileSize: number;           // bytes
+  row_count?: number;         // Optional: for verification
+}
+
+export interface CacheIndex {
+  version: string;            // For future migrations
+  lastUpdated: string;        // ISO 8601 timestamp
+  entries: CacheIndexEntry[];
+}
+
+export interface ReportMetadata {
+  reportId: string;
+  reportTypeId: string;
+  jobId: string;
+  startTime: string;          // From YouTube API
+  endTime: string;            // From YouTube API
+  startTimeActual: string;    // Actual data range in CSV (parsed)
+  endTimeActual: string;      // Actual data range in CSV (parsed)
+  downloadedAt: string;       // ISO 8601 timestamp
+  expiresAt: string;          // ISO 8601 timestamp
+  downloadUrl: string;        // Original download URL
+  columns: string[];          // CSV column names
+  isComplete: boolean;        // Completeness flag
+  fileSize: number;
+  row_count?: number;
+}
+
+export interface CacheCoverage {
+  fullyCovered: string[];     // Date ranges fully in cache
+  partiallyCovered: {         // Partial overlaps
+    range: { start: string; end: string };
+    cached: { start: string; end: string };
+    missing: { start: string; end: string };
+  }[];
+  notCovered: string[];       // Date ranges not in cache
+}
+
+export interface ReportData {
+  reportId: string;
+  startTime: string;
+  endTime: string;
+  data: Record<string, string>[];
+  source: 'cache' | 'api';
+}
 
 // Re-export googleapis types for convenience
 export type { youtube_v3 } from 'googleapis';

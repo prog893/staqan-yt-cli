@@ -9,33 +9,53 @@ import { Help, Command } from 'commander';
  * Maps category names to command names
  */
 const COMMAND_GROUPS: Record<string, string[]> = {
-  'Setup & Configuration': [
+  'Configuration': [
     'auth',
     'config',
+    'mcp',
+  ],
+  'Channel Operations': [
+    'get-channel',
+    'get-channel-analytics',
+    'get-channel-search-terms',
+    'list-videos',
+    'list-playlists',
   ],
   'Video Discovery': [
-    'list-videos',
     'get-video',
     'get-videos',
     'search-videos',
   ],
-  'Video Metadata': [
+  'Metadata Management': [
     'update-video',
-    'get-video-tags',
-    'update-video-tags',
-    'get-thumbnail',
-  ],
-  'Localizations': [
-    'get-video-localizations',
     'get-video-localization',
+    'get-video-localizations',
     'put-video-localization',
     'update-video-localization',
   ],
   'Analytics & Insights': [
     'get-video-analytics',
+    'get-video-retention',
     'get-search-terms',
     'get-traffic-sources',
-    'get-video-retention',
+  ],
+  'Reporting API': [
+    'list-report-types',
+    'list-report-jobs',
+    'get-report-data',
+    'fetch-reports',
+  ],
+  'Content Management': [
+    'get-playlist',
+    'get-playlists',
+    'get-thumbnail',
+    'get-video-tags',
+    'update-video-tags',
+  ],
+  'Engagement': [
+    'list-comments',
+    'list-captions',
+    'get-caption',
   ],
 };
 

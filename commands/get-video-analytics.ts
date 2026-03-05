@@ -2,7 +2,7 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, setVerbose, debug, formatNumber, progress, convertToCSV, chunkDateRange, retryWithBackoff } from '../lib/utils';
+import { parseVideoId, error, setVerbose, debug, formatNumber, convertToCSV, chunkDateRange, retryWithBackoff } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { AnalyticsOptions } from '../types';
@@ -46,15 +46,12 @@ async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptio
       process.exit(1);
     }
 
-    spinner.succeed('Video information retrieved');
-
     // Calculate date range
     // Default: full historical data from upload date to today
     const endDate = options.endDate || new Date().toISOString().split('T')[0];
     const startDate = options.startDate || publishedAt.split('T')[0];
 
     debug(`Date range: ${startDate} to ${endDate}`);
-    progress(`Fetching analytics from ${startDate} to ${endDate}...`);
 
     // Default metrics
     const metrics = options.metrics || 'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares';
@@ -69,7 +66,7 @@ async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptio
 
     for (let i = 0; i < dateChunks.length; i++) {
       const chunk = dateChunks[i];
-      progress(`Fetching chunk ${i + 1}/${dateChunks.length} (${chunk.start} to ${chunk.end})...`);
+      spinner.text = `Fetching chunk ${i + 1}/${dateChunks.length} (${chunk.start} to ${chunk.end})...`;
 
       const analyticsResponse = await retryWithBackoff(async () => {
         return await youtubeAnalytics.reports.query({
@@ -93,7 +90,7 @@ async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptio
       }
     }
 
-    progress(`✓ Retrieved ${allRows.length} row(s) of analytics data`);
+    spinner.succeed(`Retrieved ${allRows.length} row(s) of analytics data`);
 
     // Output results
     const outputFormat = await getOutputFormat(options.output);

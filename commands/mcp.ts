@@ -402,6 +402,105 @@ const TOOLS: Tool[] = [
       required: ['videoId'],
     },
   },
+  {
+    name: 'youtube_list_report_types',
+    description: 'List all available YouTube Reporting API report types (e.g., thumbnail CTR, demographics, traffic sources)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        output: {
+          type: 'string',
+          description: 'Output format: json, table, or text',
+          enum: ['json', 'table', 'text'],
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'youtube_list_report_jobs',
+    description: 'List YouTube Reporting API jobs with status and expiration warnings',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        type: {
+          type: 'string',
+          description: 'Filter by report type ID (e.g., channel_reach_basic_a1)',
+        },
+        output: {
+          type: 'string',
+          description: 'Output format: json, table, or text',
+          enum: ['json', 'table', 'text'],
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'youtube_get_report_data',
+    description: 'Get YouTube Reporting API report data including thumbnail impressions, CTR, and other metrics. IMPORTANT: Thumbnail CTR data is ONLY available through the Reporting API, not regular analytics.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        type: {
+          type: 'string',
+          description: 'Report type ID (e.g., channel_reach_basic_a1 for thumbnail CTR data)',
+        },
+        videoId: {
+          type: 'string',
+          description: 'Filter by video ID',
+        },
+        startDate: {
+          type: 'string',
+          description: 'Start date in YYYY-MM-DD format',
+        },
+        endDate: {
+          type: 'string',
+          description: 'End date in YYYY-MM-DD format',
+        },
+        output: {
+          type: 'string',
+          description: 'Output format: json, csv, text, table, or pretty',
+          enum: ['json', 'csv', 'text', 'table', 'pretty'],
+        },
+      },
+      required: ['type'],
+    },
+  },
+  {
+    name: 'youtube_fetch_reports',
+    description: 'Download and cache all available YouTube Reporting API reports for archival. Prevents data loss when YouTube expires reports (30-60 days). Downloads only missing reports unless --force is used.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        type: {
+          type: 'string',
+          description: 'Fetch specific report type',
+        },
+        types: {
+          type: 'string',
+          description: 'Fetch multiple report types (comma-separated)',
+        },
+        startDate: {
+          type: 'string',
+          description: 'Filter by start date (YYYY-MM-DD)',
+        },
+        endDate: {
+          type: 'string',
+          description: 'Filter by end date (YYYY-MM-DD)',
+        },
+        force: {
+          type: 'boolean',
+          description: 'Re-download even if cached',
+        },
+        verify: {
+          type: 'boolean',
+          description: 'Verify cached file completeness',
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 // Tool handler
@@ -1023,6 +1122,141 @@ async function handleToolCall(name: string, args: any) {
           },
         ],
       };
+    }
+
+    case 'youtube_list_report_types': {
+      const listReportTypesCommand = require('./list-report-types');
+      const originalConsoleLog = console.log;
+      const originalConsoleError = console.error;
+
+      try {
+        const logs: string[] = [];
+        console.log = (...args: any[]) => logs.push(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '));
+        console.error = (...args: any[]) => logs.push(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '));
+
+        await listReportTypesCommand({ output: args.output || 'table', verbose: false });
+
+        console.log = originalConsoleLog;
+        console.error = originalConsoleError;
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: logs.join('\n'),
+            },
+          ],
+        };
+      } catch (err) {
+        console.log = originalConsoleLog;
+        console.error = originalConsoleError;
+        throw err;
+      }
+    }
+
+    case 'youtube_list_report_jobs': {
+      const listReportJobsCommand = require('./list-report-jobs');
+      const originalConsoleLog = console.log;
+      const originalConsoleError = console.error;
+
+      try {
+        const logs: string[] = [];
+        console.log = (...args: any[]) => logs.push(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '));
+        console.error = (...args: any[]) => logs.push(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '));
+
+        await listReportJobsCommand({ type: args.type, output: args.output || 'table', verbose: false });
+
+        console.log = originalConsoleLog;
+        console.error = originalConsoleError;
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: logs.join('\n'),
+            },
+          ],
+        };
+      } catch (err) {
+        console.log = originalConsoleLog;
+        console.error = originalConsoleError;
+        throw err;
+      }
+    }
+
+    case 'youtube_get_report_data': {
+      const getReportDataCommand = require('./get-report-data');
+      const originalConsoleLog = console.log;
+      const originalConsoleError = console.error;
+
+      try {
+        const logs: string[] = [];
+        console.log = (...args: any[]) => logs.push(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '));
+        console.error = (...args: any[]) => logs.push(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '));
+
+        await getReportDataCommand({
+          type: args.type,
+          videoId: args.videoId,
+          startDate: args.startDate,
+          endDate: args.endDate,
+          output: args.output || 'json',
+          verbose: false,
+        });
+
+        console.log = originalConsoleLog;
+        console.error = originalConsoleError;
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: logs.join('\n'),
+            },
+          ],
+        };
+      } catch (err) {
+        console.log = originalConsoleLog;
+        console.error = originalConsoleError;
+        throw err;
+      }
+    }
+
+    case 'youtube_fetch_reports': {
+      const fetchReportsCommand = require('./fetch-reports');
+      const originalConsoleLog = console.log;
+      const originalConsoleError = console.error;
+
+      try {
+        const logs: string[] = [];
+        console.log = (...args: any[]) => logs.push(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '));
+        console.error = (...args: any[]) => logs.push(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '));
+
+        await fetchReportsCommand({
+          type: args.type,
+          types: args.types,
+          startDate: args.startDate,
+          endDate: args.endDate,
+          force: args.force,
+          verify: args.verify,
+          verbose: false,
+        });
+
+        console.log = originalConsoleLog;
+        console.error = originalConsoleError;
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: logs.join('\n'),
+            },
+          ],
+        };
+      } catch (err) {
+        console.log = originalConsoleLog;
+        console.error = originalConsoleError;
+        throw err;
+      }
     }
 
     default:

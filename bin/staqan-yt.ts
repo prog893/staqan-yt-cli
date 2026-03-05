@@ -31,6 +31,10 @@ import listCaptionsCommand = require('../commands/list-captions');
 import getCaptionCommand = require('../commands/get-caption');
 import getChannelAnalyticsCommand = require('../commands/get-channel-analytics');
 import getChannelSearchTermsCommand = require('../commands/get-channel-search-terms');
+import listReportTypesCommand = require('../commands/list-report-types');
+import listReportJobsCommand = require('../commands/list-report-jobs');
+import getReportDataCommand = require('../commands/get-report-data');
+import fetchReportsCommand = require('../commands/fetch-reports');
 
 // Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
 let version = '1.3.14'; // Fallback version for compiled binaries
@@ -309,6 +313,45 @@ program
     // Commander v12+ automatically converts kebab-case to camelCase
     getChannelAnalyticsCommand(channelHandle, options);
   });
+
+// YouTube Reporting API commands
+program
+  .command('list-report-types')
+  .description('List all available YouTube Reporting API report types')
+  .option('--output <format>', 'Output format: json, table, text')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(listReportTypesCommand);
+
+program
+  .command('list-report-jobs')
+  .description('List YouTube Reporting API jobs with status and expiration warnings')
+  .option('--type <id>', 'Filter by report type ID (e.g., channel_reach_basic_a1)')
+  .option('--output <format>', 'Output format: json, table, text')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(listReportJobsCommand);
+
+program
+  .command('get-report-data')
+  .description('Get YouTube Reporting API report data (thumbnail impressions, CTR, etc.)')
+  .requiredOption('--type <id>', 'Report type ID (e.g., channel_reach_basic_a1 for thumbnail data)')
+  .option('--video-id <id>', 'Filter by video ID')
+  .option('--start-date <date>', 'Start date (YYYY-MM-DD)')
+  .option('--end-date <date>', 'End date (YYYY-MM-DD)')
+  .option('--output <format>', 'Output format: json, csv', 'json')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(getReportDataCommand);
+
+program
+  .command('fetch-reports')
+  .description('Download and cache all available report data (archival)')
+  .option('-t, --type <id>', 'Fetch specific report type')
+  .option('-T, --types <ids>', 'Fetch multiple report types (comma-separated)')
+  .option('--start-date <date>', 'Filter by start date (YYYY-MM-DD)')
+  .option('--end-date <date>', 'Filter by end date (YYYY-MM-DD)')
+  .option('-f, --force', 'Re-download even if cached')
+  .option('--verify', 'Verify cached file completeness')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(fetchReportsCommand);
 
 // Show help if no command provided
 if (!process.argv.slice(2).length) {
