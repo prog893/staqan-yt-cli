@@ -137,8 +137,8 @@ export function detectShell(): ShellType {
     // Ignore error
   }
 
-  // Default to bash
-  return 'bash';
+  // Default to zsh (default on macOS since Catalina)
+  return 'zsh';
 }
 
 /**
