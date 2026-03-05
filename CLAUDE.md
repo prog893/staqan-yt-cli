@@ -43,6 +43,53 @@ gh pr create
 
 A command-line interface for managing YouTube videos and metadata using the YouTube Data API v3. Built with Node.js and designed for programmatic YouTube channel management.
 
+## Documentation Structure
+
+This project uses a structured documentation system to serve different audiences:
+
+```
+staqan-yt-cli/
+├── README.md                 # User-facing (concise, Homebrew-focused)
+├── CONTRIBUTING.md           # Contributor guide for humans
+├── CLAUDE.md                 # This file - AI/robot development instructions
+└── docs/                     # Comprehensive command reference
+    ├── README.md             # Documentation hub
+    ├── setup.md              # Installation & OAuth setup
+    ├── troubleshooting.md    # Common issues & solutions
+    ├── output-formats.md     # Output format guide (JSON, CSV, etc.)
+    └── commands/             # Command reference grouped by intent
+        ├── video-discovery.md        # get-video, search-videos
+        ├── channel-operations.md     # list-videos, get-channel
+        ├── metadata-management.md    # update-video, localizations
+        ├── analytics.md              # video/channel analytics
+        ├── reporting-api.md          # thumbnail CTR, reports
+        ├── engagement.md             # comments, captions
+        ├── content-management.md     # tags, thumbnails, playlists
+        └── configuration.md          # auth, config, MCP
+```
+
+**Key Points for AI Assistants:**
+
+1. **When adding commands:**
+   - Document in appropriate `docs/commands/<category>.md` file
+   - Update `lib/customHelp.ts` to match documentation grouping
+   - Follow existing documentation patterns in that file
+
+2. **When modifying commands:**
+   - Update the corresponding `docs/commands/<category>.md` file
+   - Update examples if behavior changes
+   - Add new error cases to `docs/troubleshooting.md`
+
+3. **Documentation serves different purposes:**
+   - README.md - Quick start for users (keep concise)
+   - CONTRIBUTING.md - Human contributor conventions
+   - CLAUDE.md - AI development instructions (this file)
+   - docs/ - Comprehensive reference (detailed examples)
+
+4. **Help command grouping:**
+   - Groups in `lib/customHelp.ts` MUST match documentation structure
+   - Update both files together to stay in sync
+
 ## 🤖 Subagent Development Workflow
 
 **⚠️ CRITICAL: When a subagent is spawned to work on this tool:**
@@ -435,8 +482,86 @@ npm link              # Test globally
 
 ### Step 6: Update Documentation
 
-- Add to README.md (user docs)
-- Add examples to QUICK_START.md if applicable
+**IMPORTANT:** This project uses a structured documentation system. You MUST update documentation when adding or modifying commands.
+
+**Documentation Structure:**
+```
+README.md                 # User-facing (concise, examples only)
+CONTRIBUTING.md           # Contributor guide
+CLAUDE.md                 # This file - AI development guide
+docs/                     # Comprehensive command reference
+├── README.md             # Documentation hub
+├── commands/             # Command reference by intent
+│   ├── video-discovery.md
+│   ├── channel-operations.md
+│   ├── metadata-management.md
+│   ├── analytics.md
+│   ├── reporting-api.md
+│   ├── engagement.md
+│   ├── content-management.md
+│   └── configuration.md
+├── setup.md
+├── troubleshooting.md
+└── output-formats.md
+```
+
+**What to Update:**
+
+1. **Command Documentation** (REQUIRED for new commands):
+   - Add to appropriate `docs/commands/<category>.md` file
+   - Include: usage, arguments, options, examples, output fields
+   - Follow existing documentation patterns in that file
+
+2. **Help Command Grouping** (REQUIRED):
+   - Update `lib/customHelp.ts` to include new command in appropriate group
+   - Groups must match documentation structure
+
+3. **Documentation Hub** (if new category):
+   - Update `docs/README.md` to reference new command/category
+
+4. **README.md** (OPTIONAL):
+   - Only update for significant user-facing features
+   - Keep concise, link to docs/ for details
+
+5. **Troubleshooting** (if new error cases):
+   - Update `docs/troubleshooting.md` with new error scenarios
+
+**Documentation Template for Commands:**
+```markdown
+## command-name
+
+Brief description.
+
+### Usage
+\`\`\`bash
+staqan-yt command-name <args>
+\`\`\`
+
+### Arguments
+- `arg` - Description
+
+### Options
+- `--flag` - Description
+- `-v, --verbose` - Enable verbose output
+
+### Examples
+\`\`\`bash
+# Basic usage
+staqan-yt command-name value
+\`\`\`
+
+### Output Fields
+- Field descriptions
+
+### Related Commands
+- Links to related commands
+```
+
+**Verification:**
+- [ ] Command documented in `docs/commands/<category>.md`
+- [ ] Help grouping updated in `lib/customHelp.ts`
+- [ ] Examples tested and work correctly
+- [ ] Related commands cross-referenced
 
 ### Troubleshooting TypeScript Errors
 
@@ -766,8 +891,10 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 **MANDATORY PRE-COMMIT CHECKLIST:**
 - [ ] **On a feature branch?** (NOT main!)
 - [ ] **Tested all affected commands?**
-- [ ] **Updated README.md if adding/changing commands?**
-- [ ] **Updated QUICK_START.md if changing common workflows?**
+- [ ] **Updated documentation?**
+  - [ ] README.md (if user-facing changes)
+  - [ ] docs/commands/<category>.md (command reference)
+  - [ ] lib/customHelp.ts (help grouping)
 - [ ] **Following AWS naming conventions?**
 - [ ] **Credentials never committed?**
 
@@ -790,8 +917,10 @@ git status
 ```
 
 - [ ] Test all affected commands
-- [ ] Update README.md if adding/changing commands
-- [ ] Update QUICK_START.md if changing common workflows
+- [ ] Update documentation:
+  - [ ] README.md (if user-facing)
+  - [ ] docs/commands/<category>.md (command reference)
+  - [ ] lib/customHelp.ts (help grouping)
 - [ ] Follow AWS naming conventions
 - [ ] Ensure credentials never committed
 
@@ -953,8 +1082,9 @@ async function getVideoMetadata(videoId) {
 1. Check if it fits the "programmatic YouTube API operations" scope
 2. Use AWS naming conventions
 3. Add appropriate OAuth scopes if needed
-4. Document in README and QUICK_START
-5. Test with real YouTube data
+4. Document in `docs/commands/<category>.md` and update `lib/customHelp.ts`
+5. Update README.md if user-facing feature
+6. Test with real YouTube data
 
 ## Security Considerations
 

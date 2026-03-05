@@ -8,6 +8,7 @@ Thank you for your interest in contributing! This guide covers development conve
 - [Code Conventions](#code-conventions)
 - [CLI Patterns](#cli-patterns)
 - [Testing](#testing)
+- [Documentation](#documentation)
 - [Debugging Tips](#debugging-tips)
 - [Submitting Changes](#submitting-changes)
 
@@ -294,6 +295,137 @@ staqan-yt get-video dQw4w9WgXcQ --output pretty
 4. **Output formats** - All 5 formats work correctly
 5. **Verbose mode** - Debug output is helpful
 
+## Documentation
+
+This project uses a structured documentation system to serve different audiences:
+
+### Documentation Structure
+
+```
+staqan-yt-cli/
+├── README.md                 # User-facing (concise, Homebrew-focused)
+├── CONTRIBUTING.md           # Contributor guide (this file)
+├── CLAUDE.md                 # AI/robot development instructions
+└── docs/                     # Comprehensive command reference
+    ├── README.md             # Documentation hub
+    ├── setup.md              # Installation & OAuth setup
+    ├── troubleshooting.md    # Common issues & solutions
+    ├── output-formats.md     # Output format guide
+    └── commands/             # Command reference by intent
+        ├── video-discovery.md
+        ├── channel-operations.md
+        ├── metadata-management.md
+        ├── analytics.md
+        ├── reporting-api.md
+        ├── engagement.md
+        ├── content-management.md
+        └── configuration.md
+```
+
+### When to Update Documentation
+
+**Adding a new command:**
+1. Add the command to `bin/staqan-yt.ts`
+2. Create/update documentation in `docs/commands/<category>.md`
+3. Update the command grouping in `lib/customHelp.ts` to match
+4. Update `docs/README.md` if adding a new category
+5. Test the command and all output formats
+
+**Modifying an existing command:**
+1. Update the command implementation
+2. Update the corresponding documentation in `docs/commands/<category>.md`
+3. If changing options/behavior, update examples in docs
+4. Test all output formats work correctly
+
+**Changing behavior/options:**
+1. Update the command file
+2. Update documentation in `docs/commands/<category>.md`
+3. Update `docs/troubleshooting.md` if new error cases introduced
+4. Ensure examples in documentation still work
+
+### Documentation Guidelines
+
+**README.md:**
+- Keep concise (~100 lines)
+- Focus on Homebrew installation
+- Include quick start examples
+- Link to full documentation in `docs/`
+
+**Command Documentation (`docs/commands/`):**
+- Group by intent/use case (not alphabetically)
+- Include usage, arguments, options, examples
+- Show output fields/structure
+- Add common use cases and patterns
+- Cross-reference related commands
+
+**Code Examples:**
+- Use realistic video IDs and handles
+- Show all common use cases
+- Include error handling examples where relevant
+- Test all examples before committing
+
+**Updating Help Command:**
+- The help command groups commands in `lib/customHelp.ts`
+- Groups must match documentation structure
+- Update both files together to stay in sync
+
+### Documentation Review Checklist
+
+Before submitting changes with documentation updates:
+
+- [ ] **README updated** (if user-facing changes)
+- [ ] **Command doc updated** in `docs/commands/<category>.md`
+- [ ] **Help grouping updated** in `lib/customHelp.ts` (if needed)
+- [ ] **Examples tested** - All code examples work
+- [ ] **Cross-references checked** - Related commands linked
+- [ ] **New categories documented** in `docs/README.md` (if added)
+- [ ] **Troubleshooting updated** (if new error cases)
+
+### Documentation Patterns
+
+**Command Documentation Template:**
+```markdown
+## command-name
+
+Brief description of what the command does.
+
+### Usage
+```bash
+staqan-yt command-name <args>
+```
+
+### Arguments
+- `arg` - Description
+
+### Options
+- `--flag` - Description
+- `-v, --verbose` - Enable verbose output
+
+### Examples
+```bash
+# Basic usage
+staqan-yt command-name value
+
+# With options
+staqan-yt command-name value --output csv
+```
+
+### Output Fields
+- Field descriptions
+
+### Related Commands
+- link to related commands
+
+### Common Patterns
+- Usage examples
+```
+
+**Adding Examples:**
+- Show progressive complexity (basic → advanced)
+- Include real-world use cases
+- Demonstrate piping/composition
+- Use consistent formatting
+
 ## Debugging Tips
 
 ### Enable Debug Output
@@ -372,7 +504,11 @@ ls -la ~/.staqan-yt-cli/credentials.json
 **MANDATORY PRE-COMMIT CHECKLIST:**
 - [ ] **On a feature branch?** (NOT main!)
 - [ ] **Tested all affected commands?**
-- [ ] **Updated documentation?** (README.md, docs/)
+- [ ] **Updated documentation?**
+  - [ ] README.md (if user-facing changes)
+  - [ ] docs/commands/<category>.md (command reference)
+  - [ ] lib/customHelp.ts (help grouping, if needed)
+  - [ ] docs/troubleshooting.md (if new error cases)
 - [ ] **Following AWS naming conventions?**
 - [ ] **Credentials never committed?**
 
