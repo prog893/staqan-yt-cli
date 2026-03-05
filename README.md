@@ -16,7 +16,8 @@ A powerful command-line interface for managing YouTube videos and metadata using
 - **Comments** - List video comments for engagement monitoring
 - **Channel Analytics** - Channel-level analytics reports (demographics, devices, geography, traffic sources, subscription status)
 - **Video Analytics & SEO** - Performance metrics, search terms, traffic sources
-- **Bulk Reports** - YouTube Reporting API access for CTR, impressions, and historical data
+- **Thumbnail CTR Data** - Access thumbnail impressions and click-through rate via YouTube Reporting API
+- **Report Archival** - Download and cache reports to prevent data loss (30-60 day expiration)
 - **Tags Management** - View and update video tags for better discoverability
 - **Thumbnail Access** - Retrieve video thumbnail URLs in all available qualities
 - **Multiple Output Formats** - JSON, table, text, pretty, or CSV output for any workflow
@@ -177,8 +178,12 @@ The MCP server exposes **15 operations** covering all CLI functionality:
 - `youtube_get_search_terms` - Get YouTube search terms that led to video
 - `youtube_get_traffic_sources` - Get traffic source breakdown
 - `youtube_get_video_retention` - Get audience retention curve
+
+**Reporting API (Thumbnail CTR & Bulk Reports):**
 - `youtube_list_report_types` - List available YouTube Reporting API report types
-- `youtube_get_report` - Download bulk reports (CTR, impressions, historical data)
+- `youtube_list_report_jobs` - List report jobs with status and expiration warnings
+- `youtube_get_report_data` - Get report data including thumbnail impressions and CTR (ONLY available via Reporting API)
+- `youtube_fetch_reports` - Download and cache all reports for archival (prevents data loss)
 
 **Tags & Thumbnails:**
 - `youtube_get_video_tags` - Get video tags
@@ -770,6 +775,8 @@ Get traffic source breakdown (search, suggested, external, etc.).
 
 ### Reporting API
 
+> **💡 Important Note:** Thumbnail CTR (Click-Through Rate) data is **ONLY available** through the YouTube Reporting API, not the regular YouTube Analytics API. Use `get-report-data` with `--type=channel_reach_basic_a1` to access thumbnail impressions and CTR metrics.
+
 #### List Report Types
 
 ```bash
@@ -819,6 +826,41 @@ staqan-yt get-report-data --type=channel_reach_basic_a1 --video-id=eeYl2dxv57g
 # Get all data for date range
 staqan-yt get-report-data --type=channel_reach_basic_a1 --start-date=2026-02-01 --end-date=2026-02-28
 ```
+
+> **⚡ Performance Tip:** The `get-report-data` command automatically caches downloaded reports. Subsequent requests for the same date range will be instant (loaded from cache).
+
+---
+
+#### Fetch Reports (Archival)
+
+```bash
+staqan-yt fetch-reports [options]
+```
+
+Download and cache all available report data for archival. This command downloads reports to prevent data loss when YouTube expires reports (30-60 days).
+
+**Options:**
+- `-t, --type <id>` - Fetch specific report type
+- `-T, --types <ids>` - Fetch multiple report types (comma-separated)
+- `--start-date <date>` - Filter by start date (YYYY-MM-DD)
+- `--end-date <date>` - Filter by end date (YYYY-MM-DD)
+- `-f, --force` - Re-download even if cached
+- `--verify` - Verify cached file completeness
+- `-v, --verbose` - Enable verbose output
+
+**Example:**
+```bash
+# Archive all thumbnail CTR reports
+staqan-yt fetch-reports --type=channel_reach_basic_a1
+
+# Archive all report types
+staqan-yt fetch-reports
+
+# Verify cached files
+staqan-yt fetch-reports --verify
+```
+
+> **💡 Why Use This?** YouTube reports expire after 30-60 days and are permanently deleted. Use `fetch-reports` periodically to archive your data before it disappears.
 
 ---
 
