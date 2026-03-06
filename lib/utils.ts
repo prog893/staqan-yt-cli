@@ -152,10 +152,10 @@ function formatTimestamp(seconds: number): string {
 }
 
 /**
- * Print success message
+ * Print success message (to stderr to avoid interfering with stdout piping)
  */
 function success(message: string): void {
-  console.log(chalk.green('✓ ') + message);
+  process.stderr.write(chalk.green('✓ ') + message + '\n');
 }
 
 /**
@@ -173,10 +173,10 @@ function warning(message: string): void {
 }
 
 /**
- * Print info message
+ * Print info message (to stderr to avoid interfering with stdout piping)
  */
 function info(message: string): void {
-  console.log(chalk.blue('ℹ ') + message);
+  process.stderr.write(chalk.blue('ℹ ') + message + '\n');
 }
 
 /**
