@@ -42,18 +42,33 @@ import fetchReportsCommand = require('../commands/fetch-reports');
 // then forward args to the properly-typed command function
 function withHelpWrapper(commandName: string, actionFn: (...args: any[]) => Promise<void> | void) {
   return async (...args: any[]) => {
-    // Check if any argument is "help" (but not in options)
+    // Check if "help" is in the command arguments (before Commander's validation)
+    // This works even for commands with required options
+    const commandIndex = process.argv.indexOf(commandName);
+    if (commandIndex !== -1 && process.argv[commandIndex + 1] === 'help') {
+      // Find the command and show its help
+      const cmd = program.commands.find((c: Command) => c.name() === commandName);
+      if (cmd) {
+        cmd.outputHelp();
+        process.exit(0);
+      }
+      return;
+    }
+
+    // Also check if any argument passed to the action is "help" (for commands without positional args)
     for (const arg of args) {
       // Only check string arguments that aren't part of options object
       if (typeof arg === 'string' && arg === 'help') {
         // Find the command and show its help
         const cmd = program.commands.find((c: Command) => c.name() === commandName);
         if (cmd) {
-          cmd.help();
+          cmd.outputHelp();
+          process.exit(0);
         }
         return;
       }
     }
+
     // Otherwise, execute the original action
     return actionFn(...args);
   };
@@ -359,17 +374,17 @@ program
 program
   .command('list-report-types')
   .description('List all available YouTube Reporting API report types')
-  .option('--output <format>', 'Output format: json, table, text')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(listReportTypesCommand);
+  .action(withHelpWrapper('list-report-types', listReportTypesCommand));
 
 program
   .command('list-report-jobs')
   .description('List YouTube Reporting API jobs with status and expiration warnings')
   .option('--type <id>', 'Filter by report type ID (e.g., channel_reach_basic_a1)')
-  .option('--output <format>', 'Output format: json, table, text')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(listReportJobsCommand);
+  .action(withHelpWrapper('list-report-jobs', listReportJobsCommand));
 
 program
   .command('get-report-data')
@@ -380,7 +395,7 @@ program
   .option('--end-date <date>', 'End date (YYYY-MM-DD)')
   .option('--output <format>', 'Output format: json, csv', 'json')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(getReportDataCommand);
+  .action(withHelpWrapper('get-report-data', getReportDataCommand));
 
 program
   .command('fetch-reports')
@@ -392,7 +407,7 @@ program
   .option('-f, --force', 'Re-download even if cached')
   .option('--verify', 'Verify cached file completeness')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(fetchReportsCommand);
+  .action(withHelpWrapper('fetch-reports', fetchReportsCommand));
 
 // Show help if no command provided
 if (!process.argv.slice(2).length) {
@@ -411,18 +426,23 @@ const shutdownHandler = (signal: string) => {
 process.on('SIGINT', () => shutdownHandler('SIGINT'));
 process.on('SIGTERM', () => shutdownHandler('SIGTERM'));
 
-// Error handling: suppress stack traces, show only user-friendly messages
-// Use configureOutput to prevent Commander from writing errors to stderr
-program.configureOutput({
-  writeErr: (_str) => {
-    // Suppress Commander's default error output
-    // We'll display user-friendly errors in exitOverride below
-  },
-  writeOut: (str) => process.stdout.write(str)
-});
-
 program.exitOverride((err) => {
   const error = err as { code?: string; message?: string; exitCode?: number };
+
+  // Check if user is asking for help (even with missing required options)
+  const args = process.argv.slice(2);
+  const helpIndex = args.indexOf('help');
+
+  if (helpIndex !== -1 && helpIndex > 0) {
+    // Found "help" after a command name
+    const commandName = args[helpIndex - 1];
+    const cmd = program.commands.find((c: Command) => c.name() === commandName);
+    if (cmd) {
+      cmd.outputHelp();
+      process.exit(0);
+      return; // Make sure we return after showing help
+    }
+  }
 
   // Extract clean message (remove Commander's "error: " prefix if present)
   const cleanMessage = error.message?.replace(/^error:\s*/, '') || 'An unknown error occurred';
@@ -440,6 +460,10 @@ program.exitOverride((err) => {
     console.error(chalk.red(`Error: ${cleanMessage}`));
     console.log(chalk.yellow("\nUse 'staqan-yt help <command>' for usage information"));
     process.exit(1);
+  } else if (error.code?.includes('option') || error.code?.includes('required')) {
+    console.error(chalk.red(`Error: ${cleanMessage}`));
+    console.log(chalk.yellow("\nUse 'staqan-yt help <command>' for usage information"));
+    process.exit(1);
   } else if (error.code === 'commander.help' || error.code === 'commander.helpDisplayed' || error.code === 'commander.version') {
     // Help or version was displayed, exit normally
     process.exit(0);
@@ -450,11 +474,18 @@ program.exitOverride((err) => {
   }
 });
 
-try {
-  program.parse(process.argv);
-} catch (err) {
-  const error = err as { code?: string; message?: string };
-  // Show only the error message, not the stack trace
-  console.error(chalk.red(`Error: ${error.message || 'An unexpected error occurred'}`));
-  process.exit(1);
+// Check for "help" argument BEFORE Commander parses
+// This ensures help works even for commands with required options
+const args = process.argv.slice(2);
+const helpIndex = args.indexOf('help');
+if (helpIndex > 0 && args[helpIndex - 1] !== 'help') {
+  // Found "help" after a command name
+  const commandName = args[helpIndex - 1];
+  const cmd = program.commands.find((c: Command) => c.name() === commandName);
+  if (cmd) {
+    cmd.outputHelp();
+    process.exit(0);
+  }
 }
+
+program.parse(process.argv);
