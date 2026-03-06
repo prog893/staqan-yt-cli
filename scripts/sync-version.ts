@@ -93,9 +93,26 @@ writeFileSync(formulaPath, formulaContent, 'utf-8');
 console.log(`  ✓ Updated Formula/staqan-yt.rb`);
 
 console.log(`\n✨ Version ${version} synced successfully!\n`);
-console.log(`Next steps:`);
-console.log(`  1. Review changes: git diff`);
-console.log(`  2. Stage changes: git add -A`);
-console.log(`  3. Commit: git commit -m "Bump version to ${version}"`);
-console.log(`  4. Create tag: git tag v${version}`);
-console.log(`  5. Push: git push && git push --tags`);
+
+// Stage changes
+git('git add -A');
+console.log('  ✓ Staged changes');
+
+// Commit
+const commitMessage = `Bump version to ${version}`;
+git(`git commit -m "${commitMessage}"`);
+console.log(`  ✓ Committed: ${commitMessage}`);
+
+// Create tag
+git(`git tag v${version}`);
+console.log(`  ✓ Created tag: v${version}`);
+
+// Push commit and tag
+console.log('\n📤 Pushing to GitHub...');
+git('git push origin main');
+console.log('  ✓ Pushed commit to origin/main');
+git(`git push origin v${version}`);
+console.log(`  ✓ Pushed tag v${version} to origin`);
+
+console.log(`\n🎉 Release ${version} complete!`);
+console.log(`   View tag: https://github.com/prog893/staqan-yt-cli/releases/tag/v${version}`);
