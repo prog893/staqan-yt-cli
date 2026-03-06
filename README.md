@@ -68,6 +68,22 @@ staqan-yt get-video-analytics dQw4w9WgXcQ --output csv
 staqan-yt fetch-reports --type=channel_reach_basic_a1
 ```
 
+## Global Options
+
+```bash
+# Show version (takes precedence over all other arguments)
+staqan-yt --version
+staqan-yt -V
+
+# Quiet mode - suppress informational messages
+staqan-yt --quiet list-videos @yourchannel
+staqan-yt -q get-video VIDEO_ID --output json
+
+# Verbose mode - show technical debug messages
+staqan-yt --verbose list-videos @yourchannel
+staqan-yt -v update-video VIDEO_ID --title "New Title"
+```
+
 ## Configuration
 
 Set defaults to avoid repeating common options:
@@ -133,7 +149,7 @@ Connect with Claude Desktop for natural language YouTube management:
 ### Batch Update Video Titles
 
 ```bash
-staqan-yt list-videos @mychannel --output json | \
+staqan-yt --quiet list-videos @mychannel --output json | \
   jq -r '.[].id' | \
   xargs -I {} staqan-yt update-video {} --title "New Title" --yes
 ```
@@ -141,7 +157,7 @@ staqan-yt list-videos @mychannel --output json | \
 ### Export Analytics to CSV
 
 ```bash
-staqan-yt list-videos @mychannel --output json | \
+staqan-yt --quiet list-videos @mychannel --output json | \
   jq -r '.[].id' | \
   xargs -I {} staqan-yt get-video-analytics {} --output csv > analytics.csv
 ```

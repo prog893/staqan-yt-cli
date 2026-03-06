@@ -2,6 +2,57 @@
 
 All staqan-yt-cli commands support multiple output formats via the `--output` flag.
 
+## Global Options
+
+### Quiet Mode (`-q, --quiet`)
+
+Suppress informational messages for clean output:
+
+```bash
+# Quiet JSON output (perfect for piping)
+staqan-yt --quiet list-videos @yourchannel --output json | jq '.[]'
+
+# Quiet CSV export
+staqan-yt -q list-videos @yourchannel --output csv > videos.csv
+
+# Suppress progress messages in scripts
+staqan-yt --quiet get-video VIDEO_ID --output json > video.json
+```
+
+**What gets suppressed:**
+- ✓ Success messages (e.g., "Found 10 video(s)")
+- ℹ Info messages (e.g., "Fetching channel videos...")
+- Progress spinners
+
+**What still shows:**
+- ✗ Error messages
+- ⚠ Warning messages
+- The actual output data
+
+### Verbose Mode (`-v, --verbose`)
+
+Show technical debug messages:
+
+```bash
+# See API calls and processing steps
+staqan-yt --verbose get-video VIDEO_ID
+
+# Debug authentication issues
+staqan-yt -v list-videos @yourchannel
+```
+
+### Version (`--version, -V`)
+
+Show version and exit:
+
+```bash
+staqan-yt --version    # Output: 1.4.3
+staqan-yt -V           # Short form
+
+# Takes precedence over everything else
+staqan-yt --version list-videos    # Still outputs version only
+```
+
 ## Available Formats
 
 - **json** - Machine-readable JSON (2-space indentation)
@@ -64,14 +115,14 @@ staqan-yt get-video dQw4w9WgXcQ
 **Common Usage:**
 ```bash
 # Pipe to jq for filtering
-staqan-yt list-videos @yourchannel --output json | \
+staqan-yt --quiet list-videos @yourchannel --output json | \
   jq '.[] | select(.viewCount | tonumber > 1000000)'
 
 # Save to file
-staqan-yt get-video VIDEO_ID --output json > video.json
+staqan-yt --quiet get-video VIDEO_ID --output json > video.json
 
 # Parse with scripts
-data=$(staqan-yt get-video VIDEO_ID --output json)
+data=$(staqan-yt --quiet get-video VIDEO_ID --output json)
 title=$(echo "$data" | jq -r '.title')
 ```
 
