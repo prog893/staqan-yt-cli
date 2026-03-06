@@ -14,8 +14,9 @@
     "prepublishOnly": "npm run build",
     "start": "node dist/bin/staqan-yt.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "sync-version": "bun run scripts/sync-version.ts",
-    "version": "bun run scripts/sync-version.ts"
+    "preversion": "bun run scripts/preversion.ts",
+    "version": "bun run scripts/version.ts",
+    "postversion": "bun run scripts/postversion.ts"
   },
   "keywords": [
     "youtube",
