@@ -1,10 +1,13 @@
 import { google } from 'googleapis';
+import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { error, info, success, debug, initCommand, formatTimestampWithTimezone } from '../lib/utils';
+import { getOutputFormat } from '../lib/config';
+import { formatJson, formatTable, formatCsv, formatText } from '../lib/formatters';
 
 interface ListReportJobsOptions {
   type?: string;
-  output?: 'json' | 'table' | 'text';
+  output?: 'json' | 'table' | 'text' | 'csv' | 'pretty';
   verbose?: boolean;
 }
 
@@ -45,17 +48,34 @@ async function listReportJobsCommand(options: ListReportJobsOptions): Promise<vo
 
     success(`Found ${jobs.length} job(s)\n`);
 
-    // For each job, fetch report details
+    // Collect job data for all formats
     const now = new Date();
+    const jobsData: Array<{
+      jobId: string;
+      reportTypeId: string;
+      name: string;
+      created: string;
+      daysSinceCreation: number;
+      status: string;
+      reportsCount: number;
+      latestReport: string;
+      oldestReport: string;
+      expiringReportsCount: number;
+      expirationWarnings: string[];
+      expirationCriticals: string[];
+    }> = [];
+
+    // For each job, fetch report details
     for (const job of jobs) {
       const jobCreated = new Date(job.createTime || '');
       const daysSinceCreation = Math.floor((now.getTime() - jobCreated.getTime()) / (1000 * 60 * 60 * 24));
 
-      console.log(`Job ID:     ${job.id}`);
-      console.log(`Report Type: ${job.reportTypeId}`);
-      console.log(`Name:       ${job.name}`);
-      console.log(`Created:    ${job.createTime}`);
-      console.log(`Status:     Active (${daysSinceCreation} days ago)\n`);
+      let reportsCount = 0;
+      let latestReport = 'N/A';
+      let oldestReport = 'N/A';
+      let expiringReportsCount = 0;
+      const warnings: string[] = [];
+      const criticals: string[] = [];
 
       // Fetch reports for this job
       try {
@@ -65,81 +85,139 @@ async function listReportJobsCommand(options: ListReportJobsOptions): Promise<vo
         });
 
         const reports = reportsResponse.data.reports || [];
+        reportsCount = reports.length;
 
-        if (reports.length === 0) {
-          const readyAt = new Date(jobCreated.getTime() + 48 * 60 * 60 * 1000);
-          const hoursUntilReady = Math.max(0, Math.ceil((readyAt.getTime() - now.getTime()) / (1000 * 60 * 60)));
-          const formatted = formatTimestampWithTimezone(readyAt);
+        if (reports.length > 0) {
+          latestReport = `${reports[0].startTime} to ${reports[0].endTime}`;
+          oldestReport = `${reports[reports.length - 1].startTime} to ${reports[reports.length - 1].endTime}`;
 
-          console.log('  ⏳  No reports yet (within 48-hour window)');
-          console.log(`      Ready: ${formatted.local} (${formatted.timezone})`);
-          console.log(`      Wait:  ${hoursUntilReady} hours remaining\n`);
-        } else {
           // Calculate expiration warnings
-          const warnings: string[] = [];
-          const criticals: string[] = [];
-
           for (const report of reports) {
             const reportCreated = new Date(report.createTime || '');
-            const isHistorical = reportCreated.getTime() - jobCreated.getTime() < 4 * 24 * 60 * 60 * 1000; // Within 4 days = historical
+            const isHistorical = reportCreated.getTime() - jobCreated.getTime() < 4 * 24 * 60 * 60 * 1000;
             const expirationDays = isHistorical ? 30 : 60;
             const expiresAt = new Date(reportCreated.getTime() + expirationDays * 24 * 60 * 60 * 1000);
             const daysUntilExpiration = Math.ceil((expiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
 
             if (daysUntilExpiration <= 3) {
-              criticals.push(`      🚨 CRITICAL: ${report.startTime} to ${report.endTime} (expires ${expiresAt.toISOString().split('T')[0]}, ${daysUntilExpiration} days)`);
+              criticals.push(`🚨 CRITICAL: ${report.startTime} to ${report.endTime} (expires ${expiresAt.toISOString().split('T')[0]}, ${daysUntilExpiration} days)`);
             } else if (daysUntilExpiration <= 7) {
-              warnings.push(`      ⚠️  Expiring soon: ${report.startTime} to ${report.endTime} (expires ${expiresAt.toISOString().split('T')[0]}, ${daysUntilExpiration} days)`);
+              warnings.push(`⚠️  Expiring soon: ${report.startTime} to ${report.endTime} (expires ${expiresAt.toISOString().split('T')[0]}, ${daysUntilExpiration} days)`);
+            }
+
+            if (daysUntilExpiration <= 7) {
+              expiringReportsCount++;
             }
           }
-
-          console.log(`  Reports: ${reports.length} available`);
-          console.log(`    Latest: ${reports[0].startTime} to ${reports[0].endTime} (created ${reports[0].createTime})`);
-          console.log(`    Oldest: ${reports[reports.length - 1].startTime} to ${reports[reports.length - 1].endTime} (created ${reports[reports.length - 1].createTime})`);
-
-          if (criticals.length > 0) {
-            console.log(`\n${criticals.length} report(s) expiring SOON:`);
-            criticals.forEach(c => console.log(c));
-          }
-
-          if (warnings.length > 0) {
-            if (criticals.length === 0) console.log('');
-            console.log(`${warnings.length} report(s) expiring soon:`);
-            warnings.forEach(w => console.log(w));
-          }
-
-          if (criticals.length > 0 || warnings.length > 0) {
-            console.log(`\n  💡 Run 'staqan-yt download-expiring-reports --type=${job.reportTypeId}' to save them`);
-          }
-
-          console.log('');
         }
       } catch (err) {
         debug(`Failed to fetch reports for job ${job.id}: ${err}`);
       }
 
-      console.log('---\n');
+      jobsData.push({
+        jobId: job.id || '',
+        reportTypeId: job.reportTypeId || '',
+        name: job.name || '',
+        created: job.createTime || '',
+        daysSinceCreation,
+        status: 'Active',
+        reportsCount,
+        latestReport,
+        oldestReport,
+        expiringReportsCount,
+        expirationWarnings: warnings,
+        expirationCriticals: criticals,
+      });
     }
 
-    // Show sliding window status
-    if (jobs.length > 0) {
-      const oldestJob = jobs.reduce((oldest, job) => {
-        const jobDate = new Date(job.createTime || '');
-        const oldestDate = new Date(oldest.createTime || '');
-        return jobDate < oldestDate ? job : oldest;
-      });
+    // Determine output format
+    const outputFormat = await getOutputFormat(options.output);
 
-      const oldestJobCreated = new Date(oldestJob.createTime || '');
-      const daysSinceOldestJob = Math.floor((now.getTime() - oldestJobCreated.getTime()) / (1000 * 60 * 60 * 24));
+    // Output based on format
+    switch (outputFormat) {
+      case 'json':
+        console.log(formatJson(jobsData));
+        break;
 
-      if (daysSinceOldestJob < 60) {
-        info(`📊 Sliding window phase: Growing (will stabilize at 60 days around ${new Date(oldestJobCreated.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]})`);
-      } else {
-        info(`📊 Sliding window phase: Stable (60-day rolling window)`);
-      }
+      case 'csv':
+        console.log(formatCsv(jobsData));
+        break;
 
-      info(`⚠️  Reports expire after 30 days (historical) or 60 days (regular)`);
-      info(`💡 Download reports before expiration to avoid data loss\n`);
+      case 'text':
+        console.log(formatText(jobsData));
+        break;
+
+      case 'table':
+        console.log(formatTable(jobsData));
+        break;
+
+      case 'pretty':
+      default:
+        // Pretty format with colors
+        jobsData.forEach((job, idx) => {
+          console.log(chalk.cyan(`Job ID:`) + ' ' + chalk.yellow(job.jobId));
+          console.log(chalk.gray('Report Type:') + ' ' + job.reportTypeId);
+          console.log(chalk.gray('Name:') + ' ' + job.name);
+          console.log(chalk.gray('Created:') + ' ' + job.created);
+          console.log(chalk.gray('Status:') + ' ' + chalk.green(`${job.status} (${job.daysSinceCreation} days ago)`));
+          console.log(chalk.gray('Reports:') + ' ' + chalk.yellow(job.reportsCount.toString()));
+
+          if (job.reportsCount > 0) {
+            console.log(chalk.gray('  Latest:') + ' ' + job.latestReport);
+            console.log(chalk.gray('  Oldest:') + ' ' + job.oldestReport);
+
+            // Show detailed expiration warnings
+            if (job.expirationCriticals.length > 0) {
+              console.log(`\n  ${job.expirationCriticals.length} report(s) expiring SOON:`);
+              job.expirationCriticals.forEach(c => console.log(`      ${chalk.red(c)}`));
+            }
+
+            if (job.expirationWarnings.length > 0) {
+              if (job.expirationCriticals.length === 0) console.log('');
+              console.log(`  ${job.expirationWarnings.length} report(s) expiring soon:`);
+              job.expirationWarnings.forEach(w => console.log(`      ${chalk.yellow(w)}`));
+            }
+
+            if (job.expirationCriticals.length > 0 || job.expirationWarnings.length > 0) {
+              console.log(`\n  💡 Run 'staqan-yt fetch-reports --type=${job.reportTypeId}' to download them`);
+            }
+          } else {
+            const readyAt = new Date(new Date(job.created).getTime() + 48 * 60 * 60 * 1000);
+            const hoursUntilReady = Math.max(0, Math.ceil((readyAt.getTime() - now.getTime()) / (1000 * 60 * 60)));
+            const formatted = formatTimestampWithTimezone(readyAt);
+            console.log(chalk.gray('  ⏳  No reports yet (within 48-hour window)'));
+            console.log(chalk.gray('      Ready:') + ' ' + formatted.local + chalk.gray(` (${formatted.timezone})`));
+            console.log(chalk.gray('      Wait:') + ' ' + chalk.yellow(`${hoursUntilReady} hours remaining`));
+          }
+
+          console.log('');
+          if (idx < jobsData.length - 1) {
+            console.log(chalk.gray('---'));
+            console.log('');
+          }
+        });
+
+        // Show sliding window status
+        if (jobsData.length > 0) {
+          const oldestJobData = jobsData.reduce((oldest, job) => {
+            const jobDate = new Date(job.created || '');
+            const oldestDate = new Date(oldest.created || '');
+            return jobDate < oldestDate ? job : oldest;
+          });
+
+          const oldestJobCreated = new Date(oldestJobData.created || '');
+          const daysSinceOldestJob = Math.floor((now.getTime() - oldestJobCreated.getTime()) / (1000 * 60 * 60 * 24));
+
+          if (daysSinceOldestJob < 60) {
+            info(`📊 Sliding window phase: Growing (will stabilize at 60 days around ${new Date(oldestJobCreated.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]})`);
+          } else {
+            info(`📊 Sliding window phase: Stable (60-day rolling window)`);
+          }
+
+          info(`⚠️  Reports expire after 30 days (historical) or 60 days (regular)`);
+          info(`💡 Download reports before expiration to avoid data loss\n`);
+        }
+        break;
     }
 
   } catch (err: unknown) {
