@@ -14,6 +14,9 @@ const TOKEN_PATH = path.join(CONFIG_DIR, 'token.json');
 // Global verbose flag
 let isVerboseEnabled = false;
 
+// Global quiet flag
+let isQuietEnabled = false;
+
 /**
  * Ensure config directory exists
  */
@@ -155,7 +158,9 @@ function formatTimestamp(seconds: number): string {
  * Print success message (to stderr to avoid interfering with stdout piping)
  */
 function success(message: string): void {
-  process.stderr.write(chalk.green('✓ ') + message + '\n');
+  if (!isQuietEnabled) {
+    process.stderr.write(chalk.green('✓ ') + message + '\n');
+  }
 }
 
 /**
@@ -176,7 +181,9 @@ function warning(message: string): void {
  * Print info message (to stderr to avoid interfering with stdout piping)
  */
 function info(message: string): void {
-  process.stderr.write(chalk.blue('ℹ ') + message + '\n');
+  if (!isQuietEnabled) {
+    process.stderr.write(chalk.blue('ℹ ') + message + '\n');
+  }
 }
 
 /**
@@ -208,6 +215,20 @@ function setVerbose(enabled: boolean): void {
  */
 function isVerbose(): boolean {
   return isVerboseEnabled;
+}
+
+/**
+ * Set quiet mode
+ */
+function setQuiet(enabled: boolean): void {
+  isQuietEnabled = enabled;
+}
+
+/**
+ * Get quiet mode status
+ */
+function isQuiet(): boolean {
+  return isQuietEnabled;
 }
 
 /**
@@ -419,6 +440,8 @@ export {
   confirm,
   setVerbose,
   isVerbose,
+  setQuiet,
+  isQuiet,
   debug,
   progress,
   convertToCSV,

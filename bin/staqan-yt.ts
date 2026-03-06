@@ -4,6 +4,7 @@ import { program, Command } from 'commander';
 import chalk from 'chalk';
 import * as path from 'path';
 import { GroupedHelp } from '../lib/customHelp';
+import { setQuiet, setVerbose } from '../lib/utils';
 import { OutputOption, VerboseOption, ChannelAnalyticsOptions } from '../types';
 import authCommand = require('../commands/auth');
 import listVideosCommand = require('../commands/list-videos');
@@ -88,6 +89,8 @@ program
   .description('CLI tool for managing YouTube videos and metadata')
   .version(version)
   .helpOption(false) // Disable automatic -h, --help flags (use 'help' command instead)
+  .option('-q, --quiet', 'Suppress informational messages (errors still shown)')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
   .configureOutput({
     writeErr: (_str) => {
       // Suppress Commander's default error output
@@ -474,9 +477,16 @@ program.exitOverride((err) => {
   }
 });
 
+// Check for --version argument BEFORE anything else
+// This takes precedence over all other arguments and commands
+const args = process.argv.slice(2);
+if (args.includes('--version') || args.includes('-V')) {
+  console.log(version);
+  process.exit(0);
+}
+
 // Check for "help" argument BEFORE Commander parses
 // This ensures help works even for commands with required options
-const args = process.argv.slice(2);
 const helpIndex = args.indexOf('help');
 if (helpIndex > 0 && args[helpIndex - 1] !== 'help') {
   // Found "help" after a command name
@@ -489,3 +499,12 @@ if (helpIndex > 0 && args[helpIndex - 1] !== 'help') {
 }
 
 program.parse(process.argv);
+
+// Apply global options after parsing
+const options = program.opts();
+if (options.quiet) {
+  setQuiet(true);
+}
+if (options.verbose) {
+  setVerbose(true);
+}
