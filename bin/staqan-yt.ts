@@ -88,13 +88,71 @@ program
   .name('staqan-yt')
   .description('CLI tool for managing YouTube videos and metadata')
   .version(version)
-  .helpOption(false) // Disable automatic -h, --help flags (use 'help' command instead)
+  .helpOption(false); // Disable automatic -h, --help flags (use 'help' command instead)
+
+// Configure error handling BEFORE other configuration
+program.exitOverride((err) => {
+  const error = err as { code?: string; message?: string; exitCode?: number };
+
+  // Check if user is asking for help (even with missing required options)
+  const args = process.argv.slice(2);
+  const helpIndex = args.indexOf('help');
+
+  if (helpIndex !== -1 && helpIndex > 0) {
+    // Found "help" after a command name
+    const commandName = args[helpIndex - 1];
+    const cmd = program.commands.find((c: Command) => c.name() === commandName);
+    if (cmd) {
+      cmd.outputHelp();
+      process.exit(0);
+      return; // Make sure we return after showing help
+    }
+  }
+
+  // Extract clean message (remove Commander's "error: " prefix if present)
+  const cleanMessage = error.message?.replace(/^error:\s*/, '') || 'An unknown error occurred';
+
+  // Handle all error cases with user-friendly messages
+  // Use sync write to ensure output is flushed before exit
+  if (error.code === 'commander.unknownOption') {
+    process.stderr.write(chalk.red(`Error: ${cleanMessage}\n`));
+    process.stderr.write(chalk.yellow("\nUse 'staqan-yt help' to see available options\n"));
+    process.exit(1);
+    return; // Prevent any further processing
+  } else if (error.code === 'commander.unknownCommand') {
+    process.stderr.write(chalk.red(`Error: ${cleanMessage}\n`));
+    process.stderr.write(chalk.yellow("\nUse 'staqan-yt help' to see available commands\n"));
+    process.exit(1);
+    return;
+  } else if (error.code === 'commander.missingArgument') {
+    process.stderr.write(chalk.red(`Error: ${cleanMessage}\n`));
+    process.stderr.write(chalk.yellow("\nUse 'staqan-yt help <command>' for usage information\n"));
+    process.exit(1);
+    return;
+  } else if (error.code?.includes('option') || error.code?.includes('required')) {
+    process.stderr.write(chalk.red(`Error: ${cleanMessage}\n`));
+    process.stderr.write(chalk.yellow("\nUse 'staqan-yt help <command>' for usage information\n"));
+    process.exit(1);
+    return;
+  } else if (error.code === 'commander.help' || error.code === 'commander.helpDisplayed' || error.code === 'commander.version') {
+    // Help or version was displayed, exit normally
+    process.exit(0);
+    return;
+  } else {
+    // For any other error, show just the message
+    process.stderr.write(chalk.red(`Error: ${cleanMessage}\n`));
+    process.exit(error.exitCode || 1);
+    return;
+  }
+});
+
+program
   .option('-q, --quiet', 'Suppress informational messages (errors still shown)')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .configureOutput({
     writeErr: (_str) => {
       // Suppress Commander's default error output
-      // We'll display user-friendly errors in exitOverride below
+      // We'll display user-friendly errors in exitOverride above
     },
     writeOut: (str) => process.stdout.write(str)
   })
@@ -428,54 +486,6 @@ const shutdownHandler = (signal: string) => {
 
 process.on('SIGINT', () => shutdownHandler('SIGINT'));
 process.on('SIGTERM', () => shutdownHandler('SIGTERM'));
-
-program.exitOverride((err) => {
-  const error = err as { code?: string; message?: string; exitCode?: number };
-
-  // Check if user is asking for help (even with missing required options)
-  const args = process.argv.slice(2);
-  const helpIndex = args.indexOf('help');
-
-  if (helpIndex !== -1 && helpIndex > 0) {
-    // Found "help" after a command name
-    const commandName = args[helpIndex - 1];
-    const cmd = program.commands.find((c: Command) => c.name() === commandName);
-    if (cmd) {
-      cmd.outputHelp();
-      process.exit(0);
-      return; // Make sure we return after showing help
-    }
-  }
-
-  // Extract clean message (remove Commander's "error: " prefix if present)
-  const cleanMessage = error.message?.replace(/^error:\s*/, '') || 'An unknown error occurred';
-
-  // Handle all error cases with user-friendly messages
-  if (error.code === 'commander.unknownOption') {
-    console.error(chalk.red(`Error: ${cleanMessage}`));
-    console.log(chalk.yellow("\nUse 'staqan-yt help' to see available options"));
-    process.exit(1);
-  } else if (error.code === 'commander.unknownCommand') {
-    console.error(chalk.red(`Error: ${cleanMessage}`));
-    console.log(chalk.yellow("\nUse 'staqan-yt help' to see available commands"));
-    process.exit(1);
-  } else if (error.code === 'commander.missingArgument') {
-    console.error(chalk.red(`Error: ${cleanMessage}`));
-    console.log(chalk.yellow("\nUse 'staqan-yt help <command>' for usage information"));
-    process.exit(1);
-  } else if (error.code?.includes('option') || error.code?.includes('required')) {
-    console.error(chalk.red(`Error: ${cleanMessage}`));
-    console.log(chalk.yellow("\nUse 'staqan-yt help <command>' for usage information"));
-    process.exit(1);
-  } else if (error.code === 'commander.help' || error.code === 'commander.helpDisplayed' || error.code === 'commander.version') {
-    // Help or version was displayed, exit normally
-    process.exit(0);
-  } else {
-    // For any other error, show just the message
-    console.error(chalk.red(`Error: ${cleanMessage}`));
-    process.exit(error.exitCode || 1);
-  }
-});
 
 // Check for --version argument BEFORE anything else
 // This takes precedence over all other arguments and commands
