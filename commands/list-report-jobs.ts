@@ -89,8 +89,13 @@ async function listReportJobsCommand(options: ListReportJobsOptions): Promise<vo
         reportsCount = reports.length;
 
         if (reports.length > 0) {
-          latestReport = `${reports[0].startTime} to ${reports[0].endTime}`;
-          oldestReport = `${reports[reports.length - 1].startTime} to ${reports[reports.length - 1].endTime}`;
+          const latestStart = formatTimestampWithTimezone(reports[0].startTime || '').local;
+          const latestEnd = formatTimestampWithTimezone(reports[0].endTime || '').local;
+          const oldestStart = formatTimestampWithTimezone(reports[reports.length - 1].startTime || '').local;
+          const oldestEnd = formatTimestampWithTimezone(reports[reports.length - 1].endTime || '').local;
+
+          latestReport = `${latestStart} to ${latestEnd}`;
+          oldestReport = `${oldestStart} to ${oldestEnd}`;
 
           // Calculate expiration warnings
           for (const report of reports) {
@@ -162,13 +167,13 @@ async function listReportJobsCommand(options: ListReportJobsOptions): Promise<vo
           console.log(chalk.cyan(`Job ID:`) + ' ' + chalk.yellow(job.jobId));
           console.log(chalk.gray('Report Type:') + ' ' + job.reportTypeId);
           console.log(chalk.gray('Name:') + ' ' + job.name);
-          console.log(chalk.gray('Created:') + ' ' + job.created);
+          console.log(chalk.gray('Created:') + ' ' + formatTimestampWithTimezone(job.created).local + chalk.gray(' (UTC)'));
           console.log(chalk.gray('Status:') + ' ' + chalk.green(`${job.status} (${job.daysSinceCreation} days ago)`));
           console.log(chalk.gray('Reports:') + ' ' + chalk.yellow(job.reportsCount.toString()));
 
           if (job.reportsCount > 0) {
-            console.log(chalk.gray('  Latest:') + ' ' + job.latestReport);
-            console.log(chalk.gray('  Oldest:') + ' ' + job.oldestReport);
+            console.log(chalk.gray('  Latest:') + ' ' + job.latestReport + chalk.gray(' (UTC)'));
+            console.log(chalk.gray('  Oldest:') + ' ' + job.oldestReport + chalk.gray(' (UTC)'));
 
             // Show detailed expiration warnings
             if (job.expirationCriticals.length > 0) {
