@@ -1021,6 +1021,36 @@ git push && git push --tags
 - `1.2.4` → `1.3.0` - Added new `list-playlists` command
 - `1.3.0` → `2.0.0` - Only if explicitly instructed for major breaking change
 
+## Hidden Internal Commands
+
+Some commands are registered with Commander's `{ hidden: true }` option and never appear in `staqan-yt help` output. They are implementation details and must **not** be documented in user-facing docs (README, docs/).
+
+### `__complete`
+
+**File:** `commands/complete.ts`
+**Registered in:** `bin/staqan-yt.ts` via `program.addCommand(cmd, { hidden: true })`
+
+**Purpose:** Subprocess helper for shell tab completion scripts. Shell scripts (bash/zsh) call this command and use its stdout as completion candidates.
+
+**Usage:**
+```bash
+staqan-yt __complete --type video-id      # Video IDs + titles for default channel
+staqan-yt __complete --type playlist-id   # Playlist IDs + titles for default channel
+staqan-yt __complete --type report-type   # Report type IDs + names
+```
+
+**Output format:** One `id\ttitle` per line (tab-separated). No spinners, no chalk, no extra output.
+
+**Caching:** Results are cached in `~/.staqan-yt-cli/completion-cache.json`:
+- `video-id` / `playlist-id`: 5-minute TTL, keyed as `video-id:@channel`
+- `report-type`: 1-hour TTL, keyed as `report-type`
+
+**Error handling:** Any error (no auth, no default channel, network failure) causes silent `process.exit(0)` — completion simply shows no candidates rather than printing an error to the terminal.
+
+**Shell integration:** The generated bash/zsh scripts in `lib/completion.ts` call `__complete` as a subprocess and feed its output into `_describe` (zsh) or `compgen -W` (bash).
+
+---
+
 ## Common Pitfalls
 
 ### ❌ Don't Do This

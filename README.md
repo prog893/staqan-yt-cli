@@ -101,7 +101,7 @@ staqan-yt list-videos --limit 5  # Uses @yourchannel
 
 ## Shell Completions
 
-Enable tab completion for commands and options:
+Enable tab completion for commands, options, and live YouTube data:
 
 ```bash
 # Auto-install completions (detects zsh or bash)
@@ -115,10 +115,20 @@ staqan-yt config completion bash --install
 source ~/.zshrc  # or source ~/.bashrc
 ```
 
-Once enabled, use tab completion:
+Once enabled, tab completion works at every level:
+
 ```bash
-staqan-yt ge<Tab>          # Shows: get-video, get-videos, get-channel, etc.
-staqan-yt get-video --<Tab> # Shows: --output, --verbose
+staqan-yt ge<Tab>                    # Commands: get-video, get-videos, get-channel…
+staqan-yt get-video <Tab>            # Live video IDs with titles from your channel
+staqan-yt get-playlist <Tab>         # Live playlist IDs with titles
+staqan-yt list-report-jobs --type <Tab>  # Live report type IDs
+staqan-yt get-video --output <Tab>   # json  table  text  pretty  csv
+```
+
+Dynamic ID completion uses your configured default channel and caches results locally for 5 minutes, so it stays fast. Set your channel first:
+
+```bash
+staqan-yt config set default.channel @yourchannel
 ```
 
 **Note:** Shell completions are automatically installed when using Homebrew.
