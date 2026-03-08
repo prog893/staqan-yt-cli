@@ -1,7 +1,7 @@
 class StaqanYt < Formula
   desc "CLI tool for managing YouTube videos and metadata using the YouTube Data API v3"
   homepage "https://github.com/prog893/staqan-yt-cli"
-  version "1.4.3"
+  version "1.4.4"
   license "MIT"
 
   # Source-based installation from GitHub repo
