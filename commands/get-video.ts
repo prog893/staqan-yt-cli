@@ -47,7 +47,7 @@ async function videoInfoCommand(videoIds: string[], options: OutputOption & Verb
             video.id,
             video.title,
             video.channelTitle,
-            video.publishedAt,
+            formatDate(video.publishedAt),
             video.duration,
             video.statistics.viewCount,
             video.statistics.likeCount,

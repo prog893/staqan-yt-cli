@@ -47,7 +47,7 @@ async function channelVideosCommand(channelHandle: string | undefined, options: 
 
       case 'text':
         videos.forEach(video => {
-          console.log([video.id, video.title, video.publishedAt, video.videoType].join('\t'));
+          console.log([video.id, video.title, formatDate(video.publishedAt), video.videoType].join('\t'));
         });
         break;
 
