@@ -200,27 +200,6 @@ async function listReportJobsCommand(options: ListReportJobsOptions): Promise<vo
             console.log('');
           }
         });
-
-        // Show sliding window status
-        if (jobsData.length > 0) {
-          const oldestJobData = jobsData.reduce((oldest, job) => {
-            const jobDate = new Date(job.created || '');
-            const oldestDate = new Date(oldest.created || '');
-            return jobDate < oldestDate ? job : oldest;
-          });
-
-          const oldestJobCreated = new Date(oldestJobData.created || '');
-          const daysSinceOldestJob = Math.floor((now.getTime() - oldestJobCreated.getTime()) / (1000 * 60 * 60 * 24));
-
-          if (daysSinceOldestJob < 60) {
-            info(`📊 Sliding window phase: Growing (will stabilize at 60 days around ${new Date(oldestJobCreated.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]})`);
-          } else {
-            info(`📊 Sliding window phase: Stable (60-day rolling window)`);
-          }
-
-          info(`⚠️  Reports expire after 30 days (historical) or 60 days (regular)`);
-          info(`💡 Download reports before expiration to avoid data loss\n`);
-        }
         break;
     }
   });
