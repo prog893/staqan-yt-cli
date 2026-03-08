@@ -44,12 +44,7 @@ async function listReportJobsCommand(options: ListReportJobsOptions): Promise<vo
       }
     }
 
-    spinner.succeed(`Found ${jobs.length} job(s)`);
-
-    console.log('');
-
-    // Collect job data for all formats
-
+    // Don't succeed yet - we need to fetch report details for each job
     // Collect job data for all formats
     const now = new Date();
     const jobsData: Array<{
@@ -68,7 +63,11 @@ async function listReportJobsCommand(options: ListReportJobsOptions): Promise<vo
     }> = [];
 
     // For each job, fetch report details
-    for (const job of jobs) {
+    for (let i = 0; i < jobs.length; i++) {
+      const job = jobs[i];
+      spinner.text = `Fetching job ${i + 1}/${jobs.length}`;
+      spinner.render();
+
       const jobCreated = new Date(job.createTime || '');
       const daysSinceCreation = Math.floor((now.getTime() - jobCreated.getTime()) / (1000 * 60 * 60 * 24));
 
@@ -131,6 +130,9 @@ async function listReportJobsCommand(options: ListReportJobsOptions): Promise<vo
         expirationCriticals: criticals,
       });
     }
+
+    spinner.succeed(`Found ${jobs.length} job(s)`);
+    console.log('');
 
     // Determine output format
     const outputFormat = await getOutputFormat(options.output);
