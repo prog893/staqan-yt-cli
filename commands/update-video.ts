@@ -1,7 +1,6 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { getVideoInfo, updateVideoMetadata } from '../lib/youtube';
-import { parseVideoId, confirm, success, error, warning, info, debug, initCommand } from '../lib/utils';
+import { parseVideoId, confirm, success, error, warning, info, debug, initCommand, createSpinner } from '../lib/utils';
 import { UpdateVideoOptions } from '../types';
 
 async function updateMetadataCommand(videoId: string, options: UpdateVideoOptions): Promise<void> {
@@ -19,7 +18,7 @@ async function updateMetadataCommand(videoId: string, options: UpdateVideoOption
     }
 
     // Fetch current video info
-    const spinner = ora('Fetching current video metadata...').start();
+    const spinner = createSpinner('Fetching current video metadata...').start();
     const [currentVideo] = await getVideoInfo([parsedId]);
     spinner.succeed('Current metadata retrieved');
     console.log('');
@@ -69,7 +68,7 @@ async function updateMetadataCommand(videoId: string, options: UpdateVideoOption
     }
 
     // Apply updates
-    const updateSpinner = ora('Updating video metadata...').start();
+    const updateSpinner = createSpinner('Updating video metadata...').start();
     await updateVideoMetadata(parsedId, updates);
     updateSpinner.succeed('Metadata updated successfully');
     console.log('');

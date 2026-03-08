@@ -485,6 +485,12 @@ if (args.includes('--version') || args.includes('-V')) {
   process.exit(0);
 }
 
+// Check for --quiet flag BEFORE Commander parses
+// This ensures commands know about quiet mode when they execute
+if (args.includes('--quiet') || args.includes('-q')) {
+  setQuiet(true);
+}
+
 // Check for "help" argument BEFORE Commander parses
 // This ensures help works even for commands with required options
 const helpIndex = args.indexOf('help');

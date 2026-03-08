@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
-import { error, info, success, initCommand } from '../lib/utils';
+import { initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 
@@ -16,11 +16,9 @@ interface ReportTypesOptions {
 async function listReportTypesCommand(options: ReportTypesOptions): Promise<void> {
   initCommand(options);
 
-  const auth = await getAuthenticatedClient();
-  const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
-
-  try {
-    info('Fetching available report types...\n');
+  await withSpinner('Fetching available report types...', 'Failed to fetch report types', async (spinner) => {
+    const auth = await getAuthenticatedClient();
+    const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
 
     const response = await youtubeReporting.reportTypes.list({
       onBehalfOfContentOwner: undefined,
@@ -29,11 +27,12 @@ async function listReportTypesCommand(options: ReportTypesOptions): Promise<void
     const reportTypes = response.data.reportTypes || [];
 
     if (reportTypes.length === 0) {
-      error('No report types found for this channel.');
+      spinner.info('No report types found for this channel.');
       return;
     }
 
-    success(`Found ${reportTypes.length} report type(s)\n`);
+    spinner.succeed(`Found ${reportTypes.length} report type(s)`);
+    console.log('');
 
     // Group report types by category
     const grouped = reportTypes.reduce((acc: Record<string, typeof reportTypes>, rt: typeof reportTypes[0]) => {
@@ -89,17 +88,7 @@ async function listReportTypesCommand(options: ReportTypesOptions): Promise<void
         });
         break;
     }
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    error(`Failed to fetch report types: ${message}`);
-
-    if (message.includes('API not enabled')) {
-      error('\nYouTube Reporting API is not enabled.');
-      error('Enable it at: https://console.developers.google.com/apis/api/youtubereporting.googleapis.com');
-    }
-
-    process.exit(1);
-  }
+  });
 }
 
 export = listReportTypesCommand;

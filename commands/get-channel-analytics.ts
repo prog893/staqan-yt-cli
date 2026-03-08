@@ -1,11 +1,10 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseChannelHandle, error, debug, formatNumber, initCommand, withSpinner } from '../lib/utils';
+import { parseChannelHandle, error, debug, formatNumber, initCommand, withSpinner, createSpinner } from '../lib/utils';
 import { requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ChannelAnalyticsOptions } from '../types';
-import ora from 'ora';
 
 // Predefined report type mappings
 const REPORT_TYPES: Record<string, { dimensions: string; metrics: string }> = {
@@ -136,7 +135,7 @@ async function getChannelAnalyticsCommand(channelHandle: string | undefined, opt
     }
 
     // Fetch analytics
-    const analyticsSpinner = ora('Fetching analytics data...').start();
+    const analyticsSpinner = createSpinner('Fetching analytics data...').start();
 
     try {
       const response = await youtubeAnalytics.reports.query({

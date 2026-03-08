@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
-import { error, info, success, debug, initCommand, formatTimestampWithTimezone } from '../lib/utils';
+import { info, debug, initCommand, formatTimestampWithTimezone, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv, formatText } from '../lib/formatters';
 
@@ -18,11 +18,9 @@ interface ListReportJobsOptions {
 async function listReportJobsCommand(options: ListReportJobsOptions): Promise<void> {
   initCommand(options);
 
-  const auth = await getAuthenticatedClient();
-  const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
-
-  try {
-    info('Fetching reporting jobs...\n');
+  await withSpinner('Fetching reporting jobs...', 'Failed to fetch reporting jobs', async (spinner) => {
+    const auth = await getAuthenticatedClient();
+    const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
 
     const jobsResponse = await youtubeReporting.jobs.list({
       onBehalfOfContentOwner: undefined,
@@ -31,7 +29,7 @@ async function listReportJobsCommand(options: ListReportJobsOptions): Promise<vo
     let jobs = jobsResponse.data.jobs || [];
 
     if (jobs.length === 0) {
-      error('No reporting jobs found for this channel.');
+      spinner.info('No reporting jobs found for this channel.');
       info('Jobs are created automatically when you run get-report-data for the first time.');
       return;
     }
@@ -40,13 +38,17 @@ async function listReportJobsCommand(options: ListReportJobsOptions): Promise<vo
     if (options.type) {
       jobs = jobs.filter(job => job.reportTypeId === options.type);
       if (jobs.length === 0) {
-        error(`No jobs found for report type: ${options.type}`);
+        spinner.warn(`No jobs found for report type: ${options.type}`);
         info(`Run 'list-report-types' to see available report types.`);
         return;
       }
     }
 
-    success(`Found ${jobs.length} job(s)\n`);
+    spinner.succeed(`Found ${jobs.length} job(s)`);
+
+    console.log('');
+
+    // Collect job data for all formats
 
     // Collect job data for all formats
     const now = new Date();
@@ -219,18 +221,7 @@ async function listReportJobsCommand(options: ListReportJobsOptions): Promise<vo
         }
         break;
     }
-
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    error(`Failed to fetch jobs: ${message}`);
-
-    if (message.includes('API not enabled')) {
-      error('\nYouTube Reporting API is not enabled.');
-      error('Enable it at: https://console.developers.google.com/apis/api/youtubereporting.googleapis.com');
-    }
-
-    process.exit(1);
-  }
+  });
 }
 
 export = listReportJobsCommand;

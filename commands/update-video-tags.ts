@@ -1,8 +1,7 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, confirm, success, error, warning, info, debug, initCommand } from '../lib/utils';
+import { parseVideoId, confirm, success, error, warning, info, debug, initCommand, createSpinner } from '../lib/utils';
 import { UpdateTagsOptions } from '../types';
 
 async function updateVideoTagsCommand(videoId: string, options: UpdateTagsOptions): Promise<void> {
@@ -19,7 +18,7 @@ async function updateVideoTagsCommand(videoId: string, options: UpdateTagsOption
     }
 
     // Fetch current video info
-    const spinner = ora('Fetching current video tags...').start();
+    const spinner = createSpinner('Fetching current video tags...').start();
     const auth = await getAuthenticatedClient();
     const youtube = google.youtube({ version: 'v3', auth });
 
@@ -127,7 +126,7 @@ async function updateVideoTagsCommand(videoId: string, options: UpdateTagsOption
     }
 
     // Apply updates
-    const updateSpinner = ora('Updating video tags...').start();
+    const updateSpinner = createSpinner('Updating video tags...').start();
 
     await youtube.videos.update({
       part: ['snippet'],

@@ -1,7 +1,6 @@
-import ora from 'ora';
 import chalk from 'chalk';
 import { downloadCaption } from '../lib/youtube';
-import { error, debug, initCommand } from '../lib/utils';
+import { error, debug, initCommand, createSpinner } from '../lib/utils';
 import { CaptionFormat, VerboseOption } from '../types';
 
 interface GetCaptionOptions extends VerboseOption {
@@ -14,7 +13,7 @@ async function getCaptionCommand(captionId: string, options: GetCaptionOptions):
   // Note: For caption metadata, use list-captions <videoId>
   // This command focuses on downloading caption content
   const format = options.format || 'json';
-  const spinner = ora(`Downloading caption (${format})...`).start();
+  const spinner = createSpinner(`Downloading caption (${format})...`).start();
 
   try {
     debug(`Downloading caption: ${captionId}, format: ${format}`);

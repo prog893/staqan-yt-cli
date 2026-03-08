@@ -317,15 +317,74 @@ function initCommand(options: { verbose?: boolean }): void {
 }
 
 /**
+ * Create an ora spinner, or a silent spinner in quiet mode.
+ * Use this instead of calling ora() directly in commands.
+ */
+function createSpinner(message: string): Ora {
+  if (isQuietEnabled) {
+    const silentSpinner = {
+      succeed: () => {},
+      fail: () => {},
+      info: () => {},
+      warn: () => {},
+      start: () => silentSpinner as unknown as Ora,
+      stop: () => {},
+      stopAndPersist: () => {},
+      clear: () => {},
+      render: () => {},
+      frame: () => '',
+      text: message,
+      indent: 0,
+      spinner: {},
+      color: 'cyan',
+      hideCursor: true,
+    } as unknown as Ora;
+    return silentSpinner;
+  }
+  return ora(message);
+}
+
+/**
  * Run an async function wrapped in an ora spinner.
  * On success the caller is responsible for calling spinner.succeed() inside fn.
  * On error: stops the spinner with failMessage, prints the error, and exits 1.
+ *
+ * When quiet mode is enabled, uses a silent spinner that does nothing.
  */
 async function withSpinner<T>(
   message: string,
   failMessage: string,
   fn: (spinner: Ora) => Promise<T>
 ): Promise<T> {
+  // In quiet mode, create a silent spinner
+  if (isQuietEnabled) {
+    const silentSpinner = {
+      succeed: () => {}, // Do nothing
+      fail: () => {}, // Do nothing
+      info: () => {}, // Do nothing
+      warn: () => {}, // Do nothing
+      start: () => silentSpinner as unknown as Ora,
+      stop: () => {},
+      stopAndPersist: () => {},
+      clear: () => {},
+      render: () => {},
+      frame: () => '',
+      text: '',
+      indent: 0,
+      spinner: {},
+      color: 'cyan',
+      hideCursor: true,
+    } as unknown as Ora;
+
+    try {
+      return await fn(silentSpinner);
+    } catch (err) {
+      error((err as Error).message);
+      process.exit(1);
+    }
+  }
+
+  // Normal mode: use spinner
   const spinner = ora(message).start();
   try {
     return await fn(spinner);
@@ -420,6 +479,7 @@ function formatTimestampWithTimezone(dateInput: string | Date): {
 export {
   initCommand,
   withSpinner,
+  createSpinner,
   CONFIG_DIR,
   CREDENTIALS_PATH,
   TOKEN_PATH,
