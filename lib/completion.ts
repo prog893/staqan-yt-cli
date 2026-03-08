@@ -465,7 +465,6 @@ ${commandList}
     list-report-jobs|get-report-data|fetch-reports)
       _arguments \\
         '--type[Report type ID]: :_staqan_yt_report_types' \\
-        '--types[Report type IDs (comma-separated)]: :_staqan_yt_report_types' \\
         '--output[Output format]:format:(json table text csv)' \\
         '--start-date[Start date (YYYY-MM-DD)]' \\
         '--end-date[End date (YYYY-MM-DD)]' \\

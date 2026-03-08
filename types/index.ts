@@ -311,9 +311,7 @@ export interface CompletionCacheEntry {
   fetchedAt: number;
 }
 
-export interface CompletionCache {
-  [key: string]: CompletionCacheEntry;
-}
+export type CompletionCache = Record<string, CompletionCacheEntry>;
 
 // Cache-related types
 export interface CacheIndexEntry {

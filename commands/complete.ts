@@ -62,8 +62,10 @@ async function completeCommand(options: { type: string }): Promise<void> {
         items = raw
           .filter(v => v.id && v.title)
           .map(v => ({ id: v.id, title: v.title }));
-        cache[cacheKey] = { items, fetchedAt: Date.now() };
-        await saveCache(cache);
+        if (items.length > 0) {
+          cache[cacheKey] = { items, fetchedAt: Date.now() };
+          await saveCache(cache);
+        }
       }
     } else if (type === 'report-type') {
       const entry = cache[cacheKey];
@@ -76,8 +78,10 @@ async function completeCommand(options: { type: string }): Promise<void> {
         items = (res.data.reportTypes || [])
           .filter(t => t.id && t.name)
           .map(t => ({ id: t.id!, title: t.name! }));
-        cache[cacheKey] = { items, fetchedAt: Date.now() };
-        await saveCache(cache);
+        if (items.length > 0) {
+          cache[cacheKey] = { items, fetchedAt: Date.now() };
+          await saveCache(cache);
+        }
       }
     }
 
