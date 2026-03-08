@@ -112,37 +112,38 @@ program.exitOverride((err) => {
   // Extract clean message (remove Commander's "error: " prefix if present)
   const cleanMessage = error.message?.replace(/^error:\s*/, '') || 'An unknown error occurred';
 
+  // Helper function to show error and exit
+  const showError = (message: string, helpText = '', exitCode = 1): void => {
+    process.stderr.write(chalk.red(`Error: ${message}\n`));
+    if (helpText) {
+      process.stderr.write(chalk.yellow(`\n${helpText}\n`));
+    }
+    process.exit(exitCode);
+  };
+
   // Handle all error cases with user-friendly messages
   // Use sync write to ensure output is flushed before exit
   if (error.code === 'commander.unknownOption') {
-    process.stderr.write(chalk.red(`Error: ${cleanMessage}\n`));
-    process.stderr.write(chalk.yellow("\nUse 'staqan-yt help' to see available options\n"));
-    process.exit(1);
-    return; // Prevent any further processing
+    showError(cleanMessage, "Use 'staqan-yt help' to see available options");
   } else if (error.code === 'commander.unknownCommand') {
-    process.stderr.write(chalk.red(`Error: ${cleanMessage}\n`));
-    process.stderr.write(chalk.yellow("\nUse 'staqan-yt help' to see available commands\n"));
-    process.exit(1);
-    return;
-  } else if (error.code === 'commander.missingArgument') {
-    process.stderr.write(chalk.red(`Error: ${cleanMessage}\n`));
-    process.stderr.write(chalk.yellow("\nUse 'staqan-yt help <command>' for usage information\n"));
-    process.exit(1);
-    return;
-  } else if (error.code?.includes('option') || error.code?.includes('required')) {
-    process.stderr.write(chalk.red(`Error: ${cleanMessage}\n`));
-    process.stderr.write(chalk.yellow("\nUse 'staqan-yt help <command>' for usage information\n"));
-    process.exit(1);
-    return;
-  } else if (error.code === 'commander.help' || error.code === 'commander.helpDisplayed' || error.code === 'commander.version') {
+    showError(cleanMessage, "Use 'staqan-yt help' to see available commands");
+  } else if (
+    error.code === 'commander.missingArgument' ||
+    error.code?.includes('option') ||
+    error.code?.includes('required')
+  ) {
+    showError(cleanMessage, "Use 'staqan-yt help <command>' for usage information");
+  } else if (
+    error.code === 'commander.help' ||
+    error.code === 'commander.helpDisplayed' ||
+    error.code === 'commander.version'
+  ) {
     // Help or version was displayed, exit normally
     process.exit(0);
     return;
   } else {
     // For any other error, show just the message
-    process.stderr.write(chalk.red(`Error: ${cleanMessage}\n`));
-    process.exit(error.exitCode || 1);
-    return;
+    showError(cleanMessage, '', error.exitCode || 1);
   }
 });
 
