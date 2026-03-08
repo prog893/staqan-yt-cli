@@ -368,7 +368,17 @@ ${commandList}
       _staqa_nyt_config
       return
       ;;
-    get-video|update-video|get-video-localizations|get-video-localization|\\
+    update-video)
+      _arguments \\
+        '1: :_staqan_yt_video_ids' \\
+        '--title[Video title]' \\
+        '--description[Video description]' \\
+        '--dry-run[Preview changes without applying]' \\
+        '--yes[Skip confirmation prompt]' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    get-video|get-video-localizations|get-video-localization|\\
     put-video-localization|update-video-localization|get-video-analytics|\\
     get-search-terms|get-traffic-sources|get-video-retention|list-comments|\\
     list-captions|get-video-tags|update-video-tags|get-thumbnail)

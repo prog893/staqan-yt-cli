@@ -11,16 +11,7 @@ import { getChannelVideos, listChannelPlaylists } from '../lib/youtube';
 import { getConfigValue } from '../lib/config';
 import { getAuthenticatedClient } from '../lib/auth';
 import { CONFIG_DIR } from '../lib/utils';
-import { CompletionType } from '../types';
-
-interface CacheEntry {
-  items: Array<{ id: string; title: string }>;
-  fetchedAt: number;
-}
-
-interface CompletionCache {
-  [key: string]: CacheEntry;
-}
+import { CompletionType, CompletionCache } from '../types';
 
 const CACHE_PATH = path.join(CONFIG_DIR, 'completion-cache.json');
 
@@ -46,8 +37,11 @@ async function saveCache(cache: CompletionCache): Promise<void> {
   }
 }
 
+const VALID_TYPES: CompletionType[] = ['video-id', 'playlist-id', 'report-type'];
+
 async function completeCommand(options: { type: string }): Promise<void> {
   try {
+    if (!VALID_TYPES.includes(options.type as CompletionType)) process.exit(0);
     const type = options.type as CompletionType;
     const cache = await loadCache();
     let cacheKey: string = type;
@@ -65,7 +59,9 @@ async function completeCommand(options: { type: string }): Promise<void> {
         const raw = type === 'video-id'
           ? await getChannelVideos(channel, 50)
           : await listChannelPlaylists(channel, 50);
-        items = raw.map(v => ({ id: v.id, title: v.title }));
+        items = raw
+          .filter(v => v.id && v.title)
+          .map(v => ({ id: v.id, title: v.title }));
         cache[cacheKey] = { items, fetchedAt: Date.now() };
         await saveCache(cache);
       }
@@ -77,7 +73,9 @@ async function completeCommand(options: { type: string }): Promise<void> {
         const auth = await getAuthenticatedClient();
         const yt = google.youtubereporting({ version: 'v1', auth });
         const res = await yt.reportTypes.list({});
-        items = (res.data.reportTypes || []).map(t => ({ id: t.id!, title: t.name! }));
+        items = (res.data.reportTypes || [])
+          .filter(t => t.id && t.name)
+          .map(t => ({ id: t.id!, title: t.name! }));
         cache[cacheKey] = { items, fetchedAt: Date.now() };
         await saveCache(cache);
       }

@@ -306,8 +306,13 @@ export type ConfigKey = 'default.channel' | 'default.output';
 // Completion types
 export type CompletionType = 'video-id' | 'playlist-id' | 'report-type';
 
-export interface CompleteOptions {
-  type: CompletionType;
+export interface CompletionCacheEntry {
+  items: Array<{ id: string; title: string }>;
+  fetchedAt: number;
+}
+
+export interface CompletionCache {
+  [key: string]: CompletionCacheEntry;
 }
 
 // Cache-related types
