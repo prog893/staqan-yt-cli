@@ -37,6 +37,7 @@ import listReportTypesCommand = require('../commands/list-report-types');
 import listReportJobsCommand = require('../commands/list-report-jobs');
 import getReportDataCommand = require('../commands/get-report-data');
 import fetchReportsCommand = require('../commands/fetch-reports');
+import completeCommand = require('../commands/complete');
 
 // Helper function to wrap command actions to handle "help" as an argument
 // Note: Using any[] here is pragmatic - we only check for "help" string,
@@ -470,6 +471,12 @@ program
   .option('--verify', 'Verify cached file completeness')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('fetch-reports', fetchReportsCommand));
+
+const completeCmd = new Command('__complete')
+  .description('Internal completion helper')
+  .option('--type <type>', 'Completion type: video-id, playlist-id, report-type')
+  .action(completeCommand);
+program.addCommand(completeCmd, { hidden: true });
 
 // Show help if no command provided
 if (!process.argv.slice(2).length) {
