@@ -4,8 +4,15 @@ import { google } from 'googleapis';
 import { parseVideoId, confirm, success, error, warning, info, debug, initCommand, createSpinner } from '../lib/utils';
 import { UpdateTagsOptions } from '../types';
 
-async function updateVideoTagsCommand(videoId: string, options: UpdateTagsOptions): Promise<void> {
+async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void> {
   initCommand(options);
+
+  // Extract video ID from options
+  const videoId = options['video-id'];
+  if (!videoId) {
+    error('Required: --video-id');
+    process.exit(1);
+  }
 
   try {
     const parsedId = parseVideoId(videoId);

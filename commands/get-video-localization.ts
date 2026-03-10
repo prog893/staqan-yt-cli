@@ -1,12 +1,19 @@
 import chalk from 'chalk';
 import { getVideoLocalization } from '../lib/youtube';
-import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, error, debug, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { LocalizationOptions } from '../types';
 
-async function getVideoLocalizationCommand(videoId: string, options: LocalizationOptions): Promise<void> {
+async function getVideoLocalizationCommand(options: LocalizationOptions): Promise<void> {
   initCommand(options);
+
+  // Extract video ID from options
+  const videoId = options['video-id'];
+  if (!videoId) {
+    error('Required: --video-id');
+    process.exit(1);
+  }
 
   const language = options.language; // Can be undefined, will default to main metadata language
   const langDisplay = language || 'main metadata language';

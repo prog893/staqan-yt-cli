@@ -6,8 +6,15 @@ import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { AnalyticsOptions } from '../types';
 
-async function getVideoAnalyticsCommand(videoId: string, options: AnalyticsOptions): Promise<void> {
+async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void> {
   initCommand(options);
+
+  // Extract video ID from options
+  const videoId = options['video-id'];
+  if (!videoId) {
+    error('Required: --video-id');
+    process.exit(1);
+  }
 
   await withSpinner('Fetching video information...', 'Failed to fetch analytics', async (spinner) => {
     const parsedId = parseVideoId(videoId);

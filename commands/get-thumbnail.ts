@@ -6,8 +6,15 @@ import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { GetThumbnailOptions } from '../types';
 
-async function getThumbnailCommand(videoId: string, options: GetThumbnailOptions): Promise<void> {
+async function getThumbnailCommand(options: GetThumbnailOptions): Promise<void> {
   initCommand(options);
+
+  // Extract video ID from options
+  const videoId = options['video-id'];
+  if (!videoId) {
+    error('Required: --video-id');
+    process.exit(1);
+  }
 
   await withSpinner('Fetching video thumbnail...', 'Failed to fetch video thumbnail', async (spinner) => {
     const parsedId = parseVideoId(videoId);

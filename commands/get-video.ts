@@ -3,10 +3,23 @@ import { getVideoInfo } from '../lib/youtube';
 import { parseVideoId, formatDate, formatNumber, debug, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
-import { OutputOption, VerboseOption } from '../types';
+import { OutputOption, VerboseOption, VideoIdOption, VideoIdsOption } from '../types';
 
-async function videoInfoCommand(videoIds: string[], options: OutputOption & VerboseOption): Promise<void> {
+async function videoInfoCommand(options: OutputOption & VerboseOption & (VideoIdOption | VideoIdsOption)): Promise<void> {
   initCommand(options);
+
+  // Handle both --video-id (single) and --video-ids (multiple)
+  let videoIds: string[] = [];
+  if ('video-id' in options && options['video-id']) {
+    videoIds = [options['video-id']];
+  } else if ('video-ids' in options && options['video-ids']) {
+    videoIds = options['video-ids'];
+  }
+
+  if (videoIds.length === 0) {
+    console.error('Error: Required: --video-id or --video-ids');
+    process.exit(1);
+  }
 
   await withSpinner('Fetching video information...', 'Failed to fetch video information', async (spinner) => {
     debug(`Parsing ${videoIds.length} video ID(s)`, videoIds);

@@ -3,13 +3,16 @@ import { searchVideos } from '../lib/youtube';
 import { formatDate, error, debug, initCommand, withSpinner } from '../lib/utils';
 import { getConfigValue, getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
-import { SearchVideosOptions } from '../types';
+import { SearchVideosOptions, QueryOption } from '../types';
 
-async function searchVideosCommand(
-  query: string,
-  options: SearchVideosOptions
-): Promise<void> {
+async function searchVideosCommand(options: SearchVideosOptions & QueryOption): Promise<void> {
   initCommand(options);
+
+  const query = options.query;
+  if (!query) {
+    error('Required: --query');
+    process.exit(1);
+  }
 
   // Determine search mode
   const isGlobal = options.global === true;
@@ -20,9 +23,9 @@ async function searchVideosCommand(
     error('Cannot use both --global and --channel flags together');
     console.log('');
     console.log(chalk.yellow('Use either:'));
-    console.log('  - staqan-yt search-videos "<query>" --global');
-    console.log('  - staqan-yt search-videos "<query>" --channel @handle');
-    console.log('  - staqan-yt search-videos "<query>" (uses config default.channel)');
+    console.log('  - staqan-yt search-videos --query "<query>" --global');
+    console.log('  - staqan-yt search-videos --query "<query>" --channel @handle');
+    console.log('  - staqan-yt search-videos --query "<query>" (uses config default.channel)');
     process.exit(1);
   }
 
@@ -48,8 +51,8 @@ async function searchVideosCommand(
       console.log('  3. Set a default channel: staqan-yt config set default.channel @yourChannel');
       console.log('');
       console.log(chalk.gray('Examples:'));
-      console.log(chalk.gray('  staqan-yt search-videos "tutorial" --global'));
-      console.log(chalk.gray('  staqan-yt search-videos "tutorial" --channel @mkbhd'));
+      console.log(chalk.gray('  staqan-yt search-videos --query "tutorial" --global'));
+      console.log(chalk.gray('  staqan-yt search-videos --query "tutorial" --channel @mkbhd'));
       console.log(chalk.gray('  staqan-yt config set default.channel @mkbhd'));
       process.exit(1);
     }

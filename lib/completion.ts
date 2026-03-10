@@ -74,6 +74,36 @@ export function getGlobalOptions(): string[] {
 }
 
 /**
+ * Get command-specific required flags for completion
+ */
+export function getRequiredFlags(command: string): string[] {
+  const requiredFlagMap: Record<string, string[]> = {
+    'get-video': ['--video-id'],
+    'get-videos': ['--video-ids'],
+    'update-video': ['--video-id'],
+    'search-videos': ['--query'],
+    'get-video-localizations': ['--video-ids'],
+    'get-video-localization': ['--video-id'],
+    'put-video-localization': ['--video-id'],
+    'update-video-localization': ['--video-id'],
+    'get-video-analytics': ['--video-id'],
+    'get-search-terms': ['--video-id'],
+    'get-traffic-sources': ['--video-id'],
+    'get-video-retention': ['--video-id'],
+    'get-video-tags': ['--video-id'],
+    'update-video-tags': ['--video-id'],
+    'get-thumbnail': ['--video-id'],
+    'get-playlist': ['--playlist-id'],
+    'get-playlists': ['--playlist-ids'],
+    'list-comments': ['--video-id'],
+    'list-captions': ['--video-id'],
+    'get-caption': ['--caption-id'],
+  };
+
+  return requiredFlagMap[command] || [];
+}
+
+/**
  * Get command-specific options for completion
  */
 export function getCommandOptions(command: string): string[] {
@@ -201,60 +231,22 @@ _staqa_nyt_completion() {
     fi
   done
 
-  # Count non-flag positional args already provided after the command.
-  # Properly skips flag arguments (e.g. --output json) so "json" is not
-  # counted as a positional, ensuring video-id completion still fires when
-  # flags precede the video ID argument.
-  local pos_count=0
-  local skip_next=0
-  local j
-  for ((j=2; j < cword; j++)); do
-    if [[ \$skip_next -eq 1 ]]; then
-      skip_next=0
-      continue
-    fi
-    if [[ "\${words[\$j]}" == -* ]]; then
-      case "\${words[\$j]}" in
-        --output|--sort|-s|--quality|--format|--type|-t|\\
-        --limit|-l|--channel|-c|--metrics|--report|--dimensions|\\
-        --start-date|--end-date|--tags|--add|--remove|\\
-        --title|-t|--description|-d|--language|--languages|\\
-        --content-type|--types|-T|--video-id)
-          skip_next=1 ;;
-      esac
-    else
-      ((pos_count++))
-    fi
-  done
-
-  # Complete positional arguments (non-flag completion)
-  if [[ "\${cur}" != -* ]] && [[ -n "$cmd" ]] && [[ "\$cword" -gt 1 ]]; then
-    case "$cmd" in
-      # Commands accepting exactly one video ID: only complete at position 1
-      get-video|update-video|get-video-localization|put-video-localization|\\
-      update-video-localization|get-video-analytics|get-search-terms|\\
-      get-traffic-sources|get-video-retention|get-video-tags|\\
-      update-video-tags|get-thumbnail|list-comments|list-captions)
-        [[ \$pos_count -eq 0 ]] && { _staqan_yt_complete_type video-id; return; } ;;
-      # Commands accepting multiple video IDs: complete at any position
-      get-videos|get-video-localizations)
-        _staqan_yt_complete_type video-id; return ;;
-      # Commands accepting exactly one playlist ID: only complete at position 1
-      get-playlist)
-        [[ \$pos_count -eq 0 ]] && { _staqan_yt_complete_type playlist-id; return; } ;;
-      # Commands accepting multiple playlist IDs: complete at any position
-      get-playlists)
-        _staqan_yt_complete_type playlist-id; return ;;
-    esac
-  fi
-
-  # Command-specific options
+  # Flag-based completion - complete after --video-id, --playlist-id, etc.
   case "\${prev}" in
+    --video-id)
+      _staqan_yt_complete_type video-id; return ;;
+    --video-ids)
+      _staqan_yt_complete_type video-id; return ;;
+    --playlist-id)
+      _staqan_yt_complete_type playlist-id; return ;;
+    --playlist-ids)
+      _staqan_yt_complete_type playlist-id; return ;;
+    --caption-id)
+      _staqan_yt_complete_type caption-id; return ;;
     --channel|-c)
       COMPREPLY=( \$(compgen -W "\$(staqan-yt config get default.channel 2>/dev/null || echo '@')" -- "\${cur}") )
       return
       ;;
-    --output)
     --output)
       COMPREPLY=( \$(compgen -W "json table text pretty csv" -- "\${cur}") )
       return
@@ -277,23 +269,53 @@ _staqa_nyt_completion() {
       COMPREPLY=( \$(compgen -W "${commands}" -- "\${cur}") )
       return
       ;;
-    get-video|get-videos|get-channel|get-video-localizations|get-video-localization|get-playlist|get-playlists|list-captions|get-caption)
-      COMPREPLY=( \$(compgen -W "--output --verbose" -- "\${cur}") )
+    get-video)
+      COMPREPLY=( \$(compgen -W "--video-id --output --verbose" -- "\${cur}") )
       ;;
-    list-videos|list-playlists|list-comments)
-      COMPREPLY=( \$(compgen -W "--limit --type --sort --channel --output --verbose" -- "\${cur}") )
+    get-videos)
+      COMPREPLY=( \$(compgen -W "--video-ids --output --verbose" -- "\${cur}") )
+      ;;
+    update-video)
+      COMPREPLY=( \$(compgen -W "--video-id --title --description --dry-run --yes --output --verbose" -- "\${cur}") )
       ;;
     search-videos)
-      COMPREPLY=( \$(compgen -W "--global --channel --limit --output --verbose" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--query --global --channel --limit --output --verbose" -- "\${cur}") )
       ;;
-    update-video|update-video-tags)
-      COMPREPLY=( \$(compgen -W "--title --description --tags --add --remove --dry-run --yes --output --verbose" -- "\${cur}") )
+    get-video-localizations)
+      COMPREPLY=( \$(compgen -W "--video-ids --languages --output --verbose" -- "\${cur}") )
+      ;;
+    get-video-localization|put-video-localization|update-video-localization)
+      COMPREPLY=( \$(compgen -W "--video-id --language --title --description --output --verbose" -- "\${cur}") )
       ;;
     get-video-analytics|get-channel-analytics)
-      COMPREPLY=( \$(compgen -W "--start-date --end-date --metrics --report --dimensions --output --verbose" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--video-id --start-date --end-date --metrics --report --dimensions --output --verbose" -- "\${cur}") )
+      ;;
+    get-search-terms|get-traffic-sources|get-video-retention|get-video-tags|list-captions)
+      COMPREPLY=( \$(compgen -W "--video-id --output --verbose" -- "\${cur}") )
+      ;;
+    update-video-tags)
+      COMPREPLY=( \$(compgen -W "--video-id --tags --add --remove --dry-run --yes --output --verbose" -- "\${cur}") )
       ;;
     get-thumbnail)
-      COMPREPLY=( \$(compgen -W "--quality --output --verbose" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--video-id --quality --output --verbose" -- "\${cur}") )
+      ;;
+    get-playlist)
+      COMPREPLY=( \$(compgen -W "--playlist-id --output --verbose" -- "\${cur}") )
+      ;;
+    get-playlists)
+      COMPREPLY=( \$(compgen -W "--playlist-ids --output --verbose" -- "\${cur}") )
+      ;;
+    list-videos|list-playlists)
+      COMPREPLY=( \$(compgen -W "--channel --limit --type --output --verbose" -- "\${cur}") )
+      ;;
+    list-comments)
+      COMPREPLY=( \$(compgen -W "--video-id --limit --sort --output --verbose" -- "\${cur}") )
+      ;;
+    get-caption)
+      COMPREPLY=( \$(compgen -W "--caption-id --format --verbose" -- "\${cur}") )
+      ;;
+    get-channel)
+      COMPREPLY=( \$(compgen -W "--channel --output --verbose" -- "\${cur}") )
       ;;
     config)
       COMPREPLY=( \$(compgen -W "set get list completion --show --output --verbose" -- "\${cur}") )
@@ -400,15 +422,27 @@ _staqa_nyt() {
 ${commandList}
   )
 
-  # Define arguments for specific commands
+  # Define arguments for specific commands (all flag-based, no positionals)
   case \$words[2] in
     config)
       _staqa_nyt_config
       return
       ;;
+    get-video)
+      _arguments \\
+        '--video-id[Video ID]: :_staqan_yt_video_ids' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    get-videos)
+      _arguments \\
+        '--video-ids[Video IDs]: :_staqan_yt_video_ids' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
     update-video)
       _arguments \\
-        '1: :_staqan_yt_video_ids' \\
+        '--video-id[Video ID]: :_staqan_yt_video_ids' \\
         '--title[Video title]' \\
         '--description[Video description]' \\
         '--dry-run[Preview changes without applying]' \\
@@ -416,36 +450,108 @@ ${commandList}
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
+    search-videos)
+      _arguments \\
+        '--query[Search query]' \\
+        '--global[Search all of YouTube]' \\
+        '--channel[Channel handle or ID]:channel:(@)' \\
+        '--limit[Limit number of results]' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
     get-video-localizations)
       _arguments \\
-        '*: :_staqan_yt_video_ids' \\
+        '--video-ids[Video IDs]: :_staqan_yt_video_ids' \\
+        '--languages[Comma-separated language codes]' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
-    get-video|get-video-localization|\\
-    put-video-localization|update-video-localization|get-video-analytics|\\
-    get-search-terms|get-traffic-sources|get-video-retention|\\
-    list-captions|get-video-tags)
+    get-video-localization)
       _arguments \\
-        '1: :_staqan_yt_video_ids' \\
+        '--video-id[Video ID]: :_staqan_yt_video_ids' \\
+        '--language[Language code or name]' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
-    get-videos)
+    put-video-localization)
       _arguments \\
-        '*: :_staqan_yt_video_ids' \\
+        '--video-id[Video ID]: :_staqan_yt_video_ids' \\
+        '--language[Language code or name]' \\
+        '--title[Localized title]' \\
+        '--description[Localized description]' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    update-video-localization)
+      _arguments \\
+        '--video-id[Video ID]: :_staqan_yt_video_ids' \\
+        '--language[Language code or name]' \\
+        '--title[New localized title]' \\
+        '--description[New localized description]' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    get-video-analytics)
+      _arguments \\
+        '--video-id[Video ID]: :_staqan_yt_video_ids' \\
+        '--start-date[Start date (YYYY-MM-DD)]' \\
+        '--end-date[End date (YYYY-MM-DD)]' \\
+        '--metrics[Metrics to fetch]' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    get-search-terms)
+      _arguments \\
+        '--video-id[Video ID]: :_staqan_yt_video_ids' \\
+        '--limit[Limit number of results]' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    get-traffic-sources)
+      _arguments \\
+        '--video-id[Video ID]: :_staqan_yt_video_ids' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    get-video-retention)
+      _arguments \\
+        '--video-id[Video ID]: :_staqan_yt_video_ids' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    get-video-tags)
+      _arguments \\
+        '--video-id[Video ID]: :_staqan_yt_video_ids' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    update-video-tags)
+      _arguments \\
+        '--video-id[Video ID]: :_staqan_yt_video_ids' \\
+        '--tags[Replace all tags]' \\
+        '--add[Add tags]' \\
+        '--remove[Remove tags]' \\
+        '--dry-run[Preview changes]' \\
+        '--yes[Skip confirmation]' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    get-thumbnail)
+      _arguments \\
+        '--video-id[Video ID]: :_staqan_yt_video_ids' \\
+        '--quality[Thumbnail quality]:quality:(maxres standard high medium default)' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-playlist)
       _arguments \\
-        '1: :_staqan_yt_playlist_ids' \\
+        '--playlist-id[Playlist ID]: :_staqan_yt_playlist_ids' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-playlists)
       _arguments \\
-        '*: :_staqan_yt_playlist_ids' \\
+        '--playlist-ids[Playlist IDs]: :_staqan_yt_playlist_ids' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
@@ -459,18 +565,22 @@ ${commandList}
       ;;
     list-comments)
       _arguments \\
-        '1: :_staqan_yt_video_ids' \\
+        '--video-id[Video ID]: :_staqan_yt_video_ids' \\
         '--limit[Limit number of results]' \\
         '--sort[Sort order]:order:(top new)' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
-    search-videos)
+    list-captions)
       _arguments \\
-        '--global[Search all of YouTube]' \\
-        '--channel[Channel handle or ID]:channel:(@)' \\
-        '--limit[Limit number of results]' \\
+        '--video-id[Video ID]: :_staqan_yt_video_ids' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    get-caption)
+      _arguments \\
+        '--caption-id[Caption ID]' \\
+        '--format[Caption format]:format:(srt vtt sbv srv2 ttml json)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-channel)
@@ -497,57 +607,6 @@ ${commandList}
         '--end-date[End date (YYYY-MM-DD)]' \\
         '--dimensions[Custom dimensions (comma-separated)]' \\
         '--metrics[Custom metrics (comma-separated)]' \\
-        '--output[Output format]:format:(json table text pretty csv)' \\
-        '--verbose[Enable verbose output]'
-      ;;
-    list-captions|get-caption)
-      _arguments \\
-        '--limit[Limit number of results]' \\
-        '--type[Filter by type]:type:(short regular)' \\
-        '--output[Output format]:format:(json table text pretty csv)' \\
-        '--verbose[Enable verbose output]'
-      ;;
-    list-comments)
-      _arguments \\
-        '1: :_staqan_yt_video_ids' \\
-        '--limit[Limit number of results]' \\
-        '--sort[Sort order]:order:(top new)' \\
-        '--output[Output format]:format:(json table text pretty csv)' \\
-        '--verbose[Enable verbose output]'
-      ;;
-    search-videos)
-      _arguments \\
-        '--global[Search all of YouTube]' \\
-        '--channel[Search within specific channel]' \\
-        '--limit[Limit number of results]' \\
-        '--output[Output format]:format:(json table text pretty csv)' \\
-        '--verbose[Enable verbose output]'
-      ;;
-    update-video-tags)
-      _arguments \\
-        '1: :_staqan_yt_video_ids' \\
-        '--tags[Tags to set]' \\
-        '--add[Tags to add]' \\
-        '--remove[Tags to remove]' \\
-        '--dry-run[Preview changes]' \\
-        '--yes[Skip confirmation]' \\
-        '--output[Output format]:format:(json table text pretty csv)' \\
-        '--verbose[Enable verbose output]'
-      ;;
-    get-video-analytics|get-channel-analytics)
-      _arguments \\
-        '--start-date[Start date (YYYY-MM-DD)]' \\
-        '--end-date[End date (YYYY-MM-DD)]' \\
-        '--metrics[Metrics to fetch]' \\
-        '--report[Report type]' \\
-        '--dimensions[Dimensions]' \\
-        '--output[Output format]:format:(json table text pretty csv)' \\
-        '--verbose[Enable verbose output]'
-      ;;
-    get-thumbnail)
-      _arguments \\
-        '1: :_staqan_yt_video_ids' \\
-        '--quality[Thumbnail quality]:quality:(maxres standard high medium default)' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;

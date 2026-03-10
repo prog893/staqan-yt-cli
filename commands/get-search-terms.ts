@@ -6,8 +6,15 @@ import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { SearchTermsOptions } from '../types';
 
-async function getSearchTermsCommand(videoId: string, options: SearchTermsOptions): Promise<void> {
+async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void> {
   initCommand(options);
+
+  // Extract video ID from options
+  const videoId = options['video-id'];
+  if (!videoId) {
+    error('Required: --video-id');
+    process.exit(1);
+  }
 
   await withSpinner('Fetching search terms...', 'Failed to fetch search terms', async (spinner) => {
     const parsedId = parseVideoId(videoId);

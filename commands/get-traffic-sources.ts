@@ -6,8 +6,15 @@ import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { TrafficSourcesOptions } from '../types';
 
-async function getTrafficSourcesCommand(videoId: string, options: TrafficSourcesOptions): Promise<void> {
+async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise<void> {
   initCommand(options);
+
+  // Extract video ID from options
+  const videoId = options['video-id'];
+  if (!videoId) {
+    error('Required: --video-id');
+    process.exit(1);
+  }
 
   await withSpinner('Fetching traffic sources...', 'Failed to fetch traffic sources', async (spinner) => {
     const parsedId = parseVideoId(videoId);

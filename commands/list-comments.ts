@@ -5,11 +5,18 @@ import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ListCommentsOptions } from '../types';
 
-async function listCommentsCommand(videoId: string, options: ListCommentsOptions = {}): Promise<void> {
+async function listCommentsCommand(options: ListCommentsOptions): Promise<void> {
   initCommand(options);
 
+  // Extract video ID from options
+  const videoIdInput = options['video-id'];
+  if (!videoIdInput) {
+    error('Required: --video-id');
+    process.exit(1);
+  }
+
   // Parse video ID from URL or raw ID
-  videoId = parseVideoId(videoId);
+  const videoId = parseVideoId(videoIdInput);
 
   // Validate video ID format (basic check)
   if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
