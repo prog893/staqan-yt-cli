@@ -250,6 +250,11 @@ _staqa_nyt_completion() {
 
   # Command-specific options
   case "\${prev}" in
+    --channel|-c)
+      COMPREPLY=( \$(compgen -W "\$(staqan-yt config get default.channel 2>/dev/null || echo '@')" -- "\${cur}") )
+      return
+      ;;
+    --output)
     --output)
       COMPREPLY=( \$(compgen -W "json table text pretty csv" -- "\${cur}") )
       return
@@ -444,13 +449,58 @@ ${commandList}
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
-    get-channel|list-captions|get-caption)
-      _arguments \\
-        '--output[Output format]:format:(json table text pretty csv)' \\
-        '--verbose[Enable verbose output]' \\
-        '*::filename:_files'
-      ;;
     list-videos|list-playlists)
+      _arguments \\
+        '--channel[Channel handle or ID]:channel:(@)' \\
+        '--limit[Limit number of results]' \\
+        '--type[Filter by type]:type:(short regular)' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    list-comments)
+      _arguments \\
+        '1: :_staqan_yt_video_ids' \\
+        '--limit[Limit number of results]' \\
+        '--sort[Sort order]:order:(top new)' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    search-videos)
+      _arguments \\
+        '--global[Search all of YouTube]' \\
+        '--channel[Channel handle or ID]:channel:(@)' \\
+        '--limit[Limit number of results]' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    get-channel)
+      _arguments \\
+        '--channel[Channel handle or ID]:channel:(@)' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    get-channel-search-terms)
+      _arguments \\
+        '--channel[Channel handle or ID]:channel:(@)' \\
+        '--limit[Limit number of results]' \\
+        '--content-type[Filter by content type]:type:(all video shorts)' \\
+        '--start-date[Start date (YYYY-MM-DD)]' \\
+        '--end-date[End date (YYYY-MM-DD)]' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    get-channel-analytics)
+      _arguments \\
+        '--channel[Channel handle or ID]:channel:(@)' \\
+        '--report[Report type]:type:(demographics devices geography traffic-sources subscription-status)' \\
+        '--start-date[Start date (YYYY-MM-DD)]' \\
+        '--end-date[End date (YYYY-MM-DD)]' \\
+        '--dimensions[Custom dimensions (comma-separated)]' \\
+        '--metrics[Custom metrics (comma-separated)]' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    list-captions|get-caption)
       _arguments \\
         '--limit[Limit number of results]' \\
         '--type[Filter by type]:type:(short regular)' \\

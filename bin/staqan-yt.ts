@@ -5,7 +5,7 @@ import chalk from 'chalk';
 import * as path from 'path';
 import { GroupedHelp } from '../lib/customHelp';
 import { setQuiet, setVerbose } from '../lib/utils';
-import { OutputOption, VerboseOption, ChannelAnalyticsOptions } from '../types';
+import { OutputOption, VerboseOption } from '../types';
 import authCommand = require('../commands/auth');
 import listVideosCommand = require('../commands/list-videos');
 import getVideoCommand = require('../commands/get-video');
@@ -189,8 +189,9 @@ program
 
 // List videos command
 program
-  .command('list-videos [channelHandle]')
+  .command('list-videos')
   .description('List all videos from a YouTube channel')
+  .option('-c, --channel <handle>', 'Channel handle or ID (overrides config default)')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-l, --limit <number>', 'Limit number of results', '50')
   .option('-t, --type <type>', 'Filter by video type (short or regular)')
@@ -363,8 +364,9 @@ program
 
 // List playlists command (plural - list collection)
 program
-  .command('list-playlists [channelHandle]')
+  .command('list-playlists')
   .description('List all playlists from a YouTube channel')
+  .option('-c, --channel <handle>', 'Channel handle or ID')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-l, --limit <number>', 'Limit number of results', '50')
   .option('-v, --verbose', 'Enable verbose output with debug information')
@@ -382,8 +384,9 @@ program
 
 // Get channel command (singular - single item)
 program
-  .command('get-channel [channelHandle]')
+  .command('get-channel')
   .description('Get detailed metadata for a YouTube channel')
+  .option('-c, --channel <handle>', 'Channel handle or ID')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('get-channel', getChannelCommand));
@@ -407,8 +410,9 @@ program
 
 // Channel search terms command — top keywords from YouTube Search traffic
 program
-  .command('get-channel-search-terms [channelHandle]')
+  .command('get-channel-search-terms')
   .description('Get top search keywords driving traffic to a channel (YouTube Search source)')
+  .option('-c, --channel <handle>', 'Channel handle or ID')
   .option('-l, --limit <number>', 'Limit number of results (max 25, API restriction)', '25')
   .option('--content-type <type>', 'Filter by content type: all (default), video (non-shorts), shorts', 'all')
   .option('--start-date <date>', 'Start date (YYYY-MM-DD), defaults to all-time (2005-02-14)')
@@ -419,8 +423,9 @@ program
 
 // Channel analytics command (singular - single channel report)
 program
-  .command('get-channel-analytics [channelHandle]')
+  .command('get-channel-analytics')
   .description('Get channel-level analytics reports (demographics, devices, geography, etc.)')
+  .option('-c, --channel <handle>', 'Channel handle or ID')
   .option('--report <type>', 'Predefined report type: demographics, devices, geography, traffic-sources, subscription-status')
   .option('--start-date <date>', 'Start date (YYYY-MM-DD), defaults to 30 days ago')
   .option('--end-date <date>', 'End date (YYYY-MM-DD), defaults to today')
@@ -428,10 +433,7 @@ program
   .option('--metrics <metrics>', 'Custom metrics (comma-separated, requires --dimensions)')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(withHelpWrapper('get-channel-analytics', (channelHandle: string | undefined, options: ChannelAnalyticsOptions) => {
-    // Commander v12+ automatically converts kebab-case to camelCase
-    getChannelAnalyticsCommand(channelHandle, options);
-  }));
+  .action(withHelpWrapper('get-channel-analytics', getChannelAnalyticsCommand));
 
 // YouTube Reporting API commands
 program

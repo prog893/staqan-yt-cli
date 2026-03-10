@@ -118,6 +118,10 @@ export interface TypeFilterOption {
   type?: 'short' | 'regular';
 }
 
+export interface ChannelOption {
+  channel?: string;
+}
+
 export interface UpdateVideoOptions extends VerboseOption {
   title?: string;
   description?: string;
@@ -267,7 +271,7 @@ export interface GetCaptionOptions extends OutputOption, VerboseOption {
 }
 
 // Channel analytics command options
-export interface ChannelAnalyticsOptions extends OutputOption, VerboseOption {
+export interface ChannelAnalyticsOptions extends ChannelOption, OutputOption, VerboseOption {
   report?: 'demographics' | 'devices' | 'geography' | 'traffic-sources' | 'subscription-status';
   startDate?: string;
   endDate?: string;
@@ -276,7 +280,7 @@ export interface ChannelAnalyticsOptions extends OutputOption, VerboseOption {
 }
 
 // Channel search terms command options
-export interface ChannelSearchTermsOptions extends OutputOption, VerboseOption, LimitOption {
+export interface ChannelSearchTermsOptions extends ChannelOption, OutputOption, VerboseOption, LimitOption {
   contentType?: 'all' | 'video' | 'shorts';
   startDate?: string;
   endDate?: string;
