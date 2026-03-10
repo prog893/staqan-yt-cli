@@ -57,6 +57,8 @@ async function completeCommand(options: { type: string }): Promise<void> {
       if (entry && Date.now() - entry.fetchedAt < TTL[type]) {
         items = entry.items;
       } else {
+        // 50 is a practical cap: enough for meaningful completion without
+        // hammering the API or making tab press noticeably slow.
         const raw = type === 'video-id'
           ? await getChannelVideos(channel, 50)
           : await listChannelPlaylists(channel, 50);

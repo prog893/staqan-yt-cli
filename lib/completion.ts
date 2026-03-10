@@ -201,16 +201,49 @@ _staqa_nyt_completion() {
     fi
   done
 
+  # Count non-flag positional args already provided after the command.
+  # Properly skips flag arguments (e.g. --output json) so "json" is not
+  # counted as a positional, ensuring video-id completion still fires when
+  # flags precede the video ID argument.
+  local pos_count=0
+  local skip_next=0
+  local j
+  for ((j=2; j < cword; j++)); do
+    if [[ \$skip_next -eq 1 ]]; then
+      skip_next=0
+      continue
+    fi
+    if [[ "\${words[\$j]}" == -* ]]; then
+      case "\${words[\$j]}" in
+        --output|--sort|-s|--quality|--format|--type|-t|\\
+        --limit|-l|--channel|-c|--metrics|--report|--dimensions|\\
+        --start-date|--end-date|--tags|--add|--remove|\\
+        --title|-t|--description|-d|--language|--languages|\\
+        --content-type|--types|-T|--video-id)
+          skip_next=1 ;;
+      esac
+    else
+      ((pos_count++))
+    fi
+  done
+
   # Complete positional arguments (non-flag completion)
-  if [[ "\${cur}" != -* ]] && [[ -n "$cmd" ]] && [[ "$cword" -gt 1 ]]; then
+  if [[ "\${cur}" != -* ]] && [[ -n "$cmd" ]] && [[ "\$cword" -gt 1 ]]; then
     case "$cmd" in
-      get-video|get-videos|update-video|get-video-localizations|\\
-      get-video-localization|put-video-localization|update-video-localization|\\
-      get-video-analytics|get-search-terms|get-traffic-sources|\\
-      get-video-retention|list-comments|list-captions|get-video-tags|\\
-      update-video-tags|get-thumbnail)
+      # Commands accepting exactly one video ID: only complete at position 1
+      get-video|update-video|get-video-localization|put-video-localization|\\
+      update-video-localization|get-video-analytics|get-search-terms|\\
+      get-traffic-sources|get-video-retention|get-video-tags|\\
+      update-video-tags|get-thumbnail|list-comments|list-captions)
+        [[ \$pos_count -eq 0 ]] && { _staqan_yt_complete_type video-id; return; } ;;
+      # Commands accepting multiple video IDs: complete at any position
+      get-videos|get-video-localizations)
         _staqan_yt_complete_type video-id; return ;;
-      get-playlist|get-playlists)
+      # Commands accepting exactly one playlist ID: only complete at position 1
+      get-playlist)
+        [[ \$pos_count -eq 0 ]] && { _staqan_yt_complete_type playlist-id; return; } ;;
+      # Commands accepting multiple playlist IDs: complete at any position
+      get-playlists)
         _staqan_yt_complete_type playlist-id; return ;;
     esac
   fi
@@ -378,15 +411,20 @@ ${commandList}
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
-    get-video|get-video-localizations|get-video-localization|\\
+    get-video-localizations)
+      _arguments \\
+        '*: :_staqan_yt_video_ids' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    get-video|get-video-localization|\\
     put-video-localization|update-video-localization|get-video-analytics|\\
     get-search-terms|get-traffic-sources|get-video-retention|\\
     list-captions|get-video-tags)
       _arguments \\
         '1: :_staqan_yt_video_ids' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
-        '--verbose[Enable verbose output]' \\
-        '*: :'
+        '--verbose[Enable verbose output]'
       ;;
     get-videos)
       _arguments \\
@@ -421,6 +459,7 @@ ${commandList}
       ;;
     list-comments)
       _arguments \\
+        '1: :_staqan_yt_video_ids' \\
         '--limit[Limit number of results]' \\
         '--sort[Sort order]:order:(top new)' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
