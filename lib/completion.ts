@@ -380,8 +380,8 @@ ${commandList}
       ;;
     get-video|get-video-localizations|get-video-localization|\\
     put-video-localization|update-video-localization|get-video-analytics|\\
-    get-search-terms|get-traffic-sources|get-video-retention|list-comments|\\
-    list-captions|get-video-tags|update-video-tags|get-thumbnail)
+    get-search-terms|get-traffic-sources|get-video-retention|\\
+    list-captions|get-video-tags)
       _arguments \\
         '1: :_staqan_yt_video_ids' \\
         '--output[Output format]:format:(json table text pretty csv)' \\

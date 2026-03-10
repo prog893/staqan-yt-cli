@@ -1,8 +1,26 @@
 import chalk from 'chalk';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { getConfig, setConfigValue } from '../lib/config';
-import { success, error, info } from '../lib/utils';
-import { ConfigKey } from '../types';
+import { success, error, info, CONFIG_DIR } from '../lib/utils';
+import { ConfigKey, CompletionCache } from '../types';
 import { installCompletion, detectShell } from '../lib/completion';
+
+async function invalidateChannelCache(): Promise<void> {
+  const cachePath = path.join(CONFIG_DIR, 'completion-cache.json');
+  try {
+    const raw = await fs.readFile(cachePath, 'utf-8');
+    const cache: CompletionCache = JSON.parse(raw);
+    for (const key of Object.keys(cache)) {
+      if (key.startsWith('video-id:') || key.startsWith('playlist-id:')) {
+        delete cache[key];
+      }
+    }
+    await fs.writeFile(cachePath, JSON.stringify(cache));
+  } catch {
+    // Cache may not exist yet — ignore
+  }
+}
 
 interface ConfigOptions {
   show?: boolean;
@@ -55,6 +73,9 @@ async function configCommand(
       }
 
       await setConfigValue(key as ConfigKey, value);
+      if (key === 'default.channel') {
+        await invalidateChannelCache();
+      }
       success(`Set ${chalk.cyan(key)} = ${chalk.yellow(value)}`);
       return;
     }
