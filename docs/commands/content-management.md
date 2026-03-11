@@ -9,14 +9,12 @@ Get video tags.
 ### Usage
 
 ```bash
-staqan-yt get-video-tags <videoId>
+staqan-yt get-video-tags --video-id <videoId>
 ```
 
-### Arguments
-
-- `videoId` - YouTube video ID or video URL
-
 ### Options
+
+- `--video-id <id>` - YouTube video ID or video URL (required)
 
 - `--output <format>` - Output format: json, table, text, pretty (default: pretty)
 - `-v, --verbose` - Enable verbose output with debug information
@@ -26,16 +24,16 @@ staqan-yt get-video-tags <videoId>
 
 ```bash
 # Get tags as list
-staqan-yt get-video-tags dQw4w9WgXcQ
+staqan-yt get-video-tags --video-id dQw4w9WgXcQ
 
 # Export to JSON
-staqan-yt get-video-tags dQw4w9WgXcQ --output json
+staqan-yt get-video-tags --video-id dQw4w9WgXcQ --output json
 
 # Export to text (one per line)
-staqan-yt get-video-tags dQw4w9WgXcQ --output text
+staqan-yt get-video-tags --video-id dQw4w9WgXcQ --output text
 
 # Count tags
-staqan-yt get-video-tags dQw4w9WgXcQ --output json | jq 'length'
+staqan-yt get-video-tags --video-id dQw4w9WgXcQ --output json | jq 'length'
 ```
 
 ### Output Structure
@@ -61,14 +59,12 @@ Update video tags (replace, add, or remove).
 ### Usage
 
 ```bash
-staqan-yt update-video-tags <videoId>
+staqan-yt update-video-tags --video-id <videoId>
 ```
 
-### Arguments
-
-- `videoId` - YouTube video ID or video URL
-
 ### Options
+
+- `--video-id <id>` - YouTube video ID or video URL (required)
 
 - `--tags <tags>` - Replace all tags with comma-separated list
 - `--add <tags>` - Add comma-separated tags
@@ -82,24 +78,24 @@ staqan-yt update-video-tags <videoId>
 
 ```bash
 # Replace all tags
-staqan-yt update-video-tags dQw4w9WgXcQ \
+staqan-yt update-video-tags --video-id dQw4w9WgXcQ \
   --tags "youtube,tutorial,how to,programming"
 
 # Add tags to existing
-staqan-yt update-video-tags dQw4w9WgXcQ \
+staqan-yt update-video-tags --video-id dQw4w9WgXcQ \
   --add "coding,development,tech"
 
 # Remove specific tags
-staqan-yt update-video-tags dQw4w9WgXcQ \
+staqan-yt update-video-tags --video-id dQw4w9WgXcQ \
   --remove "old tag,outdated"
 
 # Preview changes (dry run)
-staqan-yt update-video-tags dQw4w9WgXcQ \
+staqan-yt update-video-tags --video-id dQw4w9WgXcQ \
   --add "new tag" \
   --dry-run
 
 # Apply without confirmation
-staqan-yt update-video-tags dQw4w9WgXcQ \
+staqan-yt update-video-tags --video-id dQw4w9WgXcQ \
   --add "new tag" \
   --yes
 ```
@@ -150,14 +146,12 @@ Get video thumbnail URLs in all available qualities.
 ### Usage
 
 ```bash
-staqan-yt get-thumbnail <videoId>
+staqan-yt get-thumbnail --video-id <videoId>
 ```
 
-### Arguments
-
-- `videoId` - YouTube video ID or video URL
-
 ### Options
+
+- `--video-id <id>` - YouTube video ID or video URL (required)
 
 - `--quality <quality>` - Specific quality (default, medium, high, standard, maxres)
 - `--output <format>` - Output format: json, table, text, pretty (default: pretty)
@@ -168,16 +162,16 @@ staqan-yt get-thumbnail <videoId>
 
 ```bash
 # Get all thumbnail qualities
-staqan-yt get-thumbnail dQw4w9WgXcQ
+staqan-yt get-thumbnail --video-id dQw4w9WgXcQ
 
 # Get specific quality
-staqan-yt get-thumbnail dQw4w9WgXcQ --quality maxres
+staqan-yt get-thumbnail --video-id dQw4w9WgXcQ --quality maxres
 
 # Export to JSON
-staqan-yt get-thumbnail dQw4w9WgXcQ --output json
+staqan-yt get-thumbnail --video-id dQw4w9WgXcQ --output json
 
 # Get URL only (text format)
-staqan-yt get-thumbnail dQw4w9WgXcQ --quality maxres --output text
+staqan-yt get-thumbnail --video-id dQw4w9WgXcQ --quality maxres --output text
 ```
 
 ### Thumbnail Qualities
@@ -213,11 +207,11 @@ staqan-yt get-thumbnail dQw4w9WgXcQ --quality maxres --output text
 
 ```bash
 # Get URL and download
-url=$(staqan-yt get-thumbnail VIDEO_ID --quality maxres --output text)
+url=$(staqan-yt get-thumbnail --video-id VIDEO_ID --quality maxres --output text)
 curl -o thumbnail.jpg "$url"
 
 # Download all qualities
-staqan-yt get-thumbnail VIDEO_ID --output json | \
+staqan-yt get-thumbnail --video-id VIDEO_ID --output json | \
   jq -r '.[]' | \
   while read url; do
     filename=$(basename "$url")
@@ -234,12 +228,12 @@ Get detailed metadata for a single playlist.
 ### Usage
 
 ```bash
-staqan-yt get-playlist <playlistId>
+staqan-yt get-playlist --playlist-id <playlistId>
 ```
 
-### Arguments
+### Options
 
-- `playlistId` - Playlist ID or URL
+- `--playlist-id <id>` - Playlist ID or URL (required)
 
 ### Options
 
@@ -251,13 +245,13 @@ staqan-yt get-playlist <playlistId>
 
 ```bash
 # Get by playlist ID
-staqan-yt get-playlist PLrAXtmRdnEQy4V3aW8Lq9a4hWqPdMaE
+staqan-yt get-playlist --playlist-id PLrAXtmRdnEQy4V3aW8Lq9a4hWqPdMaE
 
 # Get by URL
-staqan-yt get-playlist "https://www.youtube.com/playlist?list=PLrAXtmRdnEQy4V3aW8Lq9a4hWqPdMaE"
+staqan-yt get-playlist --playlist-id "https://www.youtube.com/playlist?list=PLrAXtmRdnEQy4V3aW8Lq9a4hWqPdMaE"
 
 # Export to JSON
-staqan-yt get-playlist PLrAXtmRdnEQy4V3aW8Lq9a4hWqPdMaE --output json
+staqan-yt get-playlist --playlist-id PLrAXtmRdnEQy4V3aW8Lq9a4hWqPdMaE --output json
 ```
 
 ### Output Fields
@@ -285,12 +279,12 @@ Get detailed metadata for multiple playlists (batch operation).
 ### Usage
 
 ```bash
-staqan-yt get-playlists <playlistIds...>
+staqan-yt get-playlists --playlist-ids <playlistIds...>
 ```
 
-### Arguments
+### Options
 
-- `playlistIds...` - One or more playlist IDs (space-separated)
+- `--playlist-ids <ids...>` - One or more playlist IDs (space-separated, required)
 
 ### Options
 
@@ -302,10 +296,10 @@ staqan-yt get-playlists <playlistIds...>
 
 ```bash
 # Get multiple playlists
-staqan-yt get-playlists PLID1 PLID2 PLID3
+staqan-yt get-playlists --playlist-ids PLID1 PLID2 PLID3
 
 # Export to JSON
-staqan-yt get-playlists PLID1 PLID2 --output json
+staqan-yt get-playlists --playlist-ids PLID1 PLID2 --output json
 ```
 
 ### Output
@@ -327,7 +321,7 @@ Same as `get-playlist`, with one object per playlist.
 # Get tags from top videos in your niche
 for video_id in VIDEO_ID1 VIDEO_ID2 VIDEO_ID3; do
   echo "Tags for $video_id:"
-  staqan-yt get-video-tags "$video_id" --output text
+  staqan-yt get-video-tags --video-id "$video_id" --output text
   echo ""
 done
 ```
@@ -337,7 +331,7 @@ done
 ```bash
 # Add tags to multiple videos
 cat video_ids.txt | while read id; do
-  staqan-yt update-video-tags "$id" --add "new tag,another tag" --yes
+  staqan-yt update-video-tags --video-id "$id" --add "new tag,another tag" --yes
 done
 ```
 
@@ -348,7 +342,7 @@ done
 staqan-yt list-videos @yourchannel --output json | \
   jq -r '.[].id' | \
   while read id; do
-    url=$(staqan-yt get-thumbnail "$id" --quality maxres --output text)
+    url=$(staqan-yt get-thumbnail --video-id "$id" --quality maxres --output text)
     curl -o "${id}.jpg" "$url"
   done
 ```
@@ -360,7 +354,7 @@ staqan-yt list-videos @yourchannel --output json | \
 staqan-yt list-videos @yourchannel --output json | \
   jq -r '.[].id' | \
   while read id; do
-    tags=$(staqan-yt get-video-tags "$id" --output json)
+    tags=$(staqan-yt get-video-tags --video-id "$id" --output json)
     if ! echo "$tags" | jq -e '.[] | contains("keyword")' > /dev/null; then
       echo "$id missing 'keyword' tag"
     fi
@@ -372,7 +366,7 @@ staqan-yt list-videos @yourchannel --output json | \
 ```bash
 # Analyze tag usage across videos
 for video_id in VIDEO_ID1 VIDEO_ID2 VIDEO_ID3; do
-  count=$(staqan-yt get-video-tags "$video_id" --output json | jq 'length')
+  count=$(staqan-yt get-video-tags --video-id "$video_id" --output json | jq 'length')
   echo "$video_id: $count tags"
 done
 ```
@@ -385,7 +379,7 @@ staqan-yt get-report-data --type=channel_reach_basic_a1 --output csv | \
   awk -F, 'NR>1 && $5 > 5.0 {print $2}' | \
   while read id; do
     echo "$id:"
-    staqan-yt get-video-tags "$id" --output text
+    staqan-yt get-video-tags --video-id "$id" --output text
     echo ""
   done
 ```

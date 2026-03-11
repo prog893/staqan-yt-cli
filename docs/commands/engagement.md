@@ -9,14 +9,12 @@ List comments for a YouTube video.
 ### Usage
 
 ```bash
-staqan-yt list-comments <videoId>
+staqan-yt list-comments --video-id <videoId>
 ```
 
-### Arguments
-
-- `videoId` - YouTube video ID or video URL
-
 ### Options
+
+- `--video-id <id>` - YouTube video ID or video URL (required)
 
 - `--output <format>` - Output format: json, table, csv, text, pretty (default: pretty)
 - `-l, --limit <number>` - Limit number of results (default: 20)
@@ -28,19 +26,19 @@ staqan-yt list-comments <videoId>
 
 ```bash
 # List top comments
-staqan-yt list-comments dQw4w9WgXcQ
+staqan-yt list-comments --video-id dQw4w9WgXcQ
 
 # List newest comments first
-staqan-yt list-comments dQw4w9WgXcQ --sort new
+staqan-yt list-comments --video-id dQw4w9WgXcQ --sort new
 
 # Get more comments
-staqan-yt list-comments dQw4w9WgXcQ --limit 50
+staqan-yt list-comments --video-id dQw4w9WgXcQ --limit 50
 
 # Export to CSV
-staqan-yt list-comments dQw4w9WgXcQ --output csv > comments.csv
+staqan-yt list-comments --video-id dQw4w9WgXcQ --output csv > comments.csv
 
 # Export to JSON
-staqan-yt list-comments dQw4w9WgXcQ --output json
+staqan-yt list-comments --video-id dQw4w9WgXcQ --output json
 ```
 
 ### Output Fields
@@ -74,14 +72,12 @@ List all caption tracks for a YouTube video.
 ### Usage
 
 ```bash
-staqan-yt list-captions <videoId>
+staqan-yt list-captions --video-id <videoId>
 ```
 
-### Arguments
-
-- `videoId` - YouTube video ID or video URL
-
 ### Options
+
+- `--video-id <id>` - YouTube video ID or video URL (required)
 
 - `--output <format>` - Output format: json, table, text, pretty (default: pretty)
 - `-v, --verbose` - Enable verbose output with debug information
@@ -91,13 +87,13 @@ staqan-yt list-captions <videoId>
 
 ```bash
 # List all captions
-staqan-yt list-captions dQw4w9WgXcQ
+staqan-yt list-captions --video-id dQw4w9WgXcQ
 
 # Export to JSON
-staqan-yt list-captions dQw4w9WgXcQ --output json
+staqan-yt list-captions --video-id dQw4w9WgXcQ --output json
 
 # Find auto-generated captions
-staqan-yt list-captions dQw4w9WgXcQ --output json | \
+staqan-yt list-captions --video-id dQw4w9WgXcQ --output json | \
   jq '.[] | select(.trackKind == "asr")'
 ```
 
@@ -136,14 +132,12 @@ Download caption content to stdout.
 ### Usage
 
 ```bash
-staqan-yt get-caption <captionId>
+staqan-yt get-caption --caption-id <captionId>
 ```
 
-### Arguments
-
-- `captionId` - Caption track ID (get from `list-captions`)
-
 ### Options
+
+- `--caption-id <id>` - Caption track ID (get from `list-captions`) (required)
 
 - `--format <format>` - Caption format: srt, vtt, sbv, srv2, ttml, json (default: json)
 - `-v, --verbose` - Enable verbose output with debug information
@@ -153,19 +147,19 @@ staqan-yt get-caption <captionId>
 
 ```bash
 # Get caption ID first
-staqan-yt list-captions dQw4w9WgXcQ
+staqan-yt list-captions --video-id dQw4w9WgXcQ
 
 # Download captions (JSON format by default)
-staqan-yt get-caption en.dQw4w9WgXcQ
+staqan-yt get-caption --caption-id en.dQw4w9WgXcQ
 
 # Download as SRT (subtitle file format)
-staqan-yt get-caption en.dQw4w9WgXcQ --format srt > captions.srt
+staqan-yt get-caption --caption-id en.dQw4w9WgXcQ --format srt > captions.srt
 
 # Download as VTT
-staqan-yt get-caption en.dQw4w9WgXcQ --format vtt > captions.vtt
+staqan-yt get-caption --caption-id en.dQw4w9WgXcQ --format vtt > captions.vtt
 
 # Download as text
-staqan-yt get-caption en.dQw4w9WgXcQ --format json | jq -r '.[].text'
+staqan-yt get-caption --caption-id en.dQw4w9WgXcQ --format json | jq -r '.[].text'
 ```
 
 ### Caption Formats
@@ -225,7 +219,7 @@ staqan-yt get-caption en.dQw4w9WgXcQ --format json | \
 
 ```bash
 # Export comments for sentiment analysis
-staqan-yt list-comments VIDEO_ID --output json | \
+staqan-yt list-comments --video-id VIDEO_ID --output json | \
   jq -r '.[].textOriginal' > comments.txt
 
 # Use with sentiment analysis tools
@@ -236,7 +230,7 @@ staqan-yt list-comments VIDEO_ID --output json | \
 
 ```bash
 # Sort comments by likes
-staqan-yt list-comments VIDEO_ID --output json | \
+staqan-yt list-comments --video-id VIDEO_ID --output json | \
   jq 'sort_by(.likeCount | tonumber) | reverse | .[0:10]'
 ```
 
@@ -244,9 +238,9 @@ staqan-yt list-comments VIDEO_ID --output json | \
 
 ```bash
 # Get plain text transcript from captions
-staqan-yt list-captions VIDEO_ID --output json | \
+staqan-yt list-captions --video-id VIDEO_ID --output json | \
   jq -r '.[0].id' | \
-  xargs staqan-yt get-caption --format json | \
+  xargs staqan-yt get-caption --caption-id --format json | \
   jq -r '.[].text' > transcript.txt
 ```
 
@@ -254,11 +248,11 @@ staqan-yt list-captions VIDEO_ID --output json | \
 
 ```bash
 # Download all available caption tracks
-staqan-yt list-captions VIDEO_ID --output json | \
+staqan-yt list-captions --video-id VIDEO_ID --output json | \
   jq -r '.[].id' | \
   while read caption_id; do
     language=$(echo $caption_id | cut -d. -f1)
-    staqan-yt get-caption "$caption_id" --format srt > "${language}.srt"
+    staqan-yt get-caption --caption-id "$caption_id" --format srt > "${language}.srt"
   done
 ```
 
@@ -266,7 +260,7 @@ staqan-yt list-captions VIDEO_ID --output json | \
 
 ```bash
 # Search for specific terms in captions
-staqan-yt get-caption en.VIDEO_ID --format json | \
+staqan-yt get-caption --caption-id en.VIDEO_ID --format json | \
   jq -r '.[] | select(.text | contains("keyword"))'
 ```
 
@@ -274,7 +268,7 @@ staqan-yt get-caption en.VIDEO_ID --format json | \
 
 ```bash
 # Find most common words in comments
-staqan-yt list-comments VIDEO_ID --output json | \
+staqan-yt list-comments --video-id VIDEO_ID --output json | \
   jq -r '.[].textOriginal' | \
   tr '[:upper:]' '[:lower:]' | \
   tr -d '[:punct:]' | \

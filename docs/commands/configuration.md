@@ -202,8 +202,8 @@ staqan-yt ge<Tab>                    # get-video, get-videos, get-channel…
 staqan-yt get-video --<Tab>          # --output, --verbose
 
 # Live YouTube data completion (requires default.channel to be set)
-staqan-yt get-video <Tab>            # Video IDs with titles from your channel
-staqan-yt get-playlist <Tab>         # Playlist IDs with titles
+staqan-yt get-video --video-id <Tab>            # Video IDs with titles from your channel
+staqan-yt get-playlist --playlist-id <Tab>         # Playlist IDs with titles
 staqan-yt list-report-jobs --type <Tab>  # Report type IDs
 
 # Static value completion

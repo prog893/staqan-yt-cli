@@ -144,21 +144,28 @@ staqan-yt-cli/
 
 ### 2. AWS API Naming Conventions
 
-**CRITICAL**: All commands must follow AWS API naming conventions:
+**CRITICAL**: All commands must follow AWS API naming conventions and use **NO positional arguments**.
+
+**🚨 RULE: Everything is a named flag. No positional arguments at all.**
 
 **Singular = Single-item operations**
 ```bash
-get-video <videoId>        # Get ONE video
-update-video <videoId>     # Update ONE video
-delete-video <videoId>     # Delete ONE video (if added)
+get-video --video-id <id>        # Get ONE video
+update-video --video-id <id>     # Update ONE video
+delete-video --video-id <id>     # Delete ONE video (if added)
 ```
 
 **Plural = Batch/list operations**
 ```bash
-get-videos <id1> <id2>     # Get MULTIPLE videos (batch)
-list-videos <channel>      # List videos in channel
-search-videos <ch> <query> # Search multiple videos
+get-videos --video-ids <id1> <id2>     # Get MULTIPLE videos (batch)
+list-videos --channel <handle>         # List videos in channel
+search-videos --query <text>            # Search multiple videos
 ```
+
+**Required flags pattern:**
+- Single ID: Use `--resource-id <id>` (singular flag name, singular ID)
+- Multiple IDs: Use `--resource-ids <id...>` (plural flag name, variadic IDs)
+- Other required params: Use descriptive flag names (e.g., `--query <text>`)
 
 **Naming pattern:**
 - Use `get-` for retrieving resources
@@ -168,6 +175,7 @@ search-videos <ch> <query> # Search multiple videos
 - Use `search-` for querying resources
 - Use singular nouns for single-item operations
 - Use plural nouns for batch/list operations
+- **ALL parameters use flags** (no positional arguments)
 
 ### 3. Credential Management
 
