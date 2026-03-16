@@ -8,12 +8,22 @@ import { OutputOption, VerboseOption, PlaylistIdOption, PlaylistIdsOption } from
 async function getPlaylistCommand(options: OutputOption & VerboseOption & (PlaylistIdOption | PlaylistIdsOption)): Promise<void> {
   initCommand(options);
 
+  // Mutual exclusion check: prevent using both --playlist-id and --playlist-ids
+  const hasPlaylistId = 'playlist-id' in options && options['playlist-id'];
+  const hasPlaylistIds = 'playlist-ids' in options && options['playlist-ids'];
+
+  if (hasPlaylistId && hasPlaylistIds) {
+    console.error(chalk.red('Error: Cannot use both --playlist-id and --playlist-ids simultaneously.'));
+    console.error(chalk.yellow('Use --playlist-id for a single playlist or --playlist-ids for multiple playlists.'));
+    process.exit(1);
+  }
+
   // Handle both --playlist-id (single) and --playlist-ids (multiple)
   let playlistIds: string[] = [];
-  if ('playlist-id' in options && options['playlist-id']) {
-    playlistIds = [options['playlist-id']];
-  } else if ('playlist-ids' in options && options['playlist-ids']) {
-    playlistIds = options['playlist-ids'];
+  if (hasPlaylistId) {
+    playlistIds = [options['playlist-id']!]; // Non-null assertion after validation
+  } else if (hasPlaylistIds) {
+    playlistIds = options['playlist-ids']!; // Non-null assertion after validation
   }
 
   if (playlistIds.length === 0) {

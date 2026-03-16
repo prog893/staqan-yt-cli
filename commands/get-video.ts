@@ -8,12 +8,22 @@ import { OutputOption, VerboseOption, VideoIdOption, VideoIdsOption } from '../t
 async function videoInfoCommand(options: OutputOption & VerboseOption & (VideoIdOption | VideoIdsOption)): Promise<void> {
   initCommand(options);
 
+  // Mutual exclusion check: prevent using both --video-id and --video-ids
+  const hasVideoId = 'video-id' in options && options['video-id'];
+  const hasVideoIds = 'video-ids' in options && options['video-ids'];
+
+  if (hasVideoId && hasVideoIds) {
+    console.error(chalk.red('Error: Cannot use both --video-id and --video-ids simultaneously.'));
+    console.error(chalk.yellow('Use --video-id for a single video or --video-ids for multiple videos.'));
+    process.exit(1);
+  }
+
   // Handle both --video-id (single) and --video-ids (multiple)
   let videoIds: string[] = [];
-  if ('video-id' in options && options['video-id']) {
-    videoIds = [options['video-id']];
-  } else if ('video-ids' in options && options['video-ids']) {
-    videoIds = options['video-ids'];
+  if (hasVideoId) {
+    videoIds = [options['video-id']!]; // Non-null assertion after validation
+  } else if (hasVideoIds) {
+    videoIds = options['video-ids']!; // Non-null assertion after validation
   }
 
   if (videoIds.length === 0) {

@@ -241,8 +241,6 @@ _staqa_nyt_completion() {
       _staqan_yt_complete_type playlist-id; return ;;
     --playlist-ids)
       _staqan_yt_complete_type playlist-id; return ;;
-    --caption-id)
-      _staqan_yt_complete_type caption-id; return ;;
     --channel|-c)
       COMPREPLY=( \$(compgen -W "\$(staqan-yt config get default.channel 2>/dev/null || echo '@')" -- "\${cur}") )
       return
@@ -579,7 +577,7 @@ ${commandList}
       ;;
     get-caption)
       _arguments \\
-        '--caption-id[Caption ID]' \\
+        '--caption-id[Caption ID]:id:( )' \\
         '--format[Caption format]:format:(srt vtt sbv srv2 ttml json)' \\
         '--verbose[Enable verbose output]'
       ;;

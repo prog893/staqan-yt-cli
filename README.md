@@ -31,6 +31,12 @@ bun build ./bin/staqan-yt.ts --compile --outfile staqan-yt
 sudo mv staqan-yt /usr/local/bin/
 ```
 
+## Upgrading from v1.2.x?
+
+**Important:** v1.3.0 introduces breaking changes. All commands now use required named flags instead of positional arguments.
+
+See [MIGRATION.md](MIGRATION.md) for detailed migration guide.
+
 ## Quick Start
 
 ### 1. Set up OAuth Credentials
