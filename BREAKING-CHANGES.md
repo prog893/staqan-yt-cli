@@ -40,6 +40,112 @@ rm -rf ~/.staqan-yt-cli/data/cache-index.json
 rm -rf ~/.staqan-yt-cli/data/reports/
 ```
 
+### Advanced: Manual migration
+
+If you want to preserve your cached reports, you can manually migrate them. The schema changes are minimal:
+
+**1. Cache index changes** (`cache-index.json`):
+
+Before (v1.0):
+```json
+{
+  "version": "1.0",
+  "lastUpdated": "2026-03-16T00:00:37.235Z",
+  "entries": [
+    {
+      "reportId": "18715771037",
+      "reportTypeId": "channel_reach_basic_a1",
+      "startTime": "2026-02-28T08:00:00Z",
+      "endTime": "2026-03-01T08:00:00Z",
+      "fileSize": 1244,
+      "row_count": 23
+    }
+  ]
+}
+```
+
+After (v2.0):
+```json
+{
+  "version": "2.0",
+  "lastUpdated": "2026-03-16T00:00:37.235Z",
+  "entries": [
+    {
+      "reportId": "18715771037",
+      "reportTypeId": "channel_reach_basic_a1",
+      "startTime": "2026-02-28T08:00:00Z",
+      "endTime": "2026-03-01T08:00:00Z",
+      "fileSize": 1244,
+      "row_count": 23,
+      "channelId": "UCBQQNUsrd9mgCjsrLogKW6Q"
+    }
+  ]
+}
+```
+
+**2. Report metadata changes** (`{reportId}.metadata.json`):
+
+Before:
+```json
+{
+  "reportId": "18715771037",
+  "reportTypeId": "channel_reach_basic_a1",
+  "jobId": "daa51074-6e66-439b-82a2-ac956262b4a2",
+  ...
+  "isComplete": true,
+  "fileSize": 1244,
+  "row_count": 23
+}
+```
+
+After:
+```json
+{
+  "reportId": "18715771037",
+  "reportTypeId": "channel_reach_basic_a1",
+  "jobId": "daa51074-6e66-439b-82a2-ac956262b4a2",
+  ...
+  "isComplete": true,
+  "fileSize": 1244,
+  "row_count": 23,
+  "channelId": "UCBQQNUsrd9mgCjsrLogKW6Q"
+}
+```
+
+**Migration script example** (for advanced users):
+
+```bash
+#!/bin/bash
+# Manual migration script - BACKUP FIRST!
+
+CHANNEL_ID="UCBQQNUsrd9mgCjsrLogKW6Q"  # Your channel ID
+OLD_DIR="$HOME/.staqan-yt-cli/data"
+NEW_DIR="$HOME/.staqan-yt-cli/data/$CHANNEL_ID"
+
+# Create new directory structure
+mkdir -p "$NEW_DIR/reports"
+
+# Migrate cache-index.json
+jq --arg cid "$CHANNEL_ID" \
+  '.version = "2.0" | .entries[]?.channelId = $cid' \
+  "$OLD_DIR/cache-index.json" > "$NEW_DIR/reports/cache-index.json"
+
+# Move and migrate report directories
+for report_type in "$OLD_DIR/reports"/*; do
+  type_name=$(basename "$report_type")
+  mkdir -p "$NEW_DIR/reports/$type_name"
+
+  for metadata_file in "$report_type"/*.metadata.json; do
+    jq --arg cid "$CHANNEL_ID" \
+      '.entries[]?.channelId = $cid' \
+      "$metadata_file" > "$NEW_DIR/reports/$type_name/$(basename $metadata_file)"
+  done
+
+  # Move CSV data files (no changes needed)
+  cp "$report_type"/*.csv "$NEW_DIR/reports/$type_name/" 2>/dev/null
+done
+```
+
 ### Safety: Backup before upgrading
 
 If you want to preserve your old cache (not required, but cautious):
