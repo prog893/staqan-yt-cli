@@ -142,7 +142,47 @@ staqan-yt-cli/
 - Metadata generation logic
 - Language-specific tone guidance
 
-### 2. AWS API Naming Conventions
+### 2. File Operation Concurrency
+
+### Lock Strategy
+
+The CLI uses file-based locks with PID checking to prevent concurrent writes:
+
+**Lock files:**
+- `data/{channelId}/completion_cache.json.lock` - Completion cache
+- `data/handle-to-channel-id.json.lock` - Handle→channelId cache
+- `data/{channelId}/reports/.lock` - Per-channel reports directory
+
+**Lock behavior:**
+- Locks contain PID + timestamp
+- Automatic stale lock detection (PID doesn't exist OR age > 30min)
+- Acquire with timeout: `acquireLock(lockPath, { timeout })`
+- Always release in `finally` block
+
+**When adding new file writes:**
+1. Identify if lock is needed (concurrent access possible?)
+2. Use appropriate lock file (file.lock or .lock for dir)
+3. Always use try/finally to ensure cleanup
+4. Test with concurrent operations
+
+**Example pattern:**
+```typescript
+import { acquireLock, getLockPath } from './lock';
+
+async function writeSomething(): Promise<void> {
+  const lockPath = getLockPath('your-type', channelId);
+  let release: (() => Promise<void>) | null = null;
+
+  try {
+    release = await acquireLock(lockPath, { timeout: 5000 });
+    // ... write operations ...
+  } finally {
+    if (release) await release();
+  }
+}
+```
+
+### 3. AWS API Naming Conventions
 
 **CRITICAL**: All commands must follow AWS API naming conventions and use **NO positional arguments**.
 

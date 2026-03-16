@@ -11,6 +11,7 @@ import { google } from 'googleapis';
 import { getChannelVideos, listChannelPlaylists, getChannelId } from '../lib/youtube';
 import { getConfigValue } from '../lib/config';
 import { getAuthenticatedClient } from '../lib/auth';
+import { acquireLock, getLockPath } from '../lib/lock';
 import { CONFIG_DIR, debug } from '../lib/utils';
 import { CompletionType, CompletionCache } from '../types';
 
@@ -32,12 +33,22 @@ async function loadCache(cachePath: string): Promise<CompletionCache> {
   }
 }
 
-async function saveCache(cachePath: string, cache: CompletionCache): Promise<void> {
+async function saveCache(cachePath: string, cache: CompletionCache, channelId: string): Promise<void> {
+  const lockPath = getLockPath('completion', channelId);
+  let release: (() => Promise<void>) | null = null;
+
   try {
+    // Acquire lock with 2 second timeout (completion is fast)
+    release = await acquireLock(lockPath, { timeout: 2000 });
+
     await fs.mkdir(path.dirname(cachePath), { recursive: true });
     await fs.writeFile(cachePath, JSON.stringify(cache), { mode: 0o600 });
+
+    debug('Completion cache saved');
   } catch (err) {
     debug('Failed to save completion cache:', (err as Error).message);
+  } finally {
+    if (release) await release();
   }
 }
 
@@ -83,7 +94,7 @@ async function completeCommand(options: { type: string }): Promise<void> {
           }
           if (items.length > 0) {
             cache[type] = { items, fetchedAt: Date.now() };
-            await saveCache(cachePath, cache);
+            await saveCache(cachePath, cache, channelId);
           }
         }
       } else if (type === 'report-type') {
@@ -105,7 +116,7 @@ async function completeCommand(options: { type: string }): Promise<void> {
           }
           if (items.length > 0) {
             cache[type] = { items, fetchedAt: Date.now() };
-            await saveCache(cachePath, cache);
+            await saveCache(cachePath, cache, channelId);
           }
         }
       }

@@ -4,6 +4,7 @@ import path from 'path';
 import os from 'os';
 import { getAuthenticatedClient } from './auth';
 import { normalizeLanguage, getLanguageName } from './language';
+import { acquireLock, getLockPath } from './lock';
 import { VideoInfo, VideoListItem, VideoLocalization, VideoType, PlaylistInfo, PlaylistListItem, CommentInfo, ChannelInfo, CaptionInfo, CaptionFormat } from '../types';
 import { debug, warning } from './utils';
 
@@ -20,11 +21,21 @@ async function loadHandleCache(): Promise<Record<string, string>> {
 }
 
 async function saveHandleCache(cache: Record<string, string>): Promise<void> {
+  const lockPath = getLockPath('handles');
+  let release: (() => Promise<void>) | null = null;
+
   try {
+    // Acquire lock with 5 second timeout
+    release = await acquireLock(lockPath, { timeout: 5000 });
+
     await fs.mkdir(path.dirname(HANDLE_CACHE_PATH), { recursive: true });
     await fs.writeFile(HANDLE_CACHE_PATH, JSON.stringify(cache, null, 2), 'utf-8');
+
+    debug('Handle cache saved');
   } catch (err) {
     debug('Failed to save handle cache:', (err as Error).message);
+  } finally {
+    if (release) await release();
   }
 }
 

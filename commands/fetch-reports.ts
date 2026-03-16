@@ -10,6 +10,7 @@ import {
 } from '../lib/cache';
 import { getChannelId } from '../lib/youtube';
 import { getConfigValue } from '../lib/config';
+import { acquireLock, getLockPath } from '../lib/lock';
 import https from 'https';
 import { createWriteStream, unlinkSync } from 'fs';
 import { unlink } from 'fs/promises';
@@ -115,17 +116,26 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
     const channelId = await getChannelId(channelHandle);
     debug(`Using channel ID: ${channelId}`);
 
-    const auth = await getAuthenticatedClient();
-    const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
+    // Acquire lock for entire fetch operation
+    const lockPath = getLockPath('reports', channelId);
+    let release: (() => Promise<void>) | null = null;
 
-    // Step 1: Discover report types
-    spinner.text = 'Discovering report types...';
+    try {
+      spinner.text = 'Acquiring lock...';
+      release = await acquireLock(lockPath, { timeout: 60000 }); // 60 second timeout
 
-    const typesResponse = await youtubeReporting.reportTypes.list({
-      onBehalfOfContentOwner: undefined,
-    });
+      spinner.text = 'Initializing...';
+      const auth = await getAuthenticatedClient();
+      const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
 
-    let reportTypes = typesResponse.data.reportTypes || [];
+      // Step 1: Discover report types
+      spinner.text = 'Discovering report types...';
+
+      const typesResponse = await youtubeReporting.reportTypes.list({
+        onBehalfOfContentOwner: undefined,
+      });
+
+      let reportTypes = typesResponse.data.reportTypes || [];
 
     // Filter by --type or --types if specified
     if (options.type) {
@@ -337,6 +347,15 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
     console.log('');
 
     success('Fetch complete!');
+    } catch (err) {
+      spinner.fail('Failed to acquire reports lock');
+      error((err as Error).message);
+      console.log('');
+      error('Another fetch operation is in progress. Wait for it to complete or run: rm ~/.staqan-yt-cli/data/*/reports/.lock');
+      process.exit(1);
+    } finally {
+      if (release) await release();
+    }
   });
 }
 

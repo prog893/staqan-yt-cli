@@ -294,6 +294,30 @@ staqan-yt config set default.channel @yourchannel
 
 ---
 
+### Lock file errors
+
+**Problem:**
+```
+Failed to acquire reports lock
+Another fetch operation is in progress. Wait for it to complete or run: rm ~/.staqan-yt-cli/data/*/reports/.lock
+```
+
+**Cause:** Another `staqan-yt fetch-reports` command is already running for this channel.
+
+**Solutions:**
+1. **Wait** for the other operation to complete (check with `ps aux | grep staqan-yt`)
+2. **Remove stale lock** if process crashed: `rm ~/.staqan-yt-cli/data/{channelId}/reports/.lock`
+3. **Verify channel** - locks are per-channel, ensure you're using the correct channel
+
+**Lock file locations:**
+- Completion cache: `data/{channelId}/completion_cache.json.lock`
+- Handle cache: `data/handle-to-channel-id.json.lock`
+- Reports directory: `data/{channelId}/reports/.lock`
+
+**Note:** Locks auto-expire after 30 minutes or if the PID no longer exists.
+
+---
+
 ## Output Issues
 
 ### CSV not opening in Excel correctly
