@@ -10,12 +10,39 @@
 | `~/.staqan-yt-cli/data/cache-index.json` | `~/.staqan-yt-cli/data/{channelId}/reports/cache-index.json` |
 | `~/.staqan-yt-cli/data/reports/{reportTypeId}/` | `~/.staqan-yt-cli/data/{channelId}/reports/{reportTypeId}/` |
 
-**Required**: `default.channel` must be set in config (or pass `--channel`) for `fetch-reports` and `get-report-data`:
+### ⚠️ Important: Old cached data will not be migrated
+
+After upgrading to v1.5.0:
+- Existing report cache will be ignored (not deleted, but not used)
+- Tab completion will rebuild on first use
+- You'll need to re-download reports
+
+### Steps after upgrade
+
+1. **Set your default channel** (required):
+   ```bash
+   staqan-yt config set default.channel @yourchannel
+   ```
+
+2. **Re-download your reports** (if you had cached data):
+   ```bash
+   staqan-yt fetch-reports --type channel_reach_basic_a1
+   ```
+
+3. **Tab completion will auto-rebuild** on first use
+
+### Optional: Clean up old data
+
+If you want to remove the old unused cache files:
 ```bash
-staqan-yt config set default.channel @yourchannel
+rm ~/.staqan-yt-cli/completion-cache.json
+rm -rf ~/.staqan-yt-cli/data/cache-index.json
+rm -rf ~/.staqan-yt-cli/data/reports/
 ```
 
-**Safety**: Before upgrading, optionally back up existing cached data:
+### Safety: Backup before upgrading
+
+If you want to preserve your old cache (not required, but cautious):
 ```bash
 tar -czf ~/staqan-data-backup.tar.gz ~/.staqan-yt-cli/data/
 ```
