@@ -474,6 +474,7 @@ program
   .command('get-report-data')
   .description('Get YouTube Reporting API report data (thumbnail impressions, CTR, etc.)')
   .requiredOption('--type <id>', 'Report type ID (e.g., channel_reach_basic_a1 for thumbnail data)')
+  .option('-c, --channel <handle>', 'Channel handle or ID (overrides config default)')
   .option('--video-id <id>', 'Filter by video ID')
   .option('--start-date <date>', 'Start date (YYYY-MM-DD)')
   .option('--end-date <date>', 'End date (YYYY-MM-DD)')
@@ -484,6 +485,7 @@ program
 program
   .command('fetch-reports')
   .description('Download and cache all available report data (archival)')
+  .option('-c, --channel <handle>', 'Channel handle or ID (overrides config default)')
   .option('-t, --type <id>', 'Fetch specific report type')
   .option('-T, --types <ids>', 'Fetch multiple report types (comma-separated)')
   .option('--start-date <date>', 'Filter by start date (YYYY-MM-DD)')

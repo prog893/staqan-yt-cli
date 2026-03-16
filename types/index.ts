@@ -346,6 +346,7 @@ export type CompletionCache = Record<string, CompletionCacheEntry>;
 export interface CacheIndexEntry {
   reportId: string;
   reportTypeId: string;
+  channelId: string;          // Channel this report belongs to
   startTime: string;          // YYYY-MM-DD
   endTime: string;            // YYYY-MM-DD
   downloadedAt: string;       // ISO 8601 timestamp
@@ -363,6 +364,7 @@ export interface CacheIndex {
 export interface ReportMetadata {
   reportId: string;
   reportTypeId: string;
+  channelId: string;          // Channel this report belongs to
   jobId: string;
   startTime: string;          // From YouTube API
   endTime: string;            // From YouTube API

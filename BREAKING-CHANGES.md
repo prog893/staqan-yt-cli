@@ -1,3 +1,27 @@
+# Breaking Changes
+
+## v1.5.0: Channel-isolated cache and data storage
+
+**Directory structure change** — all per-channel data now lives under a channel ID namespace:
+
+| Before | After |
+|---|---|
+| `~/.staqan-yt-cli/completion-cache.json` | `~/.staqan-yt-cli/data/{channelId}/completion_cache.json` |
+| `~/.staqan-yt-cli/data/cache-index.json` | `~/.staqan-yt-cli/data/{channelId}/reports/cache-index.json` |
+| `~/.staqan-yt-cli/data/reports/{reportTypeId}/` | `~/.staqan-yt-cli/data/{channelId}/reports/{reportTypeId}/` |
+
+**Required**: `default.channel` must be set in config (or pass `--channel`) for `fetch-reports` and `get-report-data`:
+```bash
+staqan-yt config set default.channel @yourchannel
+```
+
+**Safety**: Before upgrading, optionally back up existing cached data:
+```bash
+tar -czf ~/staqan-data-backup.tar.gz ~/.staqan-yt-cli/data/
+```
+
+---
+
 # Migration Guide: v1.2.x → v1.3.0
 
 ## Breaking Changes

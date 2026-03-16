@@ -8,6 +8,8 @@ import {
   loadReportMetadata,
   parseCsvAndExtractRange,
 } from '../lib/cache';
+import { getChannelId } from '../lib/youtube';
+import { getConfigValue } from '../lib/config';
 import https from 'https';
 import { createWriteStream, unlinkSync } from 'fs';
 import { unlink } from 'fs/promises';
@@ -15,6 +17,7 @@ import path from 'path';
 import chalk from 'chalk';
 
 interface FetchReportsOptions {
+  channel?: string;
   type?: string;
   types?: string;
   startDate?: string;
@@ -99,6 +102,19 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
   initCommand(options);
 
   await withSpinner('Initializing...', 'Failed to fetch reports', async (spinner) => {
+    // Resolve channel handle → canonical channel ID for cache namespacing
+    const channelHandle = options.channel || await getConfigValue('default.channel');
+    if (!channelHandle) {
+      spinner.fail('No channel configured');
+      console.log('');
+      error('No channel specified. Set a default channel:\n  staqan-yt config set default.channel @yourchannel\nor pass --channel @yourchannel');
+      process.exit(1);
+    }
+
+    spinner.text = `Resolving channel ID for ${channelHandle}...`;
+    const channelId = await getChannelId(channelHandle);
+    debug(`Using channel ID: ${channelId}`);
+
     const auth = await getAuthenticatedClient();
     const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
 
@@ -220,7 +236,7 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
         const endTime = report.endTime!;
 
         // Check if already cached
-        const cached = await findCachedReports(reportTypeId, startTime, endTime);
+        const cached = await findCachedReports(channelId, reportTypeId, startTime, endTime);
 
         if (cached.length > 0 && !options.force) {
           debug(`Skipping cached report: ${reportId} (${startTime} to ${endTime})`);
@@ -244,9 +260,10 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
           const expiresAt = new Date(reportCreated.getTime() + expirationDays * 24 * 60 * 60 * 1000);
 
           // Save to cache
-          await saveReportToCache(reportId, reportTypeId, csvData, {
+          await saveReportToCache(channelId, reportId, reportTypeId, csvData, {
             reportId,
             reportTypeId,
+            channelId,
             jobId,
             startTime,
             endTime,
@@ -282,12 +299,12 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
     if (options.verify) {
       spinner.text = 'Verifying cached files...';
 
-      const index = await loadCacheIndex();
+      const index = await loadCacheIndex(channelId);
       let verified = 0;
       let corrupted = 0;
 
       for (const entry of index.entries) {
-        const metadata = await loadReportMetadata(entry.reportId, entry.reportTypeId);
+        const metadata = await loadReportMetadata(channelId, entry.reportId, entry.reportTypeId);
 
         if (!metadata) {
           warning(`Missing metadata: ${entry.reportId}`);

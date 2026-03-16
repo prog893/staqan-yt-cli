@@ -8,13 +8,11 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import ora from 'ora';
 import { google } from 'googleapis';
-import { getChannelVideos, listChannelPlaylists } from '../lib/youtube';
+import { getChannelVideos, listChannelPlaylists, getChannelId } from '../lib/youtube';
 import { getConfigValue } from '../lib/config';
 import { getAuthenticatedClient } from '../lib/auth';
-import { CONFIG_DIR, ensureConfigDir, debug } from '../lib/utils';
+import { CONFIG_DIR, debug } from '../lib/utils';
 import { CompletionType, CompletionCache } from '../types';
-
-const CACHE_PATH = path.join(CONFIG_DIR, 'completion-cache.json');
 
 const TTL: Record<CompletionType, number> = {
   'video-id': 5 * 60 * 1000,
@@ -22,18 +20,22 @@ const TTL: Record<CompletionType, number> = {
   'report-type': 60 * 60 * 1000,
 };
 
-async function loadCache(): Promise<CompletionCache> {
+function getChannelCachePath(channelId: string): string {
+  return path.join(CONFIG_DIR, 'data', channelId, 'completion_cache.json');
+}
+
+async function loadCache(cachePath: string): Promise<CompletionCache> {
   try {
-    return JSON.parse(await fs.readFile(CACHE_PATH, 'utf-8'));
+    return JSON.parse(await fs.readFile(cachePath, 'utf-8'));
   } catch {
     return {};
   }
 }
 
-async function saveCache(cache: CompletionCache): Promise<void> {
+async function saveCache(cachePath: string, cache: CompletionCache): Promise<void> {
   try {
-    await ensureConfigDir();
-    await fs.writeFile(CACHE_PATH, JSON.stringify(cache), { mode: 0o600 });
+    await fs.mkdir(path.dirname(cachePath), { recursive: true });
+    await fs.writeFile(cachePath, JSON.stringify(cache), { mode: 0o600 });
   } catch (err) {
     debug('Failed to save completion cache:', (err as Error).message);
   }
@@ -45,30 +47,31 @@ async function completeCommand(options: { type: string }): Promise<void> {
   try {
     if (!VALID_TYPES.includes(options.type as CompletionType)) process.exit(0);
     const type = options.type as CompletionType;
-    const cache = await loadCache();
-    let cacheKey: string = type;
+
+    // All completion types require a channel to be configured
+    const channel = await getConfigValue('default.channel');
+    if (!channel) process.exit(0);
+
+    // Resolve handle → canonical channel ID for namespacing
+    const channelId = await getChannelId(channel);
+    const cachePath = getChannelCachePath(channelId);
+    const cache = await loadCache(cachePath);
 
     let items: Array<{ id: string; title: string }> | undefined;
 
-    // Spinner for cold fetch - only show when running interactively (TTY), not from shell scripts
+    // Spinner for cold fetch - only show when running interactively (TTY)
     const isInteractive = process.stdout.isTTY;
     let spinner: ReturnType<typeof ora> | null = null;
 
     try {
       if (type === 'video-id' || type === 'playlist-id') {
-        const channel = await getConfigValue('default.channel');
-        if (!channel) process.exit(0);
-        cacheKey = `${type}:${channel}`;
-        const entry = cache[cacheKey];
+        const entry = cache[type];
         if (entry && Date.now() - entry.fetchedAt < TTL[type]) {
           items = entry.items;
         } else {
-          // Cold fetch - show spinner only in interactive mode
           if (isInteractive) {
             spinner = ora('Fetching completion candidates...').start();
           }
-          // 50 is a practical cap: enough for meaningful completion without
-          // hammering the API or making tab press noticeably slow.
           const raw = type === 'video-id'
             ? await getChannelVideos(channel, 50)
             : await listChannelPlaylists(channel, 50);
@@ -79,16 +82,15 @@ async function completeCommand(options: { type: string }): Promise<void> {
             spinner.succeed(`Fetched ${items.length} completion candidates`);
           }
           if (items.length > 0) {
-            cache[cacheKey] = { items, fetchedAt: Date.now() };
-            await saveCache(cache);
+            cache[type] = { items, fetchedAt: Date.now() };
+            await saveCache(cachePath, cache);
           }
         }
       } else if (type === 'report-type') {
-        const entry = cache[cacheKey];
+        const entry = cache[type];
         if (entry && Date.now() - entry.fetchedAt < TTL[type]) {
           items = entry.items;
         } else {
-          // Cold fetch - show spinner only in interactive mode
           if (isInteractive) {
             spinner = ora('Fetching report types...').start();
           }
@@ -102,15 +104,14 @@ async function completeCommand(options: { type: string }): Promise<void> {
             spinner.succeed(`Fetched ${items.length} report types`);
           }
           if (items.length > 0) {
-            cache[cacheKey] = { items, fetchedAt: Date.now() };
-            await saveCache(cache);
+            cache[type] = { items, fetchedAt: Date.now() };
+            await saveCache(cachePath, cache);
           }
         }
       }
 
       (items || []).forEach(item => console.log(`${item.id}\t${item.title}`));
     } finally {
-      // Ensure spinner is stopped even on error
       if (isInteractive && spinner) {
         spinner.stop();
       }
