@@ -61,6 +61,17 @@ export async function loadCacheIndex(channelId: string): Promise<CacheIndex> {
       throw new Error('Invalid cache index structure');
     }
 
+    // Validate version matches expected format
+    if (index.version !== CACHE_INDEX_VERSION) {
+      debug(`Cache index version mismatch for channel ${channelId}: ${index.version} vs ${CACHE_INDEX_VERSION}`);
+      // Return fresh index to prevent schema incompatibility issues
+      return {
+        version: CACHE_INDEX_VERSION,
+        lastUpdated: new Date().toISOString(),
+        entries: [],
+      };
+    }
+
     return index;
   } catch {
     debug(`Cache index not found or invalid for channel ${channelId}, creating new one`);
