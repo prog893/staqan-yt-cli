@@ -1,6 +1,6 @@
 # Breaking Changes
 
-## v1.5.0: Channel-isolated cache and data storage
+## v2.0.0: Channel-isolated cache and data storage
 
 **Directory structure change** — all per-channel data now lives under a channel ID namespace:
 
@@ -12,7 +12,7 @@
 
 ### ⚠️ Important: Old cached data will not be migrated
 
-After upgrading to v1.5.0:
+After upgrading to v2.0.0:
 - Existing report cache will be ignored (not deleted, but not used)
 - Tab completion will rebuild on first use
 - You'll need to re-download reports
@@ -155,202 +155,149 @@ tar -czf ~/staqan-data-backup.tar.gz ~/.staqan-yt-cli/data/
 
 ---
 
-# Migration Guide: v1.2.x → v1.3.0
+## v2.0.0: All positional arguments migrated to named flags
 
-## Breaking Changes
+**Command syntax change** — all positional arguments have been removed. Commands now use required named flags exclusively.
 
-All positional arguments have been removed. Commands now use required named flags exclusively (AWS CLI style).
+### What changed?
 
-## Command Migrations
+| Command type | Before (v1.x) | After (v2.0.0) |
+|---|---|---|
+| **Single video operations** | `staqan-yt get-video dQw4w9WgXcQ` | `staqan-yt get-video --video-id dQw4w9WgXcQ` |
+| **Batch video operations** | `staqan-yt get-videos id1 id2 id3` | `staqan-yt get-videos --video-ids id1 id2 id3` |
+| **Channel operations** | `staqan-yt list-videos @mkbhd` | `staqan-yt list-videos --channel @mkbhd` |
+| **Search operations** | `staqan-yt search-videos "query"` | `staqan-yt search-videos --query "query"` |
+| **Update operations** | `staqan-yt update-video ID --title "X"` | `staqan-yt update-video --video-id ID --title "X"` |
 
-### Video Operations
+### ⚠️ Important: All existing scripts and aliases will break
 
-#### Get Video(s)
-```bash
-# Old (v1.2.x)
-staqan-yt get-video dQw4w9WgXcQ
-staqan-yt get-videos id1 id2 id3
+After upgrading to v2.0.0:
+- Any scripts using positional arguments will fail
+- Shell aliases with hardcoded positional args will need updating
+- Command-line history with old syntax won't work
 
-# New (v1.3.0+)
-staqan-yt get-video --video-id dQw4w9WgXcQ
-staqan-yt get-videos --video-ids id1 id2 id3
-```
+### Steps after upgrade
 
-#### Update Video
-```bash
-# Old (v1.2.x)
-staqan-yt update-video dQw4w9WgXcQ --title "New Title"
+**1. Update your scripts**
 
-# New (v1.3.0+)
-staqan-yt update-video --video-id dQw4w9WgXcQ --title "New Title"
-```
-
-#### Video Analytics
-```bash
-# Old (v1.2.x)
-staqan-yt get-video-analytics dQw4w9WgXcQ
-
-# New (v1.3.0+)
-staqan-yt get-video-analytics --video-id dQw4w9WgXcQ
-```
-
-#### Video Tags
-```bash
-# Old (v1.2.x)
-staqan-yt get-video-tags dQw4w9WgXcQ
-staqan-yt update-video-tags dQw4w9WgXcQ --tags "tag1,tag2"
-
-# New (v1.3.0+)
-staqan-yt get-video-tags --video-id dQw4w9WgXcQ
-staqan-yt update-video-tags --video-id dQw4w9WgXcQ --tags "tag1,tag2"
-```
-
-#### Thumbnail
-```bash
-# Old (v1.2.x)
-staqan-yt get-thumbnail dQw4w9WgXcQ
-
-# New (v1.3.0+)
-staqan-yt get-thumbnail --video-id dQw4w9WgXcQ
-```
-
-### Channel Operations
-
-#### List Videos
-```bash
-# Old (v1.2.x)
-staqan-yt list-videos @mkbhd
-
-# New (v1.3.0+)
-staqan-yt list-videos --channel @mkbhd
-```
-
-#### Get Channel
-```bash
-# Old (v1.2.x)
-staqan-yt get-channel @mkbhd
-
-# New (v1.3.0+)
-staqan-yt get-channel --channel @mkbhd
-```
-
-### Playlist Operations
-
-#### Get Playlist(s)
-```bash
-# Old (v1.2.x)
-staqan-yt get-playlist PLxxx
-staqan-yt get-playlists id1 id2
-
-# New (v1.3.0+)
-staqan-yt get-playlist --playlist-id PLxxx
-staqan-yt get-playlists --playlist-ids id1 id2
-```
-
-### Search
-
-#### Search Videos
-```bash
-# Old (v1.2.x)
-staqan-yt search-videos "iPhone review"
-staqan-yt search-videos "iPhone review" --channel @mkbhd
-
-# New (v1.3.0+)
-staqan-yt search-videos --query "iPhone review"
-staqan-yt search-videos --query "iPhone review" --channel @mkbhd
-```
-
-### Localizations
-
-#### Get Video Localizations
-```bash
-# Old (v1.2.x)
-staqan-yt get-video-localizations id1 id2 id3
-
-# New (v1.3.0+)
-staqan-yt get-video-localizations --video-ids id1 id2 id3
-```
-
-#### Get/Update Video Localization
-```bash
-# Old (v1.2.x)
-staqan-yt get-video-localization dQw4w9WgXcQ --language ja
-staqan-yt put-video-localization dQw4w9WgXcQ ja "Japanese Title" "Description"
-staqan-yt update-video-localization dQw4w9WgXcQ --language ja --title "New Title"
-
-# New (v1.3.0+)
-staqan-yt get-video-localization --video-id dQw4w9WgXcQ --language ja
-staqan-yt put-video-localization --video-id dQw4w9WgXcQ --language ja --title "Japanese Title" --description "Description"
-staqan-yt update-video-localization --video-id dQw4w9WgXcQ --language ja --title "New Title"
-```
-
-### Captions
-
-#### List Captions
-```bash
-# Old (v1.2.x)
-staqan-yt list-captions dQw4w9WgXcQ
-
-# New (v1.3.0+)
-staqan-yt list-captions --video-id dQw4w9WgXcQ
-```
-
-#### Get Caption
-```bash
-# Old (v1.2.x)
-staqan-yt get-caption en.dQw4w9WgXcQ
-
-# New (v1.3.0+)
-staqan-yt get-caption --caption-id en.dQw4w9WgXcQ
-```
-
-### Comments
-
-#### List Comments
-```bash
-# Old (v1.2.x)
-staqan-yt list-comments dQw4w9WgXcQ
-
-# New (v1.3.0+)
-staqan-yt list-comments --video-id dQw4w9WgXcQ
-```
-
-## Script Updates
-
-### Batch Operations
-
-When scripting with batch operations, update your commands to use named flags:
+Replace positional arguments with named flags:
 
 ```bash
-# Old
+# Old (v1.x)
 cat video_ids.txt | xargs -I {} staqan-yt update-video {} --title "New Title" --yes
 
-# New
+# New (v2.0.0)
 cat video_ids.txt | xargs -I {} staqan-yt update-video --video-id {} --title "New Title" --yes
 ```
 
-### For Loops
-
 ```bash
-# Old
+# Old (v1.x)
 for video_id in id1 id2 id3; do
   staqan-yt get-video "$video_id"
 done
 
-# New
+# New (v2.0.0)
 for video_id in id1 id2 id3; do
   staqan-yt get-video --video-id "$video_id"
 done
 ```
 
-## Benefits of the New Syntax
+**2. Update your shell aliases**
+
+```bash
+# Old (v1.x)
+alias getvid='staqan-yt get-video'
+
+# New (v2.0.0)
+alias getvid='staqan-yt get-video --video-id'
+```
+
+### Command migration reference
+
+**Video operations:**
+```bash
+# Get single video
+staqan-yt get-video --video-id dQw4w9WgXcQ
+
+# Get multiple videos
+staqan-yt get-videos --video-ids id1 id2 id3
+
+# Update video
+staqan-yt update-video --video-id dQw4w9WgXcQ --title "New Title"
+
+# Get analytics
+staqan-yt get-video-analytics --video-id dQw4w9WgXcQ
+
+# Get/update tags
+staqan-yt get-video-tags --video-id dQw4w9WgXcQ
+staqan-yt update-video-tags --video-id dQw4w9WgXcQ --tags "tag1,tag2"
+
+# Get thumbnail
+staqan-yt get-thumbnail --video-id dQw4w9WgXcQ
+```
+
+**Channel operations:**
+```bash
+# List videos
+staqan-yt list-videos --channel @mkbhd
+
+# Get channel info
+staqan-yt get-channel --channel @mkbhd
+```
+
+**Playlist operations:**
+```bash
+# Get single playlist
+staqan-yt get-playlist --playlist-id PLxxx
+
+# Get multiple playlists
+staqan-yt get-playlists --playlist-ids id1 id2
+```
+
+**Search operations:**
+```bash
+# Search videos
+staqan-yt search-videos --query "iPhone review"
+staqan-yt search-videos --query "iPhone review" --channel @mkbhd
+```
+
+**Localization operations:**
+```bash
+# Get all localizations
+staqan-yt get-video-localizations --video-ids id1 id2 id3
+
+# Get single localization
+staqan-yt get-video-localization --video-id dQw4w9WgXcQ --language ja
+
+# Create localization
+staqan-yt put-video-localization --video-id dQw4w9WgXcQ --language ja --title "Japanese Title" --description "Description"
+
+# Update localization
+staqan-yt update-video-localization --video-id dQw4w9WgXcQ --language ja --title "New Title"
+```
+
+**Caption operations:**
+```bash
+# List captions
+staqan-yt list-captions --video-id dQw4w9WgXcQ
+
+# Get caption
+staqan-yt get-caption --caption-id en.dQw4w9WgXcQ
+```
+
+**Comment operations:**
+```bash
+# List comments
+staqan-yt list-comments --video-id dQw4w9WgXcQ
+```
+
+### Benefits of the new syntax
 
 - **Self-documenting**: Command intent is clearer with named flags
 - **Flexible ordering**: Flags can be in any order
 - **Better completion**: Tab completion suggests live YouTube data
-- **AWS CLI consistency**: Matches industry-standard CLI conventions
 
-## Configuration Shortcuts
+### Configuration shortcuts
 
 You can set default values in your config to avoid repeating common flags:
 
@@ -362,7 +309,7 @@ staqan-yt config set default.channel @mkbhd
 staqan-yt list-videos --limit 10
 ```
 
-## Need Help?
+### Need help?
 
 Run `staqan-yt <command> --help` for usage information.
 
