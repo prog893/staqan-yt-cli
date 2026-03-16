@@ -150,6 +150,7 @@ staqan-yt get-report-data
 ### Options
 
 - `--type <id>` - Report type ID (e.g., `channel_reach_basic_a1`)
+- `-c, --channel <handle>` - Channel handle or ID (overrides config default)
 - `--video-id <id>` - Filter by video ID
 - `--start-date <date>` - Start date (YYYY-MM-DD)
 - `--end-date <date>` - End date (YYYY-MM-DD)
@@ -229,7 +230,12 @@ staqan-yt get-report-data \
 
 **⚡ Caching:** The `get-report-data` command automatically caches downloaded reports. Subsequent requests for the same date range are instant (loaded from cache).
 
-Cache location: `~/.staqan-yt-cli/data/reports/`
+Cache location: `~/.staqan-yt-cli/data/{channelId}/reports/`
+
+**Required:** Set a default channel or pass `--channel`:
+```bash
+staqan-yt config set default.channel @yourchannel
+```
 
 ### Data Freshness
 
@@ -251,6 +257,7 @@ staqan-yt fetch-reports
 
 ### Options
 
+- `-c, --channel <handle>` - Channel handle or ID (overrides config default)
 - `-t, --type <id>` - Fetch specific report type
 - `-T, --types <ids>` - Fetch multiple report types (comma-separated)
 - `--start-date <date>` - Filter by start date (YYYY-MM-DD)
@@ -291,8 +298,13 @@ staqan-yt fetch-reports --force
 
 **Solution:** Use `fetch-reports` periodically to:
 - Download all available reports before they expire
-- Store them locally in `~/.staqan-yt-cli/data/reports/`
+- Store them locally in `~/.staqan-yt-cli/data/{channelId}/reports/`
 - Access historical data anytime via `get-report-data`
+
+**Required:** Set a default channel first:
+```bash
+staqan-yt config set default.channel @yourchannel
+```
 
 ### Recommended Workflow
 

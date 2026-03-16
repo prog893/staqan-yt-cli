@@ -211,15 +211,17 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
         continue;
       }
 
-      // Filter by date range if specified
+      // Filter by date range if specified (compare date portions only)
       if (options.startDate || options.endDate) {
-        const allMinDate = reports[reports.length - 1].startTime; // Oldest
-        const allMaxDate = reports[0].endTime; // Newest
-        const filteredStart = options.startDate || allMinDate!;
-        const filteredEnd = options.endDate || allMaxDate!;
+        const allMinDate = reports[reports.length - 1].startTime!.split('T')[0]; // Oldest
+        const allMaxDate = reports[0].endTime!.split('T')[0]; // Newest
+        const filteredStart = options.startDate || allMinDate;
+        const filteredEnd = options.endDate || allMaxDate;
 
         reports = reports.filter((report: typeof reports[0]) => {
-          return report.startTime! >= filteredStart && report.endTime! <= filteredEnd;
+          const reportStart = report.startTime!.split('T')[0];
+          const reportEnd = report.endTime!.split('T')[0];
+          return reportStart >= filteredStart && reportEnd <= filteredEnd;
         });
 
         debug(`Filtered to ${reports.length} report(s) for date range`);

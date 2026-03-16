@@ -181,9 +181,9 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       process.exit(0);
     }
 
-    // Step 3: Validate date range
-    const minDate = reports[reports.length - 1].startTime; // Oldest
-    const maxDate = reports[0].endTime; // Newest
+    // Step 3: Validate date range (API returns timestamps, compare date portions only)
+    const minDate = reports[reports.length - 1].startTime!.split('T')[0]; // Oldest
+    const maxDate = reports[0].endTime!.split('T')[0]; // Newest
 
     const requestedStart = options.startDate || minDate;
     const requestedEnd = options.endDate || maxDate;
@@ -220,9 +220,11 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       process.exit(1);
     }
 
-    // Step 4: Filter reports by date range
+    // Step 4: Filter reports by date range (compare date portions only)
     reports = reports.filter((report: typeof reports[0]) => {
-      return report.startTime! >= requestedStart && report.endTime! <= requestedEnd;
+      const reportStart = report.startTime!.split('T')[0];
+      const reportEnd = report.endTime!.split('T')[0];
+      return reportStart >= requestedStart && reportEnd <= requestedEnd;
     });
 
     if (reports.length === 0) {

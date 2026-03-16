@@ -348,6 +348,7 @@ export async function deleteReportFromCache(
 
 /**
  * Compute overlap between two date ranges
+ * Normalizes all inputs to date-only (YYYY-MM-DD) before comparison
  * Returns null if no overlap
  */
 export function computeDateRangeOverlap(
@@ -356,10 +357,16 @@ export function computeDateRangeOverlap(
   start2: string,
   end2: string
 ): { start: string; end: string } | null {
-  const s1 = new Date(start1).getTime();
-  const e1 = new Date(end1).getTime();
-  const s2 = new Date(start2).getTime();
-  const e2 = new Date(end2).getTime();
+  // Normalize to date-only strings (handle both YYYY-MM-DD and ISO timestamps)
+  const d1 = start1.split('T')[0];
+  const d2 = end1.split('T')[0];
+  const d3 = start2.split('T')[0];
+  const d4 = end2.split('T')[0];
+
+  const s1 = new Date(d1).getTime();
+  const e1 = new Date(d2).getTime();
+  const s2 = new Date(d3).getTime();
+  const e2 = new Date(d4).getTime();
 
   const overlapStart = Math.max(s1, s2);
   const overlapEnd = Math.min(e1, e2);
@@ -477,32 +484,35 @@ export async function analyzeCacheCoverage(
   const notCovered: string[] = [];
 
   const cachedRanges = cachedReports.map(r => ({
-    start: r.startTime,
-    end: r.endTime,
+    start: r.startTime.split('T')[0],
+    end: r.endTime.split('T')[0],
   }));
 
   const gaps = findDateGaps(cachedRanges, requestedStart, requestedEnd);
 
   for (const cachedReport of cachedReports) {
+    const cachedStart = cachedReport.startTime.split('T')[0];
+    const cachedEnd = cachedReport.endTime.split('T')[0];
+
     const overlap = computeDateRangeOverlap(
-      cachedReport.startTime,
-      cachedReport.endTime,
+      cachedStart,
+      cachedEnd,
       requestedStart,
       requestedEnd
     );
 
     if (!overlap) continue;
 
-    if (overlap.start === cachedReport.startTime && overlap.end === cachedReport.endTime) {
-      fullyCovered.push(`${cachedReport.startTime}/${cachedReport.endTime}`);
+    if (overlap.start === cachedStart && overlap.end === cachedEnd) {
+      fullyCovered.push(`${cachedStart}/${cachedEnd}`);
     } else {
-      const missingStart = overlap.start < cachedReport.startTime
+      const missingStart = overlap.start < cachedStart
         ? overlap.start
-        : new Date(new Date(cachedReport.endTime).getTime() + 86400000).toISOString().split('T')[0];
+        : new Date(new Date(cachedEnd).getTime() + 86400000).toISOString().split('T')[0];
 
-      const missingEnd = overlap.end > cachedReport.endTime
+      const missingEnd = overlap.end > cachedEnd
         ? overlap.end
-        : new Date(new Date(cachedReport.startTime).getTime() - 86400000).toISOString().split('T')[0];
+        : new Date(new Date(cachedStart).getTime() - 86400000).toISOString().split('T')[0];
 
       partiallyCovered.push({
         range: { start: requestedStart, end: requestedEnd },
