@@ -8,28 +8,10 @@ import { OutputOption, VerboseOption, VideoIdOption, VideoIdsOption } from '../t
 async function videoInfoCommand(options: OutputOption & VerboseOption & (VideoIdOption | VideoIdsOption)): Promise<void> {
   initCommand(options);
 
-  // Mutual exclusion check: prevent using both --video-id and --video-ids
-  const hasVideoId = 'video-id' in options && options['video-id'];
-  const hasVideoIds = 'video-ids' in options && options['video-ids'];
-
-  if (hasVideoId && hasVideoIds) {
-    console.error(chalk.red('Error: Cannot use both --video-id and --video-ids simultaneously.'));
-    console.error(chalk.yellow('Use --video-id for a single video or --video-ids for multiple videos.'));
-    process.exit(1);
-  }
-
-  // Handle both --video-id (single) and --video-ids (multiple)
-  let videoIds: string[] = [];
-  if (hasVideoId) {
-    videoIds = [options['video-id']!]; // Non-null assertion after validation
-  } else if (hasVideoIds) {
-    videoIds = options['video-ids']!; // Non-null assertion after validation
-  }
-
-  if (videoIds.length === 0) {
-    console.error('Error: Required: --video-id or --video-ids');
-    process.exit(1);
-  }
+  // Dispatch: get-video passes --video-id (string), get-videos passes --video-ids (string[])
+  const videoIds: string[] = 'video-ids' in options && options['video-ids']
+    ? (options as VideoIdsOption)['video-ids']!
+    : [(options as VideoIdOption)['video-id']!];
 
   await withSpinner('Fetching video information...', 'Failed to fetch video information', async (spinner) => {
     debug(`Parsing ${videoIds.length} video ID(s)`, videoIds);

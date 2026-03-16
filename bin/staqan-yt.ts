@@ -495,7 +495,7 @@ program
 
 const completeCmd = new Command('__complete')
   .description('Internal completion helper')
-  .option('--type <type>', 'Completion type: video-id, playlist-id, report-type')
+  .requiredOption('--type <type>', 'Completion type: video-id, playlist-id, report-type')
   .action(completeCommand);
 program.addCommand(completeCmd, { hidden: true });
 

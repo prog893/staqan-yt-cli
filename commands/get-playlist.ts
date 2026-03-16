@@ -8,28 +8,10 @@ import { OutputOption, VerboseOption, PlaylistIdOption, PlaylistIdsOption } from
 async function getPlaylistCommand(options: OutputOption & VerboseOption & (PlaylistIdOption | PlaylistIdsOption)): Promise<void> {
   initCommand(options);
 
-  // Mutual exclusion check: prevent using both --playlist-id and --playlist-ids
-  const hasPlaylistId = 'playlist-id' in options && options['playlist-id'];
-  const hasPlaylistIds = 'playlist-ids' in options && options['playlist-ids'];
-
-  if (hasPlaylistId && hasPlaylistIds) {
-    console.error(chalk.red('Error: Cannot use both --playlist-id and --playlist-ids simultaneously.'));
-    console.error(chalk.yellow('Use --playlist-id for a single playlist or --playlist-ids for multiple playlists.'));
-    process.exit(1);
-  }
-
-  // Handle both --playlist-id (single) and --playlist-ids (multiple)
-  let playlistIds: string[] = [];
-  if (hasPlaylistId) {
-    playlistIds = [options['playlist-id']!]; // Non-null assertion after validation
-  } else if (hasPlaylistIds) {
-    playlistIds = options['playlist-ids']!; // Non-null assertion after validation
-  }
-
-  if (playlistIds.length === 0) {
-    console.error('Error: Required: --playlist-id or --playlist-ids');
-    process.exit(1);
-  }
+  // Dispatch: get-playlist passes --playlist-id (string), get-playlists passes --playlist-ids (string[])
+  const playlistIds: string[] = 'playlist-ids' in options && options['playlist-ids']
+    ? (options as PlaylistIdsOption)['playlist-ids']!
+    : [(options as PlaylistIdOption)['playlist-id']!];
 
   await withSpinner('Fetching playlist information...', 'Failed to fetch playlist information', async (spinner) => {
     const parsedIds = playlistIds.map(parsePlaylistId);
