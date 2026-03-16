@@ -10,7 +10,7 @@ import { google } from 'googleapis';
 import { getChannelVideos, listChannelPlaylists } from '../lib/youtube';
 import { getConfigValue } from '../lib/config';
 import { getAuthenticatedClient } from '../lib/auth';
-import { CONFIG_DIR, ensureConfigDir } from '../lib/utils';
+import { CONFIG_DIR, ensureConfigDir, debug } from '../lib/utils';
 import { CompletionType, CompletionCache } from '../types';
 
 const CACHE_PATH = path.join(CONFIG_DIR, 'completion-cache.json');
@@ -33,8 +33,8 @@ async function saveCache(cache: CompletionCache): Promise<void> {
   try {
     await ensureConfigDir();
     await fs.writeFile(CACHE_PATH, JSON.stringify(cache));
-  } catch {
-    // silent
+  } catch (err) {
+    debug('Failed to save completion cache:', (err as Error).message);
   }
 }
 

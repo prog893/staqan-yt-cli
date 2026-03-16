@@ -241,6 +241,14 @@ staqan-yt get-playlist --playlist-id <playlistId>
 - `-v, --verbose` - Enable verbose output with debug information
 - `-h, --help` - Show help
 
+### Note on Flag Variants
+
+`get-playlist` accepts both `--playlist-id <id>` (single playlist) and `--playlist-ids <id...>` (multiple playlists):
+- Use `--playlist-id` for retrieving a single playlist
+- Use `--playlist-ids` for batch operations with multiple playlists
+
+For consistency, consider using `get-playlists --playlist-ids` for multiple playlists.
+
 ### Examples
 
 ```bash

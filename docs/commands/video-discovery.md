@@ -22,6 +22,14 @@ staqan-yt get-video --video-id <videoId>
 - `-v, --verbose` - Enable verbose output with debug information
 - `-h, --help` - Show help
 
+### Note on Flag Variants
+
+`get-video` accepts both `--video-id <id>` (single video) and `--video-ids <id...>` (multiple videos):
+- Use `--video-id` for retrieving a single video
+- Use `--video-ids` for batch operations with multiple videos
+
+For consistency, consider using `get-videos --video-ids` for multiple videos.
+
 ### Examples
 
 ```bash
