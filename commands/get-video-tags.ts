@@ -6,8 +6,15 @@ import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { GetTagsOptions } from '../types';
 
-async function getVideoTagsCommand(videoId: string, options: GetTagsOptions): Promise<void> {
+async function getVideoTagsCommand(options: GetTagsOptions): Promise<void> {
   initCommand(options);
+
+  // Extract video ID from options
+  const videoId = options['video-id'];
+  if (!videoId) {
+    error('Required: --video-id');
+    process.exit(1);
+  }
 
   await withSpinner('Fetching video tags...', 'Failed to fetch video tags', async (spinner) => {
     const parsedId = parseVideoId(videoId);

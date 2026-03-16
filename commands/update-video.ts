@@ -1,10 +1,16 @@
 import chalk from 'chalk';
 import { getVideoInfo, updateVideoMetadata } from '../lib/youtube';
 import { parseVideoId, confirm, success, error, warning, info, debug, initCommand, createSpinner } from '../lib/utils';
-import { UpdateVideoOptions } from '../types';
+import { UpdateVideoOptions, VideoIdOption } from '../types';
 
-async function updateMetadataCommand(videoId: string, options: UpdateVideoOptions): Promise<void> {
+async function updateMetadataCommand(options: UpdateVideoOptions & VideoIdOption): Promise<void> {
   initCommand(options);
+
+  const videoId = options['video-id'];
+  if (!videoId) {
+    error('Required: --video-id');
+    process.exit(1);
+  }
 
   try {
     debug(`Video ID input: ${videoId}`);

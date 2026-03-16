@@ -3,20 +3,20 @@ import { getChannelInfo } from '../lib/youtube';
 import { formatDate, formatNumber, error, debug, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
-import { OutputOption, VerboseOption } from '../types';
+import { ChannelOption, OutputOption, VerboseOption } from '../types';
 
-async function getChannelCommand(channelHandle: string | undefined, options: OutputOption & VerboseOption): Promise<void> {
+async function getChannelCommand(options: ChannelOption & OutputOption & VerboseOption): Promise<void> {
   initCommand(options);
 
   // Resolve channel before spinner (may need to error before spinner starts)
   let handleOrId: string;
   try {
-    handleOrId = await requireChannel(channelHandle);
+    handleOrId = await requireChannel(options.channel);
     debug(`Using channel: ${handleOrId}`);
   } catch (err) {
     error((err as Error).message);
     console.log('');
-    console.log(chalk.gray('Usage:') + ' staqan-yt get-channel [channelHandle]');
+    console.log(chalk.gray('Usage:') + ' staqan-yt get-channel --channel @yourchannel');
     console.log(chalk.gray('Or set default:') + ' staqan-yt config set default.channel @yourchannel');
     process.exit(1);
   }

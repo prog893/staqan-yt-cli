@@ -11,14 +11,12 @@ Get video performance analytics (views, watch time, CTR, etc.).
 ### Usage
 
 ```bash
-staqan-yt get-video-analytics <videoId>
+staqan-yt get-video-analytics --video-id <videoId>
 ```
 
-### Arguments
-
-- `videoId` - YouTube video ID or video URL
-
 ### Options
+
+- `--video-id <id>` - YouTube video ID or video URL (required)
 
 - `--start-date <date>` - Start date (YYYY-MM-DD), defaults to upload date
 - `--end-date <date>` - End date (YYYY-MM-DD), defaults to today
@@ -31,22 +29,22 @@ staqan-yt get-video-analytics <videoId>
 
 ```bash
 # Get all analytics (default date range: upload date to today)
-staqan-yt get-video-analytics dQw4w9WgXcQ
+staqan-yt get-video-analytics --video-id dQw4w9WgXcQ
 
 # Specify date range
-staqan-yt get-video-analytics dQw4w9WgXcQ \
+staqan-yt get-video-analytics --video-id dQw4w9WgXcQ \
   --start-date=2026-01-01 \
   --end-date=2026-01-31
 
 # Get specific metrics only
-staqan-yt get-video-analytics dQw4w9WgXcQ \
+staqan-yt get-video-analytics --video-id dQw4w9WgXcQ \
   --metrics views,estimatedMinutesWatched,averageViewDuration
 
 # Export to CSV
-staqan-yt get-video-analytics dQw4w9WgXcQ --output csv > analytics.csv
+staqan-yt get-video-analytics --video-id dQw4w9WgXcQ --output csv > analytics.csv
 
 # Export to JSON for processing
-staqan-yt get-video-analytics dQw4w9WgXcQ --output json
+staqan-yt get-video-analytics --video-id dQw4w9WgXcQ --output json
 ```
 
 ### Default Metrics
@@ -89,12 +87,12 @@ Get audience retention curve (% of viewers at each point in video).
 ### Usage
 
 ```bash
-staqan-yt get-video-retention <videoId>
+staqan-yt get-video-retention --video-id <videoId>
 ```
 
-### Arguments
+### Options
 
-- `videoId` - YouTube video ID or video URL
+- `--video-id <id>` - YouTube video ID or video URL (required)
 
 ### Options
 
@@ -106,13 +104,13 @@ staqan-yt get-video-retention <videoId>
 
 ```bash
 # Get retention curve
-staqan-yt get-video-retention dQw4w9WgXcQ
+staqan-yt get-video-retention --video-id dQw4w9WgXcQ
 
 # Export to CSV for graphing
-staqan-yt get-video-retention dQw4w9WgXcQ --output csv > retention.csv
+staqan-yt get-video-retention --video-id dQw4w9WgXcQ --output csv > retention.csv
 
 # Export to JSON
-staqan-yt get-video-retention dQw4w9WgXcQ --output json
+staqan-yt get-video-retention --video-id dQw4w9WgXcQ --output json
 ```
 
 ### Output Structure
@@ -126,14 +124,14 @@ Each data point represents:
 
 **Find drop-off points:**
 ```bash
-staqan-yt get-video-retention VIDEO_ID --output csv | \
+staqan-yt get-video-retention --video-id VIDEO_ID --output csv | \
   awk -F, 'NR>1 && $2 < 50 {print $1, "seconds: retention below 50%"}'
 ```
 
 **Graph retention curve:**
 ```bash
 # Requires gnuplot or similar
-staqan-yt get-video-retention VIDEO_ID --output csv | \
+staqan-yt get-video-retention --video-id VIDEO_ID --output csv | \
   tail -n +2 | \
   gnuplot -e "plot '-' using 1:2 with lines"
 ```
@@ -147,14 +145,12 @@ Get YouTube search terms that led viewers to this video.
 ### Usage
 
 ```bash
-staqan-yt get-search-terms <videoId>
+staqan-yt get-search-terms --video-id <videoId>
 ```
 
-### Arguments
-
-- `videoId` - YouTube video ID or video URL
-
 ### Options
+
+- `--video-id <id>` - YouTube video ID or video URL (required)
 
 - `-l, --limit <number>` - Limit number of results (default: 50)
 - `--output <format>` - Output format: json, table, text, pretty (default: pretty)
@@ -165,13 +161,13 @@ staqan-yt get-search-terms <videoId>
 
 ```bash
 # Get top search terms
-staqan-yt get-search-terms dQw4w9WgXcQ
+staqan-yt get-search-terms --video-id dQw4w9WgXcQ
 
 # Get top 100 terms
-staqan-yt get-search-terms dQw4w9WgXcQ --limit 100
+staqan-yt get-search-terms --video-id dQw4w9WgXcQ --limit 100
 
 # Export to CSV
-staqan-yt get-search-terms dQw4w9WgXcQ --output csv > search_terms.csv
+staqan-yt get-search-terms --video-id dQw4w9WgXcQ --output csv > search_terms.csv
 ```
 
 ### Output Fields
@@ -195,12 +191,12 @@ Get traffic source breakdown (search, suggested, external, etc.).
 ### Usage
 
 ```bash
-staqan-yt get-traffic-sources <videoId>
+staqan-yt get-traffic-sources --video-id <videoId>
 ```
 
-### Arguments
+### Options
 
-- `videoId` - YouTube video ID or video URL
+- `--video-id <id>` - YouTube video ID or video URL (required)
 
 ### Options
 
@@ -212,10 +208,10 @@ staqan-yt get-traffic-sources <videoId>
 
 ```bash
 # Get traffic sources
-staqan-yt get-traffic-sources dQw4w9WgXcQ
+staqan-yt get-traffic-sources --video-id dQw4w9WgXcQ
 
 # Export to CSV
-staqan-yt get-traffic-sources dQw4w9WgXcQ --output csv > traffic_sources.csv
+staqan-yt get-traffic-sources --video-id dQw4w9WgXcQ --output csv > traffic_sources.csv
 ```
 
 ### Common Traffic Sources
@@ -409,16 +405,16 @@ staqan-yt get-channel-search-terms @yourchannel --output csv > search_terms.csv
 # Get analytics for all videos in a channel
 staqan-yt list-videos @yourchannel --output json | \
   jq -r '.[].id' | \
-  xargs -I {} staqan-yt get-video-analytics {} --output csv > all_analytics.csv
+  xargs -I {} staqan-yt get-video-analytics --video-id {} --output csv > all_analytics.csv
 ```
 
 ### Compare Video Performance
 
 ```bash
 # Get analytics for multiple videos and compare
-staqan-yt get-videos VIDEO_ID_1 VIDEO_ID_2 VIDEO_ID_3 --output json | \
+staqan-yt get-videos --video-ids VIDEO_ID_1 VIDEO_ID_2 VIDEO_ID_3 --output json | \
   jq -r '.[].id' | \
-  xargs -I {} sh -c 'echo "{}:"; staqan-yt get-video-analytics {} --output csv | head -n 2'
+  xargs -I {} sh -c 'echo "{}:"; staqan-yt get-video-analytics --video-id {} --output csv | head -n 2'
 ```
 
 ### Track Daily Views
@@ -436,7 +432,7 @@ staqan-yt get-channel-analytics @yourchannel \
 
 ```bash
 # Get retention and find drop-off points
-staqan-yt get-video-retention VIDEO_ID --output csv | \
+staqan-yt get-video-retention --video-id VIDEO_ID --output csv | \
   awk -F, 'NR>1 && $2 < 70 {print "Retention drops to", $2"% at", $1, "seconds"}'
 ```
 

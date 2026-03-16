@@ -4,8 +4,15 @@ import { parseVideoId, error, debug, initCommand, withSpinner } from '../lib/uti
 import { normalizeLanguage, getLanguageName } from '../lib/language';
 import { PutLocalizationOptions } from '../types';
 
-async function putVideoLocalizationCommand(videoId: string, options: PutLocalizationOptions): Promise<void> {
+async function putVideoLocalizationCommand(options: PutLocalizationOptions): Promise<void> {
   initCommand(options);
+
+  // Extract video ID from options
+  const videoId = options['video-id'];
+  if (!videoId) {
+    error('Required: --video-id');
+    process.exit(1);
+  }
 
   const { language, title, description } = options;
 

@@ -197,10 +197,22 @@ source ~/.zshrc
 staqan-yt config completion bash --install
 source ~/.bashrc
 
-# Use tab completion
-staqan-yt ge<Tab>              # Shows: get-video, get-videos, get-channel, etc.
-staqan-yt get-video --<Tab>    # Shows: --output, --verbose
+# Commands and flags
+staqan-yt ge<Tab>                    # get-video, get-videos, get-channel…
+staqan-yt get-video --<Tab>          # --output, --verbose
+
+# Live YouTube data completion (requires default.channel to be set)
+staqan-yt get-video --video-id <Tab>            # Video IDs with titles from your channel
+staqan-yt get-playlist --playlist-id <Tab>         # Playlist IDs with titles
+staqan-yt list-report-jobs --type <Tab>  # Report type IDs
+
+# Static value completion
+staqan-yt get-video --output <Tab>   # json  table  text  pretty  csv
+staqan-yt list-comments --sort <Tab> # top  new
+staqan-yt get-caption --format <Tab> # srt  vtt  sbv  srv2  ttml  json
 ```
+
+Dynamic completion caches results locally for 5 minutes (report types: 1 hour), so it stays fast on repeated presses.
 
 #### Enabling Completions
 

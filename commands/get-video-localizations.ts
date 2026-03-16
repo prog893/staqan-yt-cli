@@ -1,12 +1,23 @@
 import chalk from 'chalk';
 import { getAllVideoLocalizations } from '../lib/youtube';
-import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, error, debug, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
-import { LocalizationOptions, VideoLocalization } from '../types';
+import { VideoIdsOption, VideoLocalization, OutputOption, VerboseOption } from '../types';
 
-async function getVideoLocalizations(videoIds: string[], options: LocalizationOptions): Promise<void> {
+interface GetVideoLocalizationsOptions extends OutputOption, VerboseOption, VideoIdsOption {
+  languages?: string;
+}
+
+async function getVideoLocalizations(options: GetVideoLocalizationsOptions): Promise<void> {
   initCommand(options);
+
+  // Extract video IDs from options
+  const videoIds = options['video-ids'];
+  if (!videoIds || videoIds.length === 0) {
+    error('Required: --video-ids');
+    process.exit(1);
+  }
 
   await withSpinner('Fetching video localizations...', 'Failed to fetch video localizations', async (spinner) => {
     debug(`Parsing ${videoIds.length} video ID(s)`, videoIds);

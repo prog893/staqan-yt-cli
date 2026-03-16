@@ -6,8 +6,15 @@ import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { RetentionOptions } from '../types';
 
-async function getRetentionCommand(videoId: string, options: RetentionOptions): Promise<void> {
+async function getRetentionCommand(options: RetentionOptions): Promise<void> {
   initCommand(options);
+
+  // Extract video ID from options
+  const videoId = options['video-id'];
+  if (!videoId) {
+    error('Required: --video-id');
+    process.exit(1);
+  }
 
   await withSpinner('Fetching video information...', 'Failed to fetch retention data', async (spinner) => {
     const parsedId = parseVideoId(videoId);

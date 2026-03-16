@@ -144,21 +144,28 @@ staqan-yt-cli/
 
 ### 2. AWS API Naming Conventions
 
-**CRITICAL**: All commands must follow AWS API naming conventions:
+**CRITICAL**: All commands must follow AWS API naming conventions and use **NO positional arguments**.
+
+**🚨 RULE: Everything is a named flag. No positional arguments at all.**
 
 **Singular = Single-item operations**
 ```bash
-get-video <videoId>        # Get ONE video
-update-video <videoId>     # Update ONE video
-delete-video <videoId>     # Delete ONE video (if added)
+get-video --video-id <id>        # Get ONE video
+update-video --video-id <id>     # Update ONE video
+delete-video --video-id <id>     # Delete ONE video (if added)
 ```
 
 **Plural = Batch/list operations**
 ```bash
-get-videos <id1> <id2>     # Get MULTIPLE videos (batch)
-list-videos <channel>      # List videos in channel
-search-videos <ch> <query> # Search multiple videos
+get-videos --video-ids <id1> <id2>     # Get MULTIPLE videos (batch)
+list-videos --channel <handle>         # List videos in channel
+search-videos --query <text>            # Search multiple videos
 ```
+
+**Required flags pattern:**
+- Single ID: Use `--resource-id <id>` (singular flag name, singular ID)
+- Multiple IDs: Use `--resource-ids <id...>` (plural flag name, variadic IDs)
+- Other required params: Use descriptive flag names (e.g., `--query <text>`)
 
 **Naming pattern:**
 - Use `get-` for retrieving resources
@@ -168,6 +175,7 @@ search-videos <ch> <query> # Search multiple videos
 - Use `search-` for querying resources
 - Use singular nouns for single-item operations
 - Use plural nouns for batch/list operations
+- **ALL parameters use flags** (no positional arguments)
 
 ### 3. Credential Management
 
@@ -1020,6 +1028,36 @@ git push && git push --tags
 - `1.2.3` → `1.2.4` - Bug fix, documentation update
 - `1.2.4` → `1.3.0` - Added new `list-playlists` command
 - `1.3.0` → `2.0.0` - Only if explicitly instructed for major breaking change
+
+## Hidden Internal Commands
+
+Some commands are registered with Commander's `{ hidden: true }` option and never appear in `staqan-yt help` output. They are implementation details and must **not** be documented in user-facing docs (README, docs/).
+
+### `__complete`
+
+**File:** `commands/complete.ts`
+**Registered in:** `bin/staqan-yt.ts` via `program.addCommand(cmd, { hidden: true })`
+
+**Purpose:** Subprocess helper for shell tab completion scripts. Shell scripts (bash/zsh) call this command and use its stdout as completion candidates.
+
+**Usage:**
+```bash
+staqan-yt __complete --type video-id      # Video IDs + titles for default channel
+staqan-yt __complete --type playlist-id   # Playlist IDs + titles for default channel
+staqan-yt __complete --type report-type   # Report type IDs + names
+```
+
+**Output format:** One `id\ttitle` per line (tab-separated). No spinners, no chalk, no extra output.
+
+**Caching:** Results are cached in `~/.staqan-yt-cli/completion-cache.json`:
+- `video-id` / `playlist-id`: 5-minute TTL, keyed as `video-id:@channel`
+- `report-type`: 1-hour TTL, keyed as `report-type`
+
+**Error handling:** Any error (no auth, no default channel, network failure) causes silent `process.exit(0)` — completion simply shows no candidates rather than printing an error to the terminal.
+
+**Shell integration:** The generated bash/zsh scripts in `lib/completion.ts` call `__complete` as a subprocess and feed its output into `_describe` (zsh) or `compgen -W` (bash).
+
+---
 
 ## Common Pitfalls
 

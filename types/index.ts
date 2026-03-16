@@ -99,6 +99,31 @@ export interface LanguageMap {
   [key: string]: LanguageInfo;
 }
 
+// ID option types for commands (replacing positional arguments)
+export interface VideoIdOption {
+  'video-id'?: string;
+}
+
+export interface VideoIdsOption {
+  'video-ids'?: string[];
+}
+
+export interface PlaylistIdOption {
+  'playlist-id'?: string;
+}
+
+export interface PlaylistIdsOption {
+  'playlist-ids'?: string[];
+}
+
+export interface CaptionIdOption {
+  'caption-id'?: string;
+}
+
+export interface QueryOption {
+  query?: string;
+}
+
 // Command option types
 export interface VerboseOption {
   verbose?: boolean;
@@ -118,6 +143,10 @@ export interface TypeFilterOption {
   type?: 'short' | 'regular';
 }
 
+export interface ChannelOption {
+  channel?: string;
+}
+
 export interface UpdateVideoOptions extends VerboseOption {
   title?: string;
   description?: string;
@@ -125,42 +154,42 @@ export interface UpdateVideoOptions extends VerboseOption {
   yes?: boolean;
 }
 
-export interface LocalizationOptions extends VerboseOption, OutputOption {
+export interface LocalizationOptions extends VerboseOption, OutputOption, VideoIdOption {
   language?: string;
   languages?: string;
 }
 
-export interface PutLocalizationOptions extends VerboseOption {
+export interface PutLocalizationOptions extends VerboseOption, VideoIdOption {
   language: string;
   title: string;
   description: string;
 }
 
-export interface UpdateLocalizationOptions extends VerboseOption {
+export interface UpdateLocalizationOptions extends VerboseOption, VideoIdOption {
   language: string;
   title?: string;
   description?: string;
 }
 
 // Analytics command options
-export interface AnalyticsOptions extends OutputOption, VerboseOption {
+export interface AnalyticsOptions extends OutputOption, VerboseOption, VideoIdOption {
   startDate?: string;
   endDate?: string;
   metrics?: string;
 }
 
-export interface SearchTermsOptions extends OutputOption, VerboseOption {
+export interface SearchTermsOptions extends OutputOption, VerboseOption, VideoIdOption {
   limit?: string;
 }
 
-export interface TrafficSourcesOptions extends OutputOption, VerboseOption {}
+export interface TrafficSourcesOptions extends OutputOption, VerboseOption, VideoIdOption {}
 
-export interface RetentionOptions extends OutputOption, VerboseOption {}
+export interface RetentionOptions extends OutputOption, VerboseOption, VideoIdOption {}
 
 // Tags command options
-export interface GetTagsOptions extends OutputOption, VerboseOption {}
+export interface GetTagsOptions extends OutputOption, VerboseOption, VideoIdOption {}
 
-export interface UpdateTagsOptions extends VerboseOption {
+export interface UpdateTagsOptions extends VerboseOption, VideoIdOption {
   tags?: string;
   add?: string;
   remove?: string;
@@ -169,7 +198,7 @@ export interface UpdateTagsOptions extends VerboseOption {
 }
 
 // Thumbnail command options
-export interface GetThumbnailOptions extends OutputOption, VerboseOption {
+export interface GetThumbnailOptions extends OutputOption, VerboseOption, VideoIdOption {
   quality?: string;
 }
 
@@ -180,7 +209,7 @@ export interface UpdateThumbnailOptions extends VerboseOption {
 }
 
 // Comments command options
-export interface ListCommentsOptions extends OutputOption, VerboseOption, LimitOption {
+export interface ListCommentsOptions extends OutputOption, VerboseOption, LimitOption, VideoIdOption {
   sort?: 'top' | 'new';
 }
 
@@ -259,15 +288,15 @@ export interface CaptionInfo {
 }
 
 // Captions command options
-export interface ListCaptionsOptions extends OutputOption, VerboseOption {}
+export interface ListCaptionsOptions extends OutputOption, VerboseOption, VideoIdOption {}
 
-export interface GetCaptionOptions extends OutputOption, VerboseOption {
+export interface GetCaptionOptions extends OutputOption, VerboseOption, CaptionIdOption {
   download?: boolean;
   format?: CaptionFormat;
 }
 
 // Channel analytics command options
-export interface ChannelAnalyticsOptions extends OutputOption, VerboseOption {
+export interface ChannelAnalyticsOptions extends ChannelOption, OutputOption, VerboseOption {
   report?: 'demographics' | 'devices' | 'geography' | 'traffic-sources' | 'subscription-status';
   startDate?: string;
   endDate?: string;
@@ -276,7 +305,7 @@ export interface ChannelAnalyticsOptions extends OutputOption, VerboseOption {
 }
 
 // Channel search terms command options
-export interface ChannelSearchTermsOptions extends OutputOption, VerboseOption, LimitOption {
+export interface ChannelSearchTermsOptions extends ChannelOption, OutputOption, VerboseOption, LimitOption {
   contentType?: 'all' | 'video' | 'shorts';
   startDate?: string;
   endDate?: string;
@@ -302,6 +331,16 @@ export interface Config {
 }
 
 export type ConfigKey = 'default.channel' | 'default.output';
+
+// Completion types
+export type CompletionType = 'video-id' | 'playlist-id' | 'report-type';
+
+export interface CompletionCacheEntry {
+  items: Array<{ id: string; title: string }>;
+  fetchedAt: number;
+}
+
+export type CompletionCache = Record<string, CompletionCacheEntry>;
 
 // Cache-related types
 export interface CacheIndexEntry {

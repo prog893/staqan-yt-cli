@@ -9,12 +9,12 @@ Get detailed metadata for a single video.
 ### Usage
 
 ```bash
-staqan-yt get-video <videoId>
+staqan-yt get-video --video-id <videoId>
 ```
 
-### Arguments
+### Options
 
-- `videoId` - YouTube video ID (11 characters) or video URL
+- `--video-id <id>` - YouTube video ID (11 characters) or video URL (required)
 
 ### Options
 
@@ -22,20 +22,28 @@ staqan-yt get-video <videoId>
 - `-v, --verbose` - Enable verbose output with debug information
 - `-h, --help` - Show help
 
+### Note on Flag Variants
+
+`get-video` accepts both `--video-id <id>` (single video) and `--video-ids <id...>` (multiple videos):
+- Use `--video-id` for retrieving a single video
+- Use `--video-ids` for batch operations with multiple videos
+
+For consistency, consider using `get-videos --video-ids` for multiple videos.
+
 ### Examples
 
 ```bash
 # Get video by ID
-staqan-yt get-video dQw4w9WgXcQ
+staqan-yt get-video --video-id dQw4w9WgXcQ
 
 # Get video by URL
-staqan-yt get-video https://www.youtube.com/watch?v=dQw4w9WgXcQ
+staqan-yt get-video --video-id https://www.youtube.com/watch?v=dQw4w9WgXcQ
 
 # Output as JSON
-staqan-yt get-video dQw4w9WgXcQ --output json
+staqan-yt get-video --video-id dQw4w9WgXcQ --output json
 
 # Output as table
-staqan-yt get-video dQw4w9WgXcQ --output table
+staqan-yt get-video --video-id dQw4w9WgXcQ --output table
 ```
 
 ### Output Fields
@@ -68,12 +76,12 @@ Get detailed metadata for multiple videos in a single batch operation.
 ### Usage
 
 ```bash
-staqan-yt get-videos <videoIds...>
+staqan-yt get-videos --video-ids <videoIds...>
 ```
 
-### Arguments
+### Options
 
-- `videoIds...` - One or more YouTube video IDs (space-separated)
+- `--video-ids <ids...>` - One or more YouTube video IDs (space-separated, required)
 
 ### Options
 
@@ -85,13 +93,13 @@ staqan-yt get-videos <videoIds...>
 
 ```bash
 # Get multiple videos
-staqan-yt get-videos dQw4w9WgXcQ abc123xyz def456uvw
+staqan-yt get-videos --video-ids dQw4w9WgXcQ abc123xyz def456uvw
 
 # Output as CSV for analysis
-staqan-yt get-videos dQw4w9WgXcQ abc123xyz --output csv > videos.csv
+staqan-yt get-videos --video-ids dQw4w9WgXcQ abc123xyz --output csv > videos.csv
 
 # Get from file
-cat video_ids.txt | xargs staqan-yt get-videos --output json
+cat video_ids.txt | xargs staqan-yt get-videos --video-ids --output json
 ```
 
 ### Output Fields
@@ -119,14 +127,12 @@ Search for videos on YouTube or within a specific channel.
 ### Usage
 
 ```bash
-staqan-yt search-videos <query>
+staqan-yt search-videos --query <query>
 ```
 
-### Arguments
-
-- `query` - Search query string
-
 ### Options
+
+- `--query <text>` - Search query string (required)
 
 - `-g, --global` - Search all of YouTube (ignores channel filters)
 - `-c, --channel <handle>` - Search within a specific channel (overrides config default)
@@ -140,19 +146,19 @@ staqan-yt search-videos <query>
 ```bash
 # Search within your default channel
 staqan-yt config set default.channel @yourchannel
-staqan-yt search-videos "iPhone review"
+staqan-yt search-videos --query "iPhone review"
 
 # Search within a specific channel
-staqan-yt search-videos "craft beer" --channel @staqan
+staqan-yt search-videos --query "craft beer" --channel @staqan
 
 # Search all of YouTube
-staqan-yt search-videos "how to cook" --global
+staqan-yt search-videos --query "how to cook" --global
 
 # Limit results
-staqan-yt search-videos "tutorial" --limit 50
+staqan-yt search-videos --query "tutorial" --limit 50
 
 # Output as CSV
-staqan-yt search-videos "Python" --output csv > results.csv
+staqan-yt search-videos --query "Python" --output csv > results.csv
 ```
 
 ### Output Fields
@@ -190,7 +196,7 @@ staqan-yt search-videos "Python" --output csv > results.csv
 
 ```bash
 # Search for series episodes
-staqan-yt search-videos "Part 1" --channel @yourchannel --output json | \
+staqan-yt search-videos --query "Part 1" --channel @yourchannel --output json | \
   jq -r '.[] | "\(.title) - \(.id)"'
 ```
 
@@ -198,19 +204,19 @@ staqan-yt search-videos "Part 1" --channel @yourchannel --output json | \
 
 ```bash
 # Search and export to CSV
-staqan-yt search-videos "review" --channel @yourchannel --output csv > reviews.csv
+staqan-yt search-videos --query "review" --channel @yourchannel --output csv > reviews.csv
 
 # Search and export to JSON
-staqan-yt search-videos "tutorial" --output json > tutorials.json
+staqan-yt search-videos --query "tutorial" --output json > tutorials.json
 ```
 
 ### Batch Get Video Details
 
 ```bash
 # Search and get full details for results
-staqan-yt search-videos "keyword" --output json | \
+staqan-yt search-videos --query "keyword" --output json | \
   jq -r '.[].id' | \
-  xargs staqan-yt get-videos --output json
+  xargs staqan-yt get-videos --video-ids --output json
 ```
 
 ### Find Most Viewed Videos

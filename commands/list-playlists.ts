@@ -3,13 +3,13 @@ import { listChannelPlaylists } from '../lib/youtube';
 import { formatDate, formatNumber, debug, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
-import { OutputOption, LimitOption, VerboseOption } from '../types';
+import { ChannelOption, OutputOption, LimitOption, VerboseOption } from '../types';
 
-async function listPlaylistsCommand(channelHandle: string | undefined, options: OutputOption & LimitOption & VerboseOption): Promise<void> {
+async function listPlaylistsCommand(options: ChannelOption & OutputOption & LimitOption & VerboseOption): Promise<void> {
   initCommand(options);
 
   await withSpinner('Fetching channel playlists...', 'Failed to fetch playlists', async (spinner) => {
-    const channel = await requireChannel(channelHandle);
+    const channel = await requireChannel(options.channel);
     debug(`Using channel: ${channel}`);
 
     const limit = parseInt(options.limit || '50');

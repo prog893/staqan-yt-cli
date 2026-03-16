@@ -29,12 +29,12 @@ const MAX_VIDEO_IDS = 500;
 // YouTube founding date — used as the effective "lifetime" start
 const YOUTUBE_START_DATE = '2005-02-14';
 
-async function getChannelSearchTermsCommand(channelHandle: string | undefined, options: ChannelSearchTermsOptions): Promise<void> {
+async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions): Promise<void> {
   initCommand(options);
 
   await withSpinner('Resolving channel...', 'Failed to fetch channel search terms', async (spinner) => {
     // Resolve channel from arg or config default
-    const channelArg = await requireChannel(channelHandle);
+    const channelArg = await requireChannel(options.channel);
     debug(`Using channel: ${channelArg}`);
 
     const parsedChannel = parseChannelHandle(channelArg);

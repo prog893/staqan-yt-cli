@@ -30,12 +30,12 @@ const REPORT_TYPES: Record<string, { dimensions: string; metrics: string }> = {
   },
 };
 
-async function getChannelAnalyticsCommand(channelHandle: string | undefined, options: ChannelAnalyticsOptions): Promise<void> {
+async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Promise<void> {
   initCommand(options);
 
   await withSpinner('Fetching channel analytics...', 'Failed to fetch channel analytics', async (spinner) => {
     // Determine channel ID
-    const channelId = await requireChannel(channelHandle);
+    const channelId = await requireChannel(options.channel);
     debug(`Using channel: ${channelId}`);
 
     const parsedChannel = parseChannelHandle(channelId);

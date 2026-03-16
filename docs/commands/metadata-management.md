@@ -9,14 +9,12 @@ Update video title and/or description.
 ### Usage
 
 ```bash
-staqan-yt update-video <videoId>
+staqan-yt update-video --video-id <videoId>
 ```
 
-### Arguments
-
-- `videoId` - YouTube video ID or video URL
-
 ### Options
+
+- `--video-id <id>` - YouTube video ID or video URL (required)
 
 - `-t, --title <title>` - New video title
 - `-d, --description <description>` - New video description
@@ -30,23 +28,23 @@ staqan-yt update-video <videoId>
 
 ```bash
 # Preview changes (dry run)
-staqan-yt update-video dQw4w9WgXcQ --title "New Title" --dry-run
+staqan-yt update-video --video-id dQw4w9WgXcQ --title "New Title" --dry-run
 
 # Update title with confirmation
-staqan-yt update-video dQw4w9WgXcQ --title "Updated: My Video Title"
+staqan-yt update-video --video-id dQw4w9WgXcQ --title "Updated: My Video Title"
 
 # Update description without confirmation
-staqan-yt update-video dQw4w9WgXcQ \
+staqan-yt update-video --video-id dQw4w9WgXcQ \
   --description "New description here" \
   --yes
 
 # Update both title and description
-staqan-yt update-video dQw4w9WgXcQ \
+staqan-yt update-video --video-id dQw4w9WgXcQ \
   --title "New Title" \
   --description "New description"
 
 # Update and show result as JSON
-staqan-yt update-video dQw4w9WgXcQ \
+staqan-yt update-video --video-id dQw4w9WgXcQ \
   --title "New Title" \
   --output json
 ```
@@ -76,14 +74,12 @@ Get specific video localization for a language.
 ### Usage
 
 ```bash
-staqan-yt get-video-localization <videoId>
+staqan-yt get-video-localization --video-id <videoId>
 ```
 
-### Arguments
-
-- `videoId` - YouTube video ID or video URL
-
 ### Options
+
+- `--video-id <id>` - YouTube video ID or video URL (required)
 
 - `--language <lang>` - Language code or name (e.g., "ja", "Japanese", "ja-JP")
 - `--output <format>` - Output format: json, table, text, pretty (default: pretty)
@@ -94,16 +90,16 @@ staqan-yt get-video-localization <videoId>
 
 ```bash
 # Get main metadata language (default)
-staqan-yt get-video-localization dQw4w9WgXcQ
+staqan-yt get-video-localization --video-id dQw4w9WgXcQ
 
 # Get Japanese localization
-staqan-yt get-video-localization dQw4w9WgXcQ --language ja
+staqan-yt get-video-localization --video-id dQw4w9WgXcQ --language ja
 
 # Get Russian localization
-staqan-yt get-video-localization dQw4w9WgXcQ --language Russian
+staqan-yt get-video-localization --video-id dQw4w9WgXcQ --language Russian
 
 # Output as JSON
-staqan-yt get-video-localization dQw4w9WgXcQ --language ja --output json
+staqan-yt get-video-localization --video-id dQw4w9WgXcQ --language ja --output json
 ```
 
 ### Language Specification
@@ -135,14 +131,12 @@ Get all video localizations including the main metadata language. Supports multi
 ### Usage
 
 ```bash
-staqan-yt get-video-localizations <videoIds...>
+staqan-yt get-video-localizations --video-ids <videoIds...>
 ```
 
-### Arguments
-
-- `videoIds...` - One or more YouTube video IDs (space-separated)
-
 ### Options
+
+- `--video-ids <ids...>` - One or more YouTube video IDs (space-separated, required)
 
 - `--languages <langs>` - Comma-separated list of languages (e.g. "en,ja,ru")
 - `--output <format>` - Output format: json, table, text, pretty (default: pretty)
@@ -153,19 +147,19 @@ staqan-yt get-video-localizations <videoIds...>
 
 ```bash
 # Get all localizations for a video
-staqan-yt get-video-localizations dQw4w9WgXcQ
+staqan-yt get-video-localizations --video-ids dQw4w9WgXcQ
 
 # Get specific languages only
-staqan-yt get-video-localizations dQw4w9WgXcQ --languages en,ja,ru
+staqan-yt get-video-localizations --video-ids dQw4w9WgXcQ --languages en,ja,ru
 
 # Get localizations for multiple videos
-staqan-yt get-video-localizations dQw4w9WgXcQ abc123xyz def456uvw
+staqan-yt get-video-localizations --video-ids dQw4w9WgXcQ abc123xyz def456uvw
 
 # Export to JSON
-staqan-yt get-video-localizations dQw4w9WgXcQ --output json
+staqan-yt get-video-localizations --video-ids dQw4w9WgXcQ --output json
 
 # Export to CSV
-staqan-yt get-video-localizations dQw4w9WgXcQ --languages en,ja --output csv
+staqan-yt get-video-localizations --video-ids dQw4w9WgXcQ --languages en,ja --output csv
 ```
 
 ### Output Structure
@@ -181,7 +175,7 @@ Use `--languages` to only show specific languages:
 
 ```bash
 # Only English and Japanese
-staqan-yt get-video-localizations dQw4w9WgXcQ --languages en,ja
+staqan-yt get-video-localizations --video-ids dQw4w9WgXcQ --languages en,ja
 
 # Common language codes:
 # en - English
@@ -207,12 +201,12 @@ Create a new video localization for a language. Fails if the localization alread
 ### Usage
 
 ```bash
-staqan-yt put-video-localization <videoId>
+staqan-yt put-video-localization --video-id <videoId>
 ```
 
-### Arguments
+### Options
 
-- `videoId` - YouTube video ID or video URL
+- `--video-id <id>` - YouTube video ID or video URL (required)
 
 ### Required Options
 
@@ -230,19 +224,19 @@ staqan-yt put-video-localization <videoId>
 
 ```bash
 # Create Japanese localization
-staqan-yt put-video-localization dQw4w9WgXcQ \
+staqan-yt put-video-localization --video-id dQw4w9WgXcQ \
   --language ja \
   --title "日本語のタイトル" \
   --description "日本語の説明"
 
 # Create Russian localization
-staqan-yt put-video-localization dQw4w9WgXcQ \
+staqan-yt put-video-localization --video-id dQw4w9WgXcQ \
   --language Russian \
   --title "Название на русском" \
   --description "Описание на русском"
 
 # Create Spanish localization
-staqan-yt put-video-localization dQw4w9WgXcQ \
+staqan-yt put-video-localization --video-id dQw4w9WgXcQ \
   --language es \
   --title "Título en español" \
   --description "Descripción en español"
@@ -273,16 +267,16 @@ Update an existing video localization. Fails if the localization does not exist.
 ### Usage
 
 ```bash
-staqan-yt update-video-localization <videoId>
+staqan-yt update-video-localization --video-id <videoId>
 ```
 
-### Arguments
+### Options
 
-- `videoId` - YouTube video ID or video URL
+- `--video-id <id>` - YouTube video ID or video URL (required)
 
 ### Required Options
 
-- `--language <lang>` - Language code or name (e.g., "ja", "Japanese")
+- `--language <lang>` - Language code or name (e.g., "ja", "Japanese") (required)
 
 ### Options
 
@@ -296,17 +290,17 @@ staqan-yt update-video-localization <videoId>
 
 ```bash
 # Update Japanese title only
-staqan-yt update-video-localization dQw4w9WgXcQ \
+staqan-yt update-video-localization --video-id dQw4w9WgXcQ \
   --language ja \
   --title "更新された日本語のタイトル"
 
 # Update Japanese description only
-staqan-yt update-video-localization dQw4w9WgXcQ \
+staqan-yt update-video-localization --video-id dQw4w9WgXcQ \
   --language ja \
   --description "更新された日本語の説明"
 
 # Update both title and description
-staqan-yt update-video-localization dQw4w9WgXcQ \
+staqan-yt update-video-localization --video-id dQw4w9WgXcQ \
   --language ja \
   --title "新しいタイトル" \
   --description "新しい説明"
@@ -344,7 +338,7 @@ To create a new localization, use `put-video-localization` instead.
 ```bash
 # Update titles for multiple videos
 cat video_ids.txt | while read id; do
-  staqan-yt update-video "$id" --title "Updated: $(date +%Y-%m-%d)" --yes
+  staqan-yt update-video --video-id "$id" --title "Updated: $(date +%Y-%m-%d)" --yes
 done
 ```
 
@@ -353,7 +347,7 @@ done
 ```bash
 # Add Japanese localization to multiple videos
 cat video_ids.txt | while read id; do
-  staqan-yt put-video-localization "$id" \
+  staqan-yt put-video-localization --video-id "$id" \
     --language ja \
     --title "日本語のタイトル" \
     --description "日本語の説明"
@@ -366,7 +360,7 @@ done
 # Export localizations for all videos
 staqan-yt list-videos @yourchannel --output json | \
   jq -r '.[].id' | \
-  xargs staqan-yt get-video-localizations --output json > localizations.json
+  xargs staqan-yt get-video-localizations --video-ids --output json > localizations.json
 ```
 
 ### Update Localizations from CSV
@@ -376,7 +370,7 @@ staqan-yt list-videos @yourchannel --output json | \
 csvtool named 'video_id,language,title,description' localizations.csv | \
   tail -n +2 | \
   while IFS=, read -r video_id language title description; do
-    staqan-yt update-video-localization "$video_id" \
+    staqan-yt update-video-localization --video-id "$video_id" \
       --language "$language" \
       --title "$title" \
       --description "$description" \
@@ -391,7 +385,7 @@ csvtool named 'video_id,language,title,description' localizations.csv | \
 staqan-yt list-videos @yourchannel --output json | \
   jq -r '.[].id' | \
   while read id; do
-    if ! staqan-yt get-video-localization "$id" --language ja &>/dev/null; then
+    if ! staqan-yt get-video-localization --video-id "$id" --language ja &>/dev/null; then
       echo "$id missing Japanese localization"
     fi
   done

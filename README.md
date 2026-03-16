@@ -31,6 +31,12 @@ bun build ./bin/staqan-yt.ts --compile --outfile staqan-yt
 sudo mv staqan-yt /usr/local/bin/
 ```
 
+## Upgrading from v1.2.x?
+
+**Important:** v1.3.0 introduces breaking changes. All commands now use required named flags instead of positional arguments.
+
+See [MIGRATION.md](MIGRATION.md) for detailed migration guide.
+
 ## Quick Start
 
 ### 1. Set up OAuth Credentials
@@ -53,16 +59,16 @@ staqan-yt auth
 
 ```bash
 # List videos from a channel
-staqan-yt list-videos @mkbhd --limit 10
+staqan-yt list-videos --channel @mkbhd --limit 10
 
 # Get video information
-staqan-yt get-video dQw4w9WgXcQ
+staqan-yt get-video --video-id dQw4w9WgXcQ
 
 # Search within a channel
-staqan-yt search-videos "iPhone" --channel @mkbhd
+staqan-yt search-videos --query "iPhone" --channel @mkbhd
 
 # Get analytics
-staqan-yt get-video-analytics dQw4w9WgXcQ --output csv
+staqan-yt get-video-analytics --video-id dQw4w9WgXcQ --output csv
 
 # Archive thumbnail CTR reports
 staqan-yt fetch-reports --type=channel_reach_basic_a1
@@ -76,12 +82,12 @@ staqan-yt --version
 staqan-yt -V
 
 # Quiet mode - suppress informational messages
-staqan-yt --quiet list-videos @yourchannel
-staqan-yt -q get-video VIDEO_ID --output json
+staqan-yt --quiet list-videos --channel @yourchannel
+staqan-yt -q get-video --video-id VIDEO_ID --output json
 
 # Verbose mode - show technical debug messages
-staqan-yt --verbose list-videos @yourchannel
-staqan-yt -v update-video VIDEO_ID --title "New Title"
+staqan-yt --verbose list-videos --channel @yourchannel
+staqan-yt -v update-video --video-id VIDEO_ID --title "New Title"
 ```
 
 ## Configuration
@@ -101,7 +107,7 @@ staqan-yt list-videos --limit 5  # Uses @yourchannel
 
 ## Shell Completions
 
-Enable tab completion for commands and options:
+Enable tab completion for commands, options, and live YouTube data:
 
 ```bash
 # Auto-install completions (detects zsh or bash)
@@ -115,10 +121,20 @@ staqan-yt config completion bash --install
 source ~/.zshrc  # or source ~/.bashrc
 ```
 
-Once enabled, use tab completion:
+Once enabled, tab completion works at every level:
+
 ```bash
-staqan-yt ge<Tab>          # Shows: get-video, get-videos, get-channel, etc.
-staqan-yt get-video --<Tab> # Shows: --output, --verbose
+staqan-yt ge<Tab>                         # Commands: get-video, get-videos, get-channel…
+staqan-yt get-video --video-id <Tab>     # Live video IDs with titles from your channel
+staqan-yt get-playlist --playlist-id <Tab>  # Live playlist IDs with titles
+staqan-yt list-report-jobs --type <Tab>   # Live report type IDs
+staqan-yt get-video --output <Tab>        # json  table  text  pretty  csv
+```
+
+Dynamic ID completion uses your configured default channel and caches results locally for 5 minutes, so it stays fast. Set your channel first:
+
+```bash
+staqan-yt config set default.channel @yourchannel
 ```
 
 **Note:** Shell completions are automatically installed when using Homebrew.
@@ -149,17 +165,17 @@ Connect with Claude Desktop for natural language YouTube management:
 ### Batch Update Video Titles
 
 ```bash
-staqan-yt --quiet list-videos @mychannel --output json | \
+staqan-yt --quiet list-videos --channel @mychannel --output json | \
   jq -r '.[].id' | \
-  xargs -I {} staqan-yt update-video {} --title "New Title" --yes
+  xargs -I {} staqan-yt update-video --video-id {} --title "New Title" --yes
 ```
 
 ### Export Analytics to CSV
 
 ```bash
-staqan-yt --quiet list-videos @mychannel --output json | \
+staqan-yt --quiet list-videos --channel @mychannel --output json | \
   jq -r '.[].id' | \
-  xargs -I {} staqan-yt get-video-analytics {} --output csv > analytics.csv
+  xargs -I {} staqan-yt get-video-analytics --video-id {} --output csv > analytics.csv
 ```
 
 ### Archive All Reports

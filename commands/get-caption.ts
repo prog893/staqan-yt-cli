@@ -1,16 +1,19 @@
 import chalk from 'chalk';
 import { downloadCaption } from '../lib/youtube';
 import { error, debug, initCommand, createSpinner } from '../lib/utils';
-import { CaptionFormat, VerboseOption } from '../types';
+import { GetCaptionOptions } from '../types';
 
-interface GetCaptionOptions extends VerboseOption {
-  format?: CaptionFormat;
-}
-
-async function getCaptionCommand(captionId: string, options: GetCaptionOptions): Promise<void> {
+async function getCaptionCommand(options: GetCaptionOptions): Promise<void> {
   initCommand(options);
 
-  // Note: For caption metadata, use list-captions <videoId>
+  // Extract caption ID from options
+  const captionId = options['caption-id'];
+  if (!captionId) {
+    error('Required: --caption-id');
+    process.exit(1);
+  }
+
+  // Note: For caption metadata, use list-captions --video-id <videoId>
   // This command focuses on downloading caption content
   const format = options.format || 'json';
   const spinner = createSpinner(`Downloading caption (${format})...`).start();

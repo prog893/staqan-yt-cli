@@ -135,18 +135,32 @@ If you prefer to install completions manually:
 
 ### Using Completions
 
-Once enabled, you can use tab completion:
+Once enabled, you can use tab completion at every level:
 
 ```bash
 # Complete commands
-staqan-yt ge<Tab>          # Completes to: get-video, get-videos, get-channel, etc.
+staqan-yt ge<Tab>                    # get-video, get-videos, get-channel…
 
-# Complete options
-staqan-yt get-video --<Tab>  # Shows: --output, --verbose
+# Complete flags with live YouTube data
+staqan-yt get-video --video-id <Tab>            # Video IDs with titles from your default channel
+staqan-yt get-videos --video-ids <Tab>           # Multiple video IDs (add as many as needed)
+staqan-yt get-playlist --playlist-id <Tab>         # Playlist IDs with titles
+staqan-yt list-report-jobs --type <Tab>  # Report type IDs
 
-# Complete output formats
-staqan-yt get-video --out<Tab>  # Shows: json, table, text, pretty, csv
+# Complete options and flag values
+staqan-yt get-video --<Tab>          # --output, --verbose
+staqan-yt get-video --output <Tab>   # json  table  text  pretty  csv
+staqan-yt list-comments --sort <Tab> # top  new
+staqan-yt get-caption --format <Tab> # srt  vtt  sbv  srv2  ttml  json
 ```
+
+Dynamic ID completion (video IDs, playlist IDs, report types) fetches live data from YouTube and caches results for 5 minutes. It requires a default channel to be configured.
+
+```bash
+staqan-yt config set default.channel @yourchannel
+```
+
+If no default channel is set, flag completion for IDs falls back to no candidates (other completion still works normally).
 
 ## OAuth Setup
 
@@ -277,7 +291,7 @@ staqan-yt config set default.channel @yourchannel
 
 # Now you can omit the channel argument
 staqan-yt list-videos --limit 10
-staqan-yt search-videos "keyword"
+staqan-yt search-videos --query "keyword"
 ```
 
 ### Set Default Output Format

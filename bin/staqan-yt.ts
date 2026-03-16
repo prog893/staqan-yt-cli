@@ -5,7 +5,6 @@ import chalk from 'chalk';
 import * as path from 'path';
 import { GroupedHelp } from '../lib/customHelp';
 import { setQuiet, setVerbose } from '../lib/utils';
-import { OutputOption, VerboseOption, ChannelAnalyticsOptions } from '../types';
 import authCommand = require('../commands/auth');
 import listVideosCommand = require('../commands/list-videos');
 import getVideoCommand = require('../commands/get-video');
@@ -37,6 +36,7 @@ import listReportTypesCommand = require('../commands/list-report-types');
 import listReportJobsCommand = require('../commands/list-report-jobs');
 import getReportDataCommand = require('../commands/get-report-data');
 import fetchReportsCommand = require('../commands/fetch-reports');
+import completeCommand = require('../commands/complete');
 
 // Helper function to wrap command actions to handle "help" as an argument
 // Note: Using any[] here is pragmatic - we only check for "help" string,
@@ -188,8 +188,9 @@ program
 
 // List videos command
 program
-  .command('list-videos [channelHandle]')
+  .command('list-videos')
   .description('List all videos from a YouTube channel')
+  .option('-c, --channel <handle>', 'Channel handle or ID (overrides config default)')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-l, --limit <number>', 'Limit number of results', '50')
   .option('-t, --type <type>', 'Filter by video type (short or regular)')
@@ -198,24 +199,27 @@ program
 
 // Get single video command
 program
-  .command('get-video <videoId>')
+  .command('get-video')
   .description('Get detailed metadata for a single video')
+  .requiredOption('--video-id <id>', 'Video ID')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(withHelpWrapper('get-video', (videoId: string, options: OutputOption & VerboseOption) => getVideoCommand([videoId], options)));
+  .action(withHelpWrapper('get-video', getVideoCommand));
 
 // Get multiple videos command (batch operation)
 program
-  .command('get-videos <videoIds...>')
+  .command('get-videos')
   .description('Get detailed metadata for multiple videos')
+  .requiredOption('--video-ids <ids...>', 'One or more video IDs')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('get-videos', getVideoCommand));
 
 // Update video command
 program
-  .command('update-video <videoId>')
+  .command('update-video')
   .description('Update video title and/or description')
+  .requiredOption('--video-id <id>', 'Video ID')
   .option('-t, --title <title>', 'New video title')
   .option('-d, --description <description>', 'New video description')
   .option('--dry-run', 'Preview changes without applying them')
@@ -226,8 +230,9 @@ program
 
 // Search videos command
 program
-  .command('search-videos <query>')
+  .command('search-videos')
   .description('Search for videos on YouTube or within a specific channel')
+  .requiredOption('--query <text>', 'Search query')
   .option('-g, --global', 'Search all of YouTube (ignores channel filters)')
   .option('-c, --channel <handle>', 'Search within a specific channel (overrides config default)')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
@@ -237,8 +242,9 @@ program
 
 // Get all video localizations (plural - returns multiple)
 program
-  .command('get-video-localizations <videoIds...>')
+  .command('get-video-localizations')
   .description('Get all video localizations including main metadata language (supports multiple videos)')
+  .requiredOption('--video-ids <ids...>', 'One or more video IDs')
   .option('--languages <langs>', 'Comma-separated list of languages (e.g., "en,ja,ru")')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
@@ -246,8 +252,9 @@ program
 
 // Get single video localization (singular - returns one)
 program
-  .command('get-video-localization <videoId>')
+  .command('get-video-localization')
   .description('Get specific video localization (defaults to main metadata language)')
+  .requiredOption('--video-id <id>', 'Video ID')
   .option('--language <lang>', 'Language code or name (e.g., "ja", "Japanese")')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
@@ -255,8 +262,9 @@ program
 
 // Create new localization (PUT - fail if exists)
 program
-  .command('put-video-localization <videoId>')
+  .command('put-video-localization')
   .description('Create new video localization (fails if already exists)')
+  .requiredOption('--video-id <id>', 'Video ID')
   .requiredOption('--language <lang>', 'Language code or name (e.g., "ja", "Japanese")')
   .requiredOption('--title <title>', 'Localized title')
   .requiredOption('--description <desc>', 'Localized description')
@@ -266,8 +274,9 @@ program
 
 // Update existing localization (UPDATE - fail if doesn't exist)
 program
-  .command('update-video-localization <videoId>')
+  .command('update-video-localization')
   .description('Update existing video localization (fails if does not exist)')
+  .requiredOption('--video-id <id>', 'Video ID')
   .requiredOption('--language <lang>', 'Language code or name (e.g., "ja", "Japanese")')
   .option('--title <title>', 'New localized title')
   .option('--description <desc>', 'New localized description')
@@ -277,8 +286,9 @@ program
 
 // Analytics commands
 program
-  .command('get-video-analytics <videoId>')
+  .command('get-video-analytics')
   .description('Get video performance analytics (views, watch time, CTR, etc.)')
+  .requiredOption('--video-id <id>', 'Video ID')
   .option('--start-date <date>', 'Start date (YYYY-MM-DD), defaults to upload date')
   .option('--end-date <date>', 'End date (YYYY-MM-DD), defaults to today')
   .option('--metrics <metrics>', 'Comma-separated list of metrics to fetch')
@@ -287,38 +297,43 @@ program
   .action(withHelpWrapper('get-video-analytics', getVideoAnalytics));
 
 program
-  .command('get-search-terms <videoId>')
+  .command('get-search-terms')
   .description('Get YouTube search terms that led viewers to this video')
+  .requiredOption('--video-id <id>', 'Video ID')
   .option('-l, --limit <number>', 'Limit number of results', '50')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('get-search-terms', getSearchTerms));
 
 program
-  .command('get-traffic-sources <videoId>')
+  .command('get-traffic-sources')
   .description('Get traffic source breakdown (search, suggested, external, etc.)')
+  .requiredOption('--video-id <id>', 'Video ID')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('get-traffic-sources', getTrafficSources));
 
 program
-  .command('get-video-retention <videoId>')
+  .command('get-video-retention')
   .description('Get audience retention curve (% of viewers at each point in video)')
+  .requiredOption('--video-id <id>', 'Video ID')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('get-video-retention', getVideoRetention));
 
 // Tags commands
 program
-  .command('get-video-tags <videoId>')
+  .command('get-video-tags')
   .description('Get video tags')
+  .requiredOption('--video-id <id>', 'Video ID')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('get-video-tags', getVideoTags));
 
 program
-  .command('update-video-tags <videoId>')
+  .command('update-video-tags')
   .description('Update video tags (replace, add, or remove)')
+  .requiredOption('--video-id <id>', 'Video ID')
   .option('--tags <tags>', 'Replace all tags with comma-separated list')
   .option('--add <tags>', 'Add comma-separated tags')
   .option('--remove <tags>', 'Remove comma-separated tags')
@@ -330,8 +345,9 @@ program
 
 // Thumbnail commands
 program
-  .command('get-thumbnail <videoId>')
+  .command('get-thumbnail')
   .description('Get video thumbnail URLs')
+  .requiredOption('--video-id <id>', 'Video ID')
   .option('--quality <quality>', 'Specific quality (default, medium, high, standard, maxres)')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
@@ -346,24 +362,27 @@ program
 // Playlist commands
 // Get single playlist command (singular)
 program
-  .command('get-playlist <playlistId>')
+  .command('get-playlist')
   .description('Get detailed metadata for a single playlist')
+  .requiredOption('--playlist-id <id>', 'Playlist ID')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('get-playlist', getPlaylistCommand));
 
 // Get multiple playlists command (plural - batch operation)
 program
-  .command('get-playlists <playlistIds...>')
+  .command('get-playlists')
   .description('Get detailed metadata for multiple playlists')
+  .requiredOption('--playlist-ids <ids...>', 'One or more playlist IDs')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('get-playlists', getPlaylistsCommand));
 
 // List playlists command (plural - list collection)
 program
-  .command('list-playlists [channelHandle]')
+  .command('list-playlists')
   .description('List all playlists from a YouTube channel')
+  .option('-c, --channel <handle>', 'Channel handle or ID')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-l, --limit <number>', 'Limit number of results', '50')
   .option('-v, --verbose', 'Enable verbose output with debug information')
@@ -371,8 +390,9 @@ program
 
 // List comments command (plural - list collection)
 program
-  .command('list-comments <videoId>')
+  .command('list-comments')
   .description('List comments for a YouTube video')
+  .requiredOption('--video-id <id>', 'Video ID')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-l, --limit <number>', 'Limit number of results', '20')
   .option('-s, --sort <order>', 'Sort order: top or new', 'top')
@@ -381,8 +401,9 @@ program
 
 // Get channel command (singular - single item)
 program
-  .command('get-channel [channelHandle]')
+  .command('get-channel')
   .description('Get detailed metadata for a YouTube channel')
+  .option('-c, --channel <handle>', 'Channel handle or ID')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('get-channel', getChannelCommand));
@@ -390,24 +411,27 @@ program
 // Caption commands
 // List captions command (plural - list collection)
 program
-  .command('list-captions <videoId>')
+  .command('list-captions')
   .description('List all caption tracks for a YouTube video')
+  .requiredOption('--video-id <id>', 'Video ID')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('list-captions', listCaptionsCommand));
 
 // Get single caption command (singular)
 program
-  .command('get-caption <captionId>')
+  .command('get-caption')
   .description('Download caption content to stdout (get caption ID from list-captions)')
+  .requiredOption('--caption-id <id>', 'Caption ID')
   .option('--format <format>', 'Caption format: srt, vtt, sbv, srv2, ttml, json (default: json)', 'json')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('get-caption', getCaptionCommand));
 
 // Channel search terms command — top keywords from YouTube Search traffic
 program
-  .command('get-channel-search-terms [channelHandle]')
+  .command('get-channel-search-terms')
   .description('Get top search keywords driving traffic to a channel (YouTube Search source)')
+  .option('-c, --channel <handle>', 'Channel handle or ID')
   .option('-l, --limit <number>', 'Limit number of results (max 25, API restriction)', '25')
   .option('--content-type <type>', 'Filter by content type: all (default), video (non-shorts), shorts', 'all')
   .option('--start-date <date>', 'Start date (YYYY-MM-DD), defaults to all-time (2005-02-14)')
@@ -418,8 +442,9 @@ program
 
 // Channel analytics command (singular - single channel report)
 program
-  .command('get-channel-analytics [channelHandle]')
+  .command('get-channel-analytics')
   .description('Get channel-level analytics reports (demographics, devices, geography, etc.)')
+  .option('-c, --channel <handle>', 'Channel handle or ID')
   .option('--report <type>', 'Predefined report type: demographics, devices, geography, traffic-sources, subscription-status')
   .option('--start-date <date>', 'Start date (YYYY-MM-DD), defaults to 30 days ago')
   .option('--end-date <date>', 'End date (YYYY-MM-DD), defaults to today')
@@ -427,10 +452,7 @@ program
   .option('--metrics <metrics>', 'Custom metrics (comma-separated, requires --dimensions)')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
-  .action(withHelpWrapper('get-channel-analytics', (channelHandle: string | undefined, options: ChannelAnalyticsOptions) => {
-    // Commander v12+ automatically converts kebab-case to camelCase
-    getChannelAnalyticsCommand(channelHandle, options);
-  }));
+  .action(withHelpWrapper('get-channel-analytics', getChannelAnalyticsCommand));
 
 // YouTube Reporting API commands
 program
@@ -470,6 +492,12 @@ program
   .option('--verify', 'Verify cached file completeness')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('fetch-reports', fetchReportsCommand));
+
+const completeCmd = new Command('__complete')
+  .description('Internal completion helper')
+  .requiredOption('--type <type>', 'Completion type: video-id, playlist-id, report-type')
+  .action(completeCommand);
+program.addCommand(completeCmd, { hidden: true });
 
 // Show help if no command provided
 if (!process.argv.slice(2).length) {
