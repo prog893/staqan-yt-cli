@@ -107,7 +107,7 @@ async function isLockStale(lockPath: string, staleAge: number): Promise<boolean>
     }
 
     return false;
-  } catch (err) {
+  } catch {
     // Can't read lock file - assume stale
     debug(`Failed to read lock file ${lockPath}, assuming stale`);
     return true;
