@@ -217,12 +217,17 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       process.exit(1);
     }
 
-    if (requestedStart < minDate || requestedEnd > maxDate) {
-      spinner.fail('Data not available for requested date range');
+    // Adjust date range to available data if needed
+    const adjustedStart = requestedStart < minDate ? minDate : requestedStart;
+    const adjustedEnd = requestedEnd > maxDate ? maxDate : requestedEnd;
+
+    // Warn if range was adjusted
+    if (adjustedStart !== requestedStart || adjustedEnd !== requestedEnd) {
+      spinner.warn('Adjusting date range to available data');
       console.log('');
-      error(`Data not available for requested date range`);
-      console.log(chalk.gray('Available:') + ` ${minDate} to ${maxDate}`);
+      console.log(chalk.yellow('Warning:') + ' Requested date range extends beyond available data');
       console.log(chalk.gray('Requested:') + ` ${requestedStart} to ${requestedEnd}`);
+      console.log(chalk.gray('Will return:') + ` ${adjustedStart} to ${adjustedEnd}`);
       console.log('');
 
       if (requestedStart < minDate) {
@@ -237,15 +242,13 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
         console.log(chalk.red('Future dates not available:') + ` ${maxDate} to ${requestedEnd}`);
         console.log('');
       }
-
-      process.exit(1);
     }
 
     // Step 4: Filter reports by date range (compare date portions only)
     reports = reports.filter((report: typeof reports[0]) => {
       const reportStart = report.startTime!.split('T')[0];
       const reportEnd = report.endTime!.split('T')[0];
-      return reportStart >= requestedStart && reportEnd <= requestedEnd;
+      return reportStart >= adjustedStart && reportEnd <= adjustedEnd;
     });
 
     if (reports.length === 0) {
@@ -257,7 +260,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
     // Step 5: Analyze cache coverage
     spinner.text = 'Analyzing cache coverage...';
-    const coverage = await analyzeCacheCoverage(channelId, options.type, requestedStart, requestedEnd);
+    const coverage = await analyzeCacheCoverage(channelId, options.type, adjustedStart, adjustedEnd);
     debug('Cache coverage:', coverage);
 
     // Step 6: Load cached data
