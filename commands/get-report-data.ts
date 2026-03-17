@@ -221,6 +221,17 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
     const adjustedStart = requestedStart < minDate ? minDate : requestedStart;
     const adjustedEnd = requestedEnd > maxDate ? maxDate : requestedEnd;
 
+    // Validate that adjusted range has overlap (i.e., requested range is not entirely before/after available data)
+    if (adjustedStart > adjustedEnd) {
+      spinner.fail('No overlap between requested range and available data');
+      process.stderr.write('\n');
+      process.stderr.write(chalk.red('Error:') + ' Requested date range has no overlap with available data\n');
+      process.stderr.write(chalk.gray('Requested:') + ` ${requestedStart} to ${requestedEnd}\n`);
+      process.stderr.write(chalk.gray('Available:') + ` ${minDate} to ${maxDate}\n`);
+      process.stderr.write('\n');
+      process.exit(1);
+    }
+
     // Warn if range was adjusted
     if (adjustedStart !== requestedStart || adjustedEnd !== requestedEnd) {
       spinner.warn('Adjusting date range to available data');
