@@ -50,7 +50,7 @@ export async function ensureCacheDir(channelId: string): Promise<void> {
 /**
  * Load per-channel cache index
  */
-export async function loadCacheIndex(channelId: string): Promise<CacheIndex> {
+export async function loadCacheIndex(channelId: string, channelHandle?: string): Promise<CacheIndex> {
   try {
     await ensureCacheDir(channelId);
     const data = await fs.readFile(getChannelCacheIndexPath(channelId), 'utf-8');
@@ -63,8 +63,9 @@ export async function loadCacheIndex(channelId: string): Promise<CacheIndex> {
     // Validate version matches expected format
     if (index.version !== CACHE_INDEX_VERSION) {
       const indexPath = getChannelCacheIndexPath(channelId);
+      const channelArg = channelHandle ?? channelId;
       warning(`Cache index is outdated (v${index.version} → v${CACHE_INDEX_VERSION}). Cached report data cleared.`);
-      warning(`  To rebuild: staqan-yt fetch-reports --channel ${channelId}`);
+      warning(`  To rebuild: staqan-yt fetch-reports --channel ${channelArg}`);
       warning(`  To delete:  ${indexPath}`);
       return {
         version: CACHE_INDEX_VERSION,

@@ -310,7 +310,7 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
     if (options.verify) {
       spinner.text = 'Verifying cached files...';
 
-      const index = await loadCacheIndex(channelId);
+      const index = await loadCacheIndex(channelId, channelHandle);
       let verified = 0;
       let corrupted = 0;
 
