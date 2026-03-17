@@ -9,6 +9,7 @@ import {
   readCachedReport,
   saveReportToCache,
   parseCsvAndExtractRange,
+  ensureCacheDir,
 } from '../lib/cache';
 import { getChannelId } from '../lib/youtube';
 import { acquireLock, getLockPath } from '../lib/lock';
@@ -110,6 +111,15 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
     spinner.text = `Resolving channel ID for ${channelHandle}...`;
     const channelId = await getChannelId(channelHandle);
     debug(`Using channel ID: ${channelId}`);
+
+    // Ensure cache directory exists before attempting lock
+    try {
+      await ensureCacheDir(channelId);
+    } catch (err) {
+      spinner.fail('Failed to create cache directory');
+      error((err as Error).message);
+      process.exit(1);
+    }
 
     const auth = await getAuthenticatedClient();
     const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
