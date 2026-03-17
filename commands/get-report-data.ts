@@ -166,7 +166,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
     if (reports.length === 0) {
       // Job exists but no reports yet (within 48h window)
-      const jobCreated = new Date(matchingJob!.createTime || '');
+      const jobCreated = new Date(matchingJob.createTime || '');
       const readyAt = new Date(jobCreated.getTime() + 48 * 60 * 60 * 1000);
       const now = new Date();
       const hoursUntilReady = Math.max(0, Math.ceil((readyAt.getTime() - now.getTime()) / (1000 * 60 * 60)));
@@ -174,7 +174,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
       spinner.succeed('Job exists but no reports yet');
       console.log('');
-      console.log(chalk.gray('Created:') + ' ' + matchingJob!.createTime);
+      console.log(chalk.gray('Created:') + ' ' + matchingJob.createTime);
       console.log(chalk.gray('Ready:') + ' ' + chalk.cyan(`${formatted.local} (${formatted.timezone})`));
       console.log(chalk.yellow('Wait:') + ' ' + chalk.cyan(`${hoursUntilReady} hours remaining`));
       console.log('');
@@ -313,7 +313,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
         const { csvData, headers, data } = await downloadReport(report, auth, tmpPath);
 
         // Calculate expiration date
-        const jobCreated = new Date(matchingJob!.createTime || '');
+        const jobCreated = new Date(matchingJob.createTime || '');
         const reportCreated = new Date(report.createTime || '');
         const isHistorical = reportCreated.getTime() - jobCreated.getTime() < 4 * 24 * 60 * 60 * 1000;
         const expirationDays = isHistorical ? 30 : 60;
@@ -424,7 +424,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
     // Step 10: Show expiration warning for the reports used
     const now = new Date();
-    const jobCreated = new Date(matchingJob!.createTime || '');
+    const jobCreated = new Date(matchingJob.createTime || '');
 
     for (const report of cachedReports) {
       const expiresAt = new Date(report.expiresAt);

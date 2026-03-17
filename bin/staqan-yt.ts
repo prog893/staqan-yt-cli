@@ -41,7 +41,9 @@ import completeCommand = require('../commands/complete');
 // Helper function to wrap command actions to handle "help" as an argument
 // Note: Using any[] here is pragmatic - we only check for "help" string,
 // then forward args to the properly-typed command function
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function withHelpWrapper(commandName: string, actionFn: (...args: any[]) => Promise<void> | void) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return async (...args: any[]) => {
     // Check if "help" is in the command arguments (before Commander's validation)
     // This works even for commands with required options

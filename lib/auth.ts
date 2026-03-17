@@ -130,7 +130,8 @@ async function authenticate(): Promise<OAuth2Client> {
 
   return new Promise((resolve, reject) => {
     // Create local server to receive callback
-    const server = http.createServer(async (req, res) => {
+    const server = http.createServer((req, res) => {
+      (async () => {
       try {
         const queryParams = url.parse(req.url!, true).query;
 
@@ -155,6 +156,7 @@ async function authenticate(): Promise<OAuth2Client> {
         server.close();
         reject(err);
       }
+      })();
     });
 
     // Configure server to prevent hanging
