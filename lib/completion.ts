@@ -427,114 +427,144 @@ ${commandList}
       return
       ;;
     get-video)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--video-id[Video ID]: :_staqan_yt_video_ids' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-videos)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--video-ids[Video IDs]: :_staqan_yt_video_ids' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     update-video)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--video-id[Video ID]: :_staqan_yt_video_ids' \\
-        '--title[Video title]' \\
-        '--description[Video description]' \\
+        '--title[Video title]:title:' \\
+        '--description[Video description]:desc:' \\
         '--dry-run[Preview changes without applying]' \\
         '--yes[Skip confirmation prompt]' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     search-videos)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
-        '--query[Search query]' \\
+        '--query[Search query]:query:' \\
         '--global[Search all of YouTube]' \\
-        '--channel[Channel handle or ID]:channel:(@)' \\
-        '--limit[Limit number of results]' \\
+        '--channel[Channel handle or ID]:channel:' \\
+        '--limit[Limit number of results]:n:' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-video-localizations)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--video-ids[Video IDs]: :_staqan_yt_video_ids' \\
-        '--languages[Comma-separated language codes]' \\
+        '--languages[Comma-separated language codes]:langs:' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-video-localization)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--video-id[Video ID]: :_staqan_yt_video_ids' \\
-        '--language[Language code or name]' \\
+        '--language[Language code or name]:lang:' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     put-video-localization)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--video-id[Video ID]: :_staqan_yt_video_ids' \\
-        '--language[Language code or name]' \\
-        '--title[Localized title]' \\
-        '--description[Localized description]' \\
+        '--language[Language code or name]:lang:' \\
+        '--title[Localized title]:title:' \\
+        '--description[Localized description]:desc:' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     update-video-localization)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--video-id[Video ID]: :_staqan_yt_video_ids' \\
-        '--language[Language code or name]' \\
-        '--title[New localized title]' \\
-        '--description[New localized description]' \\
+        '--language[Language code or name]:lang:' \\
+        '--title[New localized title]:title:' \\
+        '--description[New localized description]:desc:' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-video-analytics)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--video-id[Video ID]: :_staqan_yt_video_ids' \\
-        '--start-date[Start date (YYYY-MM-DD)]' \\
-        '--end-date[End date (YYYY-MM-DD)]' \\
-        '--metrics[Metrics to fetch]' \\
+        '--start-date[Start date (YYYY-MM-DD)]:date:' \\
+        '--end-date[End date (YYYY-MM-DD)]:date:' \\
+        '--metrics[Metrics to fetch]:metrics:' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-search-terms)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--video-id[Video ID]: :_staqan_yt_video_ids' \\
-        '--limit[Limit number of results]' \\
+        '--limit[Limit number of results]:n:' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-traffic-sources)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--video-id[Video ID]: :_staqan_yt_video_ids' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-video-retention)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--video-id[Video ID]: :_staqan_yt_video_ids' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-video-tags)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--video-id[Video ID]: :_staqan_yt_video_ids' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     update-video-tags)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--video-id[Video ID]: :_staqan_yt_video_ids' \\
-        '--tags[Replace all tags]' \\
-        '--add[Add tags]' \\
-        '--remove[Remove tags]' \\
+        '--tags[Replace all tags]:tags:' \\
+        '--add[Add tags]:tags:' \\
+        '--remove[Remove tags]:tags:' \\
         '--dry-run[Preview changes]' \\
         '--yes[Skip confirmation]' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-thumbnail)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--video-id[Video ID]: :_staqan_yt_video_ids' \\
         '--quality[Thumbnail quality]:quality:(maxres standard high medium default)' \\
@@ -542,80 +572,113 @@ ${commandList}
         '--verbose[Enable verbose output]'
       ;;
     get-playlist)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--playlist-id[Playlist ID]: :_staqan_yt_playlist_ids' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-playlists)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--playlist-ids[Playlist IDs]: :_staqan_yt_playlist_ids' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     list-videos|list-playlists)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
-        '--channel[Channel handle or ID]:channel:(@)' \\
-        '--limit[Limit number of results]' \\
+        '--channel[Channel handle or ID]:channel:' \\
+        '--limit[Limit number of results]:n:' \\
         '--type[Filter by type]:type:(short regular)' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     list-comments)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--video-id[Video ID]: :_staqan_yt_video_ids' \\
-        '--limit[Limit number of results]' \\
+        '--limit[Limit number of results]:n:' \\
         '--sort[Sort order]:order:(top new)' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     list-captions)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--video-id[Video ID]: :_staqan_yt_video_ids' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-caption)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--caption-id[Caption ID]:id:( )' \\
         '--format[Caption format]:format:(srt vtt sbv srv2 ttml json)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-channel)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
-        '--channel[Channel handle or ID]:channel:(@)' \\
+        '--channel[Channel handle or ID]:channel:' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-channel-search-terms)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
-        '--channel[Channel handle or ID]:channel:(@)' \\
-        '--limit[Limit number of results]' \\
+        '--channel[Channel handle or ID]:channel:' \\
+        '--limit[Limit number of results]:n:' \\
         '--content-type[Filter by content type]:type:(all video shorts)' \\
-        '--start-date[Start date (YYYY-MM-DD)]' \\
-        '--end-date[End date (YYYY-MM-DD)]' \\
+        '--start-date[Start date (YYYY-MM-DD)]:date:' \\
+        '--end-date[End date (YYYY-MM-DD)]:date:' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-channel-analytics)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
-        '--channel[Channel handle or ID]:channel:(@)' \\
+        '--channel[Channel handle or ID]:channel:' \\
         '--report[Report type]:type:(demographics devices geography traffic-sources subscription-status)' \\
-        '--start-date[Start date (YYYY-MM-DD)]' \\
-        '--end-date[End date (YYYY-MM-DD)]' \\
-        '--dimensions[Custom dimensions (comma-separated)]' \\
-        '--metrics[Custom metrics (comma-separated)]' \\
+        '--start-date[Start date (YYYY-MM-DD)]:date:' \\
+        '--end-date[End date (YYYY-MM-DD)]:date:' \\
+        '--dimensions[Custom dimensions (comma-separated)]:dims:' \\
+        '--metrics[Custom metrics (comma-separated)]:metrics:' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
-    list-report-jobs|get-report-data|fetch-reports)
+    list-report-jobs|get-report-data)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--type[Report type ID]: :_staqan_yt_report_types' \\
         '--output[Output format]:format:(json table text csv)' \\
-        '--start-date[Start date (YYYY-MM-DD)]' \\
-        '--end-date[End date (YYYY-MM-DD)]' \\
-        '--force[Re-download even if cached]' \\
+        '--start-date[Start date (YYYY-MM-DD)]:date:' \\
+        '--end-date[End date (YYYY-MM-DD)]:date:' \\
         '--verbose[Enable verbose output]'
+      ;;
+    fetch-reports)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
+      _arguments \\
+        '{-c,--channel}[Channel handle or ID]:channel:' \\
+        '{-t,--type}[Report type ID]: :_staqan_yt_report_types' \\
+        '{-T,--types}[Report type IDs (comma-separated)]:ids:' \\
+        '--start-date[Start date (YYYY-MM-DD)]:date:' \\
+        '--end-date[End date (YYYY-MM-DD)]:date:' \\
+        '{-f,--force}[Re-download even if cached]' \\
+        '--verify[Verify cached file completeness]' \\
+        '--output[Output format]:format:(json table text csv)' \\
+        '{-v,--verbose}[Enable verbose output]'
       ;;
     *)
       _describe 'command' commands
