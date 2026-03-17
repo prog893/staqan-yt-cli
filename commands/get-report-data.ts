@@ -11,6 +11,7 @@ import {
   parseCsvAndExtractRange,
 } from '../lib/cache';
 import { getChannelId } from '../lib/youtube';
+import { acquireLock, getLockPath } from '../lib/lock';
 import { CacheIndexEntry } from '../types';
 import https from 'https';
 import { createWriteStream, unlinkSync } from 'fs';
@@ -293,54 +294,68 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
     const tmpDir = '/tmp';
 
-    for (let i = 0; i < reportsToFetch.length; i++) {
-      const report = reportsToFetch[i];
-      const tmpPath = path.join(tmpDir, `${report.id}.csv`);
+    // Acquire lock just before writes; soft-fail with warning if busy
+    let writeRelease: (() => Promise<void>) | null = null;
+    try {
+      writeRelease = await acquireLock(getLockPath('reports', channelId), { timeout: 5000 });
+    } catch {
+      console.log(chalk.gray('Info: could not acquire lock for reports, skipping cache update'));
+    }
 
-      spinner.text = `Downloading report ${i + 1}/${reportsToFetch.length}...`;
+    try {
+      for (let i = 0; i < reportsToFetch.length; i++) {
+        const report = reportsToFetch[i];
+        const tmpPath = path.join(tmpDir, `${report.id}.csv`);
 
-      // Download report
-      const { csvData, headers, data } = await downloadReport(report, auth, tmpPath);
+        spinner.text = `Downloading report ${i + 1}/${reportsToFetch.length}...`;
 
-      // Calculate expiration date
-      const jobCreated = new Date(matchingJob!.createTime || '');
-      const reportCreated = new Date(report.createTime || '');
-      const isHistorical = reportCreated.getTime() - jobCreated.getTime() < 4 * 24 * 60 * 60 * 1000;
-      const expirationDays = isHistorical ? 30 : 60;
-      const expiresAt = new Date(reportCreated.getTime() + expirationDays * 24 * 60 * 60 * 1000);
+        // Download report
+        const { csvData, headers, data } = await downloadReport(report, auth, tmpPath);
 
-      // Parse CSV to get actual date range
-      const parsed = parseCsvAndExtractRange(csvData);
+        // Calculate expiration date
+        const jobCreated = new Date(matchingJob!.createTime || '');
+        const reportCreated = new Date(report.createTime || '');
+        const isHistorical = reportCreated.getTime() - jobCreated.getTime() < 4 * 24 * 60 * 60 * 1000;
+        const expirationDays = isHistorical ? 30 : 60;
+        const expiresAt = new Date(reportCreated.getTime() + expirationDays * 24 * 60 * 60 * 1000);
 
-      // Save to cache
-      await saveReportToCache(channelId, report.id || '', options.type, csvData, {
-        reportId: report.id || '',
-        reportTypeId: options.type,
-        channelId,
-        jobId,
-        startTime: report.startTime || '',
-        endTime: report.endTime || '',
-        startTimeActual: parsed.minDate,
-        endTimeActual: parsed.maxDate,
-        downloadedAt: new Date().toISOString(),
-        expiresAt: expiresAt.toISOString(),
-        downloadUrl: report.downloadUrl || '',
-        columns: headers,
-        isComplete: true,
-        fileSize: csvData.length,
-        row_count: data.length,
-      });
+        // Parse CSV to get actual date range
+        const parsed = parseCsvAndExtractRange(csvData);
 
-      allData.push(...data);
+        if (writeRelease) {
+          // Save to cache
+          await saveReportToCache(channelId, report.id || '', options.type, csvData, {
+            reportId: report.id || '',
+            reportTypeId: options.type,
+            channelId,
+            jobId,
+            startTime: report.startTime || '',
+            endTime: report.endTime || '',
+            startTimeActual: parsed.minDate,
+            endTimeActual: parsed.maxDate,
+            downloadedAt: new Date().toISOString(),
+            expiresAt: expiresAt.toISOString(),
+            downloadUrl: report.downloadUrl || '',
+            columns: headers,
+            isComplete: true,
+            fileSize: csvData.length,
+            row_count: data.length,
+          });
+        }
 
-      // Cleanup
-      try {
-        unlinkSync(tmpPath);
-      } catch {
-        // Ignore cleanup errors
+        allData.push(...data);
+
+        // Cleanup
+        try {
+          unlinkSync(tmpPath);
+        } catch {
+          // Ignore cleanup errors
+        }
+
+        debug(`Downloaded: ${report.startTime} to ${report.endTime}`);
       }
-
-      debug(`Downloaded: ${report.startTime} to ${report.endTime}`);
+    } finally {
+      if (writeRelease) await writeRelease();
     }
 
     spinner.succeed(`Retrieved ${cachedReports.length} cached + ${reportsToFetch.length} new report(s)`);

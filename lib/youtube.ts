@@ -25,10 +25,9 @@ async function saveHandleCache(cache: Record<string, string>): Promise<void> {
   let release: (() => Promise<void>) | null = null;
 
   try {
+    await fs.mkdir(path.dirname(HANDLE_CACHE_PATH), { recursive: true });
     // Acquire lock with 5 second timeout
     release = await acquireLock(lockPath, { timeout: 5000 });
-
-    await fs.mkdir(path.dirname(HANDLE_CACHE_PATH), { recursive: true });
     await fs.writeFile(HANDLE_CACHE_PATH, JSON.stringify(cache, null, 2), 'utf-8');
 
     debug('Handle cache saved');

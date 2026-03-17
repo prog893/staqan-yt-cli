@@ -7,6 +7,7 @@ import {
   loadCacheIndex,
   loadReportMetadata,
   parseCsvAndExtractRange,
+  ensureCacheDir,
 } from '../lib/cache';
 import { getChannelId } from '../lib/youtube';
 import { getConfigValue } from '../lib/config';
@@ -34,7 +35,7 @@ interface FetchReportsOptions {
 async function downloadReport(
   report: { id?: string | null; downloadUrl?: string | null; startTime?: string | null; endTime?: string | null; createTime?: string | null },
   auth: { getAccessToken(): Promise<{ token?: string | null }> }
-): Promise<{ csvData: string; headers: string[]; data: Record<string, string>[] }> {
+): Promise<{ csvData: string; headers: string[]; data: Record<string, string>[]; minDate: string; maxDate: string }> {
   const tmpPath = path.join('/tmp', `${report.id}.csv`);
 
   // Get access token for authenticated request
@@ -93,7 +94,7 @@ async function downloadReport(
     // Ignore cleanup errors
   }
 
-  return { csvData, headers: parsed.headers, data: parsed.data };
+  return { csvData, headers: parsed.headers, data: parsed.data, minDate: parsed.minDate, maxDate: parsed.maxDate };
 }
 
 /**
@@ -122,6 +123,7 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
 
     try {
       spinner.text = 'Acquiring lock...';
+      await ensureCacheDir(channelId);
       release = await acquireLock(lockPath, { timeout: 60000 }); // 60 second timeout
 
       spinner.text = 'Initializing...';
@@ -137,32 +139,32 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
 
       let reportTypes = typesResponse.data.reportTypes || [];
 
-    // Filter by --type or --types if specified
-    if (options.type) {
-      reportTypes = reportTypes.filter(t => t.id === options.type);
-      debug(`Filtering by single type: ${options.type}`);
-    } else if (options.types) {
-      const requestedIds = options.types.split(',');
-      reportTypes = reportTypes.filter(t => requestedIds.includes(t.id!));
-      debug(`Filtering by multiple types: ${requestedIds.join(', ')}`);
-    }
+      // Filter by --type or --types if specified
+      if (options.type) {
+        reportTypes = reportTypes.filter(t => t.id === options.type);
+        debug(`Filtering by single type: ${options.type}`);
+      } else if (options.types) {
+        const requestedIds = options.types.split(',');
+        reportTypes = reportTypes.filter(t => requestedIds.includes(t.id!));
+        debug(`Filtering by multiple types: ${requestedIds.join(', ')}`);
+      }
 
-    if (reportTypes.length === 0) {
-      spinner.fail('No report types found');
+      if (reportTypes.length === 0) {
+        spinner.fail('No report types found');
+        console.log('');
+        error('No report types found matching your criteria.');
+        process.exit(1);
+      }
+
+      spinner.succeed(`Found ${reportTypes.length} report type(s)`);
       console.log('');
-      error('No report types found matching your criteria.');
-      process.exit(1);
-    }
 
-    spinner.succeed(`Found ${reportTypes.length} report type(s)`);
-    console.log('');
+      // Step 2: Process each report type
+      let totalDownloaded = 0;
+      let totalSkipped = 0;
+      let totalErrors = 0;
 
-    // Step 2: Process each report type
-    let totalDownloaded = 0;
-    let totalSkipped = 0;
-    let totalErrors = 0;
-
-    for (const reportType of reportTypes) {
+      for (const reportType of reportTypes) {
       const reportTypeId = reportType.id!;
       spinner.text = `Processing ${reportTypeId}...`;
 
@@ -259,10 +261,7 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
         // Download report
         try {
           spinner.text = `Downloading ${reportTypeId}: ${startTime} to ${endTime}...`;
-          const { csvData, headers, data } = await downloadReport(report, auth);
-
-          // Parse CSV to get actual date range
-          const parsed = parseCsvAndExtractRange(csvData);
+          const { csvData, headers, data, minDate, maxDate } = await downloadReport(report, auth);
 
           // Calculate expiration date
           const jobCreated = new Date(matchingJob.createTime || '');
@@ -279,8 +278,8 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
             jobId,
             startTime,
             endTime,
-            startTimeActual: parsed.minDate || startTime,
-            endTimeActual: parsed.maxDate || endTime,
+            startTimeActual: minDate || startTime,
+            endTimeActual: maxDate || endTime,
             downloadedAt: new Date().toISOString(),
             expiresAt: expiresAt.toISOString(),
             downloadUrl: report.downloadUrl!,

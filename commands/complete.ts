@@ -38,10 +38,9 @@ async function saveCache(cachePath: string, cache: CompletionCache, channelId: s
   let release: (() => Promise<void>) | null = null;
 
   try {
+    await fs.mkdir(path.dirname(cachePath), { recursive: true });
     // Acquire lock with 2 second timeout (completion is fast)
     release = await acquireLock(lockPath, { timeout: 2000 });
-
-    await fs.mkdir(path.dirname(cachePath), { recursive: true });
     await fs.writeFile(cachePath, JSON.stringify(cache), { mode: 0o600 });
 
     debug('Completion cache saved');
