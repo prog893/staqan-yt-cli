@@ -101,23 +101,23 @@ export interface LanguageMap {
 
 // ID option types for commands (replacing positional arguments)
 export interface VideoIdOption {
-  'video-id'?: string;
+  videoId?: string;
 }
 
 export interface VideoIdsOption {
-  'video-ids'?: string[];
+  videoIds?: string[];
 }
 
 export interface PlaylistIdOption {
-  'playlist-id'?: string;
+  playlistId?: string;
 }
 
 export interface PlaylistIdsOption {
-  'playlist-ids'?: string[];
+  playlistIds?: string[];
 }
 
 export interface CaptionIdOption {
-  'caption-id'?: string;
+  captionId?: string;
 }
 
 export interface QueryOption {

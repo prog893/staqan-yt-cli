@@ -10,7 +10,7 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
   initCommand(options);
 
   // Extract video ID from options
-  const videoId = options['video-id'];
+  const videoId = options.videoId;
   if (!videoId) {
     error('Required: --video-id');
     process.exit(1);

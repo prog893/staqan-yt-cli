@@ -9,9 +9,9 @@ async function videoInfoCommand(options: OutputOption & VerboseOption & (VideoId
   initCommand(options);
 
   // Dispatch: get-video passes --video-id (string), get-videos passes --video-ids (string[])
-  const videoIds: string[] = 'video-ids' in options && options['video-ids']
-    ? (options as VideoIdsOption)['video-ids']!
-    : [(options as VideoIdOption)['video-id']!];
+  const videoIds: string[] = 'videoIds' in options && options['videoIds']
+    ? (options as VideoIdsOption).videoIds!
+    : [(options as VideoIdOption).videoId!];
 
   await withSpinner('Fetching video information...', 'Failed to fetch video information', async (spinner) => {
     debug(`Parsing ${videoIds.length} video ID(s)`, videoIds);

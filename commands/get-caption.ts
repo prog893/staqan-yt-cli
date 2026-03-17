@@ -7,7 +7,7 @@ async function getCaptionCommand(options: GetCaptionOptions): Promise<void> {
   initCommand(options);
 
   // Extract caption ID from options
-  const captionId = options['caption-id'];
+  const captionId = options.captionId;
   if (!captionId) {
     error('Required: --caption-id');
     process.exit(1);
