@@ -1,8 +1,42 @@
 import { google, youtube_v3 } from 'googleapis';
+import { promises as fs } from 'fs';
+import path from 'path';
+import os from 'os';
 import { getAuthenticatedClient } from './auth';
 import { normalizeLanguage, getLanguageName } from './language';
+import { acquireLock, getLockPath } from './lock';
 import { VideoInfo, VideoListItem, VideoLocalization, VideoType, PlaylistInfo, PlaylistListItem, CommentInfo, ChannelInfo, CaptionInfo, CaptionFormat } from '../types';
 import { debug, warning } from './utils';
+
+// ─── Handle → channel ID cache ────────────────────────────────────────────────
+
+const HANDLE_CACHE_PATH = path.join(os.homedir(), '.staqan-yt-cli', 'data', 'handle-to-channel-id.json');
+
+async function loadHandleCache(): Promise<Record<string, string>> {
+  try {
+    return JSON.parse(await fs.readFile(HANDLE_CACHE_PATH, 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+async function saveHandleCache(cache: Record<string, string>): Promise<void> {
+  const lockPath = getLockPath('handles');
+  let release: (() => Promise<void>) | null = null;
+
+  try {
+    await fs.mkdir(path.dirname(HANDLE_CACHE_PATH), { recursive: true });
+    // Acquire lock with 5 second timeout
+    release = await acquireLock(lockPath, { timeout: 5000 });
+    await fs.writeFile(HANDLE_CACHE_PATH, JSON.stringify(cache, null, 2), 'utf-8');
+
+    debug('Handle cache saved');
+  } catch (err) {
+    debug('Failed to save handle cache:', (err as Error).message);
+  } finally {
+    if (release) await release();
+  }
+}
 
 // ─── Client ──────────────────────────────────────────────────────────────────
 
@@ -53,16 +87,31 @@ async function getYouTubeClient(): Promise<youtube_v3.Youtube> {
 // ─── Channels ─────────────────────────────────────────────────────────────────
 
 /**
- * Get channel ID from handle or username
+ * Get channel ID from handle or username.
+ * Short-circuits if input is already a channel ID (UC + 22 chars).
+ * Caches resolved handle → ID mappings on disk to avoid repeat API calls.
  */
 async function getChannelId(handleOrId: string): Promise<string> {
-  debug(`Getting channel ID for: ${handleOrId}`);
+  // Short-circuit: already a channel ID — no API call needed
+  if (/^UC[a-zA-Z0-9_-]{22}$/.test(handleOrId)) {
+    debug(`Channel ID detected directly: ${handleOrId}`);
+    return handleOrId;
+  }
+
+  // Check FS handle cache before touching the API
+  const handleCache = await loadHandleCache();
+  if (handleCache[handleOrId]) {
+    debug(`Channel ID cache hit for: ${handleOrId} → ${handleCache[handleOrId]}`);
+    return handleCache[handleOrId];
+  }
+
+  debug(`Resolving channel ID for: ${handleOrId}`);
   const youtube = await getYouTubeClient();
+  let channelId: string | null = null;
 
   // If it starts with @, search by handle
   if (handleOrId.startsWith('@')) {
     debug('Searching by handle using search endpoint');
-    // Try searching by handle using search endpoint
     const searchResponse = await youtube.search.list({
       part: ['snippet'],
       q: handleOrId,
@@ -71,41 +120,48 @@ async function getChannelId(handleOrId: string): Promise<string> {
     });
 
     if (searchResponse.data.items && searchResponse.data.items.length > 0) {
-      const channelId = searchResponse.data.items[0].snippet!.channelId!;
+      channelId = searchResponse.data.items[0].snippet!.channelId!;
       debug(`Found channel ID: ${channelId}`);
-      return channelId;
+    }
+  } else {
+    // Try to get channel directly by ID
+    try {
+      const response = await youtube.channels.list({
+        part: ['id'],
+        id: [handleOrId],
+      });
+
+      if (response.data.items && response.data.items.length > 0) {
+        channelId = response.data.items[0].id!;
+      }
+    } catch {
+      // Continue to search
     }
 
+    // Fall back to username search
+    if (!channelId) {
+      const searchResponse = await youtube.search.list({
+        part: ['snippet'],
+        q: handleOrId,
+        type: ['channel'],
+        maxResults: 1,
+      });
+
+      if (searchResponse.data.items && searchResponse.data.items.length > 0) {
+        channelId = searchResponse.data.items[0].snippet!.channelId!;
+      }
+    }
+  }
+
+  if (!channelId) {
     throw new Error(`Channel not found: ${handleOrId}`);
   }
 
-  // Try to get channel directly
-  try {
-    const response = await youtube.channels.list({
-      part: ['id'],
-      id: [handleOrId],
-    });
+  // Persist to FS cache so future calls skip the API
+  handleCache[handleOrId] = channelId;
+  await saveHandleCache(handleCache);
 
-    if (response.data.items && response.data.items.length > 0) {
-      return response.data.items[0].id!;
-    }
-  } catch {
-    // Continue to search
-  }
-
-  // Try searching by username
-  const searchResponse = await youtube.search.list({
-    part: ['snippet'],
-    q: handleOrId,
-    type: ['channel'],
-    maxResults: 1,
-  });
-
-  if (searchResponse.data.items && searchResponse.data.items.length > 0) {
-    return searchResponse.data.items[0].snippet!.channelId!;
-  }
-
-  throw new Error(`Channel not found: ${handleOrId}`);
+  return channelId;
 }
 
 /**

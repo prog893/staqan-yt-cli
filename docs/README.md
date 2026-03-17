@@ -138,25 +138,7 @@ Common issues and solutions:
 - [YouTube Data API Docs](https://developers.google.com/youtube/v3)
 - [Issue Tracker](https://github.com/prog893/staqan-yt-cli/issues)
 
-## Command Patterns
-
-### AWS-Style Naming
-
-Commands follow AWS API naming conventions:
-
-**Singular = Single-item operations:**
-```bash
-get-video <videoId>        # Get ONE video
-update-video <videoId>     # Update ONE video
-```
-
-**Plural = Batch/list operations:**
-```bash
-get-videos <id1> <id2>     # Get MULTIPLE videos
-list-videos <channel>      # List videos in channel
-```
-
-### Global Options
+## Global Options
 
 All commands support these options:
 

@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '../lib/auth';
 import { error, debug, initCommand, withSpinner, formatTimestampWithTimezone } from '../lib/utils';
-import { getOutputFormat } from '../lib/config';
+import { getOutputFormat, getConfigValue } from '../lib/config';
 import { formatJson, formatTable, formatCsv, formatText } from '../lib/formatters';
 import {
   analyzeCacheCoverage,
@@ -10,6 +10,8 @@ import {
   saveReportToCache,
   parseCsvAndExtractRange,
 } from '../lib/cache';
+import { getChannelId } from '../lib/youtube';
+import { acquireLock, getLockPath } from '../lib/lock';
 import { CacheIndexEntry } from '../types';
 import https from 'https';
 import { createWriteStream, unlinkSync } from 'fs';
@@ -19,6 +21,7 @@ import chalk from 'chalk';
 
 interface ReportDataOptions {
   type: string;
+  channel?: string;
   videoId?: string;
   startDate?: string;
   endDate?: string;
@@ -95,6 +98,19 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
   initCommand(options);
 
   await withSpinner('Checking for existing reporting job...', 'Failed to fetch report data', async (spinner) => {
+    // Resolve channel handle → canonical channel ID for cache namespacing
+    const channelHandle = options.channel || await getConfigValue('default.channel');
+    if (!channelHandle) {
+      spinner.fail('No channel configured');
+      console.log('');
+      error('No channel specified. Set a default channel:\n  staqan-yt config set default.channel @yourchannel\nor pass --channel @yourchannel');
+      process.exit(1);
+    }
+
+    spinner.text = `Resolving channel ID for ${channelHandle}...`;
+    const channelId = await getChannelId(channelHandle);
+    debug(`Using channel ID: ${channelId}`);
+
     const auth = await getAuthenticatedClient();
     const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
 
@@ -150,7 +166,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
     if (reports.length === 0) {
       // Job exists but no reports yet (within 48h window)
-      const jobCreated = new Date(matchingJob!.createTime || '');
+      const jobCreated = new Date(matchingJob.createTime || '');
       const readyAt = new Date(jobCreated.getTime() + 48 * 60 * 60 * 1000);
       const now = new Date();
       const hoursUntilReady = Math.max(0, Math.ceil((readyAt.getTime() - now.getTime()) / (1000 * 60 * 60)));
@@ -158,7 +174,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
       spinner.succeed('Job exists but no reports yet');
       console.log('');
-      console.log(chalk.gray('Created:') + ' ' + matchingJob!.createTime);
+      console.log(chalk.gray('Created:') + ' ' + matchingJob.createTime);
       console.log(chalk.gray('Ready:') + ' ' + chalk.cyan(`${formatted.local} (${formatted.timezone})`));
       console.log(chalk.yellow('Wait:') + ' ' + chalk.cyan(`${hoursUntilReady} hours remaining`));
       console.log('');
@@ -166,9 +182,9 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       process.exit(0);
     }
 
-    // Step 3: Validate date range
-    const minDate = reports[reports.length - 1].startTime; // Oldest
-    const maxDate = reports[0].endTime; // Newest
+    // Step 3: Validate date range (API returns timestamps, compare date portions only)
+    const minDate = reports[reports.length - 1].startTime!.split('T')[0]; // Oldest
+    const maxDate = reports[0].endTime!.split('T')[0]; // Newest
 
     const requestedStart = options.startDate || minDate;
     const requestedEnd = options.endDate || maxDate;
@@ -192,8 +208,8 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       if (requestedStart < minDate) {
         const missingDays = Math.ceil((new Date(minDate).getTime() - new Date(requestedStart).getTime()) / (24 * 60 * 60 * 1000));
         console.log(chalk.red('Missing:') + ` ${requestedStart} to ${minDate} (${missingDays} days, expired and deleted)`);
-        console.log(chalk.yellow('Tip:') + ' Download reports before expiration to avoid data loss');
-        console.log(chalk.yellow('Tip:') + ` Run 'staqan-yt fetch-reports --type=${options.type}'`);
+        console.log(chalk.yellow('Tip:') + ' Run fetch-reports regularly to keep a local archive and avoid data loss:');
+        console.log(chalk.gray('       ') + chalk.cyan(`staqan-yt fetch-reports --type=${options.type}`));
         console.log('');
       }
 
@@ -205,9 +221,11 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       process.exit(1);
     }
 
-    // Step 4: Filter reports by date range
+    // Step 4: Filter reports by date range (compare date portions only)
     reports = reports.filter((report: typeof reports[0]) => {
-      return report.startTime! >= requestedStart && report.endTime! <= requestedEnd;
+      const reportStart = report.startTime!.split('T')[0];
+      const reportEnd = report.endTime!.split('T')[0];
+      return reportStart >= requestedStart && reportEnd <= requestedEnd;
     });
 
     if (reports.length === 0) {
@@ -219,7 +237,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
     // Step 5: Analyze cache coverage
     spinner.text = 'Analyzing cache coverage...';
-    const coverage = await analyzeCacheCoverage(options.type, requestedStart, requestedEnd);
+    const coverage = await analyzeCacheCoverage(channelId, options.type, requestedStart, requestedEnd);
     debug('Cache coverage:', coverage);
 
     // Step 6: Load cached data
@@ -228,10 +246,10 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
     for (const range of coverage.fullyCovered) {
       const [start, end] = range.split('/');
-      const cached = await findCachedReports(options.type, start, end);
+      const cached = await findCachedReports(channelId, options.type, start, end);
 
       for (const cachedReport of cached) {
-        const reportData = await readCachedReport(cachedReport.reportId, options.type);
+        const reportData = await readCachedReport(channelId, cachedReport.reportId, options.type);
         if (reportData) {
           allData.push(...reportData.data);
           cachedReports.push(cachedReport);
@@ -261,7 +279,6 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       const reportStart = report.startTime!;
       const reportEnd = report.endTime!;
 
-      // Check if this report covers any missing range
       const coversMissing = missingRanges.some(range => {
         return reportStart <= range.end && reportEnd >= range.start;
       });
@@ -277,53 +294,68 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
     const tmpDir = '/tmp';
 
-    for (let i = 0; i < reportsToFetch.length; i++) {
-      const report = reportsToFetch[i];
-      const tmpPath = path.join(tmpDir, `${report.id}.csv`);
+    // Acquire lock just before writes; soft-fail with warning if busy
+    let writeRelease: (() => Promise<void>) | null = null;
+    try {
+      writeRelease = await acquireLock(getLockPath('reports', channelId), { timeout: 5000 });
+    } catch {
+      console.log(chalk.gray('Info: could not acquire lock for reports, skipping cache update'));
+    }
 
-      spinner.text = `Downloading report ${i + 1}/${reportsToFetch.length}...`;
+    try {
+      for (let i = 0; i < reportsToFetch.length; i++) {
+        const report = reportsToFetch[i];
+        const tmpPath = path.join(tmpDir, `${report.id}.csv`);
 
-      // Download report
-      const { csvData, headers, data } = await downloadReport(report, auth, tmpPath);
+        spinner.text = `Downloading report ${i + 1}/${reportsToFetch.length}...`;
 
-      // Calculate expiration date
-      const jobCreated = new Date(matchingJob!.createTime || '');
-      const reportCreated = new Date(report.createTime || '');
-      const isHistorical = reportCreated.getTime() - jobCreated.getTime() < 4 * 24 * 60 * 60 * 1000;
-      const expirationDays = isHistorical ? 30 : 60;
-      const expiresAt = new Date(reportCreated.getTime() + expirationDays * 24 * 60 * 60 * 1000);
+        // Download report
+        const { csvData, headers, data } = await downloadReport(report, auth, tmpPath);
 
-      // Parse CSV to get actual date range
-      const parsed = parseCsvAndExtractRange(csvData);
+        // Calculate expiration date
+        const jobCreated = new Date(matchingJob.createTime || '');
+        const reportCreated = new Date(report.createTime || '');
+        const isHistorical = reportCreated.getTime() - jobCreated.getTime() < 4 * 24 * 60 * 60 * 1000;
+        const expirationDays = isHistorical ? 30 : 60;
+        const expiresAt = new Date(reportCreated.getTime() + expirationDays * 24 * 60 * 60 * 1000);
 
-      // Save to cache
-      await saveReportToCache(report.id || '', options.type, csvData, {
-        reportId: report.id || '',
-        reportTypeId: options.type,
-        jobId,
-        startTime: report.startTime || '',
-        endTime: report.endTime || '',
-        startTimeActual: parsed.minDate,
-        endTimeActual: parsed.maxDate,
-        downloadedAt: new Date().toISOString(),
-        expiresAt: expiresAt.toISOString(),
-        downloadUrl: report.downloadUrl || '',
-        columns: headers,
-        isComplete: true,
-        fileSize: csvData.length,
-        row_count: data.length,
-      });
+        // Parse CSV to get actual date range
+        const parsed = parseCsvAndExtractRange(csvData);
 
-      allData.push(...data);
+        if (writeRelease) {
+          // Save to cache
+          await saveReportToCache(channelId, report.id || '', options.type, csvData, {
+            reportId: report.id || '',
+            reportTypeId: options.type,
+            channelId,
+            jobId,
+            startTime: report.startTime || '',
+            endTime: report.endTime || '',
+            startTimeActual: parsed.minDate,
+            endTimeActual: parsed.maxDate,
+            downloadedAt: new Date().toISOString(),
+            expiresAt: expiresAt.toISOString(),
+            downloadUrl: report.downloadUrl || '',
+            columns: headers,
+            isComplete: true,
+            fileSize: csvData.length,
+            row_count: data.length,
+          });
+        }
 
-      // Cleanup
-      try {
-        unlinkSync(tmpPath);
-      } catch {
-        // Ignore cleanup errors
+        allData.push(...data);
+
+        // Cleanup
+        try {
+          unlinkSync(tmpPath);
+        } catch {
+          // Ignore cleanup errors
+        }
+
+        debug(`Downloaded: ${report.startTime} to ${report.endTime}`);
       }
-
-      debug(`Downloaded: ${report.startTime} to ${report.endTime}`);
+    } finally {
+      if (writeRelease) await writeRelease();
     }
 
     spinner.succeed(`Retrieved ${cachedReports.length} cached + ${reportsToFetch.length} new report(s)`);
@@ -392,10 +424,9 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
     // Step 10: Show expiration warning for the reports used
     const now = new Date();
-    const jobCreated = new Date(matchingJob!.createTime || '');
+    const jobCreated = new Date(matchingJob.createTime || '');
 
     for (const report of cachedReports) {
-      // For cached reports, check expiration based on metadata
       const expiresAt = new Date(report.expiresAt);
       const daysUntilExpiration = Math.ceil((expiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
 
@@ -420,7 +451,8 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
         console.log(chalk.yellow('⚠️  Expiration Notice:'));
         console.log(chalk.gray('  Report:') + ` ${report.startTime} to ${report.endTime} (new)`);
         console.log(chalk.gray('  Expires:') + ' ' + chalk.red(`${expiresAt.toISOString().split('T')[0]} (${daysUntilExpiration} days remaining)`));
-        console.log(chalk.yellow('  Tip:') + ` Run 'staqan-yt fetch-reports --type=${options.type}' to archive it`);
+        console.log(chalk.yellow('  Tip:') + ' Run fetch-reports regularly to keep a local archive:');
+        console.log(chalk.gray('         ') + chalk.cyan(`staqan-yt fetch-reports --type=${options.type}`));
         console.log('');
       }
     }

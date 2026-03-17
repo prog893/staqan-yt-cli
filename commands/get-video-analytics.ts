@@ -103,7 +103,7 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
 
       let total = 0;
       allRows.forEach(row => {
-        const value = (row as unknown[])[index];
+        const value = row[index];
         if (typeof value === 'number') {
           total += value;
         }

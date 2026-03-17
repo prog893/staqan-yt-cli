@@ -1,66 +1,82 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { CONFIG_DIR } from './utils';
+import { CONFIG_DIR, debug, warning } from './utils';
 import { CacheIndex, CacheIndexEntry, ReportMetadata, CacheCoverage } from '../types';
-import { debug } from './utils';
 
-// Cache directory structure
+// Base data directory
 const DATA_DIR = path.join(CONFIG_DIR, 'data');
-const CACHE_DIR = path.join(DATA_DIR, 'reports');
-const CACHE_INDEX_PATH = path.join(DATA_DIR, 'cache-index.json');
 
-// Cache index version (for future migrations)
-const CACHE_INDEX_VERSION = '1.0';
+// Cache index version
+const CACHE_INDEX_VERSION = '2.0';
+
+// ─── Per-channel path helpers ──────────────────────────────────────────────────
+
+function getChannelDataDir(channelId: string): string {
+  return path.join(DATA_DIR, channelId);
+}
+
+function getChannelReportsDir(channelId: string): string {
+  return path.join(DATA_DIR, channelId, 'reports');
+}
+
+function getChannelCacheIndexPath(channelId: string): string {
+  return path.join(DATA_DIR, channelId, 'reports', 'cache-index.json');
+}
 
 /**
- * Ensure cache directory structure exists
+ * Ensure per-channel cache directory structure exists
  */
-export async function ensureCacheDir(): Promise<void> {
+export async function ensureCacheDir(channelId: string): Promise<void> {
+  const channelDir = getChannelDataDir(channelId);
+  const reportsDir = getChannelReportsDir(channelId);
+
+  // Check if new channel directory is being created
+  let isNew = false;
   try {
-    await fs.access(DATA_DIR);
+    await fs.access(channelDir);
   } catch {
-    await fs.mkdir(DATA_DIR, { recursive: true });
+    isNew = true;
   }
 
-  try {
-    await fs.access(CACHE_DIR);
-  } catch {
-    await fs.mkdir(CACHE_DIR, { recursive: true });
+  await fs.mkdir(reportsDir, { recursive: true });
+
+  if (isNew) {
+    debug(`Created new channel directory: ${channelDir}`);
   }
 }
 
-/**
- * Get cache directory path
- */
-export function getCacheDir(): string {
-  return CACHE_DIR;
-}
+// ─── Cache index ──────────────────────────────────────────────────────────────
 
 /**
- * Get reports subdirectory path
+ * Load per-channel cache index
  */
-export function getReportsDir(): string {
-  return CACHE_DIR;
-}
-
-/**
- * Load global cache index
- */
-export async function loadCacheIndex(): Promise<CacheIndex> {
+export async function loadCacheIndex(channelId: string, channelHandle?: string): Promise<CacheIndex> {
   try {
-    await ensureCacheDir();
-    const data = await fs.readFile(CACHE_INDEX_PATH, 'utf-8');
+    await ensureCacheDir(channelId);
+    const data = await fs.readFile(getChannelCacheIndexPath(channelId), 'utf-8');
     const index = JSON.parse(data) as CacheIndex;
 
-    // Validate structure
     if (!index.version || !Array.isArray(index.entries)) {
       throw new Error('Invalid cache index structure');
     }
 
+    // Validate version matches expected format
+    if (index.version !== CACHE_INDEX_VERSION) {
+      const indexPath = getChannelCacheIndexPath(channelId);
+      const channelArg = channelHandle ?? channelId;
+      warning(`Cache index is outdated (v${index.version} → v${CACHE_INDEX_VERSION}). Cached report data cleared.`);
+      warning(`  To rebuild: staqan-yt fetch-reports --channel ${channelArg}`);
+      warning(`  To delete:  ${indexPath}`);
+      return {
+        version: CACHE_INDEX_VERSION,
+        lastUpdated: new Date().toISOString(),
+        entries: [],
+      };
+    }
+
     return index;
   } catch {
-    // File doesn't exist or is invalid - return empty index
-    debug('Cache index not found or invalid, creating new one');
+    debug(`Cache index not found or invalid for channel ${channelId}, creating new one`);
     return {
       version: CACHE_INDEX_VERSION,
       lastUpdated: new Date().toISOString(),
@@ -70,60 +86,56 @@ export async function loadCacheIndex(): Promise<CacheIndex> {
 }
 
 /**
- * Save global cache index
+ * Save per-channel cache index
  */
-export async function saveCacheIndex(index: CacheIndex): Promise<void> {
-  await ensureCacheDir();
+export async function saveCacheIndex(channelId: string, index: CacheIndex): Promise<void> {
+  await ensureCacheDir(channelId);
   index.lastUpdated = new Date().toISOString();
-  await fs.writeFile(CACHE_INDEX_PATH, JSON.stringify(index, null, 2), 'utf-8');
+  await fs.writeFile(getChannelCacheIndexPath(channelId), JSON.stringify(index, null, 2), 'utf-8');
 }
 
 /**
  * Add entry to cache index
  */
-export async function addCacheEntry(entry: CacheIndexEntry): Promise<void> {
-  const index = await loadCacheIndex();
+export async function addCacheEntry(channelId: string, entry: CacheIndexEntry): Promise<void> {
+  const index = await loadCacheIndex(channelId);
 
-  // Check if entry already exists
   const existingIndex = index.entries.findIndex(e => e.reportId === entry.reportId);
   if (existingIndex >= 0) {
-    // Update existing entry
     index.entries[existingIndex] = entry;
   } else {
-    // Add new entry
     index.entries.push(entry);
   }
 
-  await saveCacheIndex(index);
+  await saveCacheIndex(channelId, index);
   debug(`Added cache entry: ${entry.reportId}`);
 }
 
 /**
  * Remove entry from cache index
  */
-export async function removeCacheEntry(reportId: string): Promise<void> {
-  const index = await loadCacheIndex();
+export async function removeCacheEntry(channelId: string, reportId: string): Promise<void> {
+  const index = await loadCacheIndex(channelId);
   index.entries = index.entries.filter(e => e.reportId !== reportId);
-  await saveCacheIndex(index);
+  await saveCacheIndex(channelId, index);
   debug(`Removed cache entry: ${reportId}`);
 }
 
 /**
- * Find cached reports for a type and date range
+ * Find cached reports for a type and date range (filtered by channelId)
  */
 export async function findCachedReports(
+  channelId: string,
   reportTypeId: string,
   startDate: string,
   endDate: string
 ): Promise<CacheIndexEntry[]> {
-  const index = await loadCacheIndex();
+  const index = await loadCacheIndex(channelId);
 
   return index.entries.filter(entry => {
-    if (entry.reportTypeId !== reportTypeId) {
-      return false;
-    }
+    if (entry.channelId !== channelId) return false;
+    if (entry.reportTypeId !== reportTypeId) return false;
 
-    // Check for overlap with requested range
     const overlap = computeDateRangeOverlap(
       entry.startTime,
       entry.endTime,
@@ -135,32 +147,31 @@ export async function findCachedReports(
   });
 }
 
-/**
- * Get report directory path
- */
-function getReportTypeDir(reportTypeId: string): string {
-  return path.join(CACHE_DIR, reportTypeId);
+// ─── Report file paths ────────────────────────────────────────────────────────
+
+function getReportTypeDir(channelId: string, reportTypeId: string): string {
+  return path.join(getChannelReportsDir(channelId), reportTypeId);
 }
 
-/**
- * Get report file paths
- */
-function getReportPaths(reportId: string, reportTypeId: string) {
-  const reportTypeDir = getReportTypeDir(reportTypeId);
+function getReportPaths(channelId: string, reportId: string, reportTypeId: string) {
+  const reportTypeDir = getReportTypeDir(channelId, reportTypeId);
   return {
     csv: path.join(reportTypeDir, `${reportId}.csv`),
     metadata: path.join(reportTypeDir, `${reportId}.metadata.json`),
   };
 }
 
+// ─── Metadata ────────────────────────────────────────────────────────────────
+
 /**
  * Load report metadata
  */
 export async function loadReportMetadata(
+  channelId: string,
   reportId: string,
   reportTypeId: string
 ): Promise<ReportMetadata | null> {
-  const { metadata: metadataPath } = getReportPaths(reportId, reportTypeId);
+  const { metadata: metadataPath } = getReportPaths(channelId, reportId, reportTypeId);
 
   try {
     const data = await fs.readFile(metadataPath, 'utf-8');
@@ -173,14 +184,16 @@ export async function loadReportMetadata(
 /**
  * Save report metadata
  */
-export async function saveReportMetadata(metadata: ReportMetadata): Promise<void> {
-  const reportTypeDir = getReportTypeDir(metadata.reportTypeId);
+export async function saveReportMetadata(channelId: string, metadata: ReportMetadata): Promise<void> {
+  const reportTypeDir = getReportTypeDir(channelId, metadata.reportTypeId);
   await fs.mkdir(reportTypeDir, { recursive: true });
 
-  const { metadata: metadataPath } = getReportPaths(metadata.reportId, metadata.reportTypeId);
+  const { metadata: metadataPath } = getReportPaths(channelId, metadata.reportId, metadata.reportTypeId);
   await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), 'utf-8');
   debug(`Saved metadata for: ${metadata.reportId}`);
 }
+
+// ─── CSV parsing ──────────────────────────────────────────────────────────────
 
 /**
  * Parse CSV line properly handling quoted fields
@@ -196,15 +209,12 @@ function parseCsvLine(line: string): string[] {
 
     if (char === '"') {
       if (inQuotes && nextChar === '"') {
-        // Escaped quote
         current += '"';
         i++;
       } else {
-        // Toggle quote mode
         inQuotes = !inQuotes;
       }
     } else if (char === ',' && !inQuotes) {
-      // Field separator
       result.push(current);
       current = '';
     } else {
@@ -212,9 +222,7 @@ function parseCsvLine(line: string): string[] {
     }
   }
 
-  // Add last field
   result.push(current);
-
   return result;
 }
 
@@ -239,7 +247,6 @@ export function parseCsvAndExtractRange(csvData: string): {
     return obj;
   });
 
-  // Find date range (assuming 'date' column exists)
   const dates = data
     .map(row => row.date)
     .filter(date => date)
@@ -251,34 +258,33 @@ export function parseCsvAndExtractRange(csvData: string): {
   return { headers, data, minDate, maxDate };
 }
 
+// ─── Report cache operations ──────────────────────────────────────────────────
+
 /**
  * Read cached report CSV data
  */
 export async function readCachedReport(
+  channelId: string,
   reportId: string,
   reportTypeId: string
 ): Promise<{
   headers: string[];
   data: Record<string, string>[];
 } | null> {
-  const { csv: csvPath } = getReportPaths(reportId, reportTypeId);
+  const { csv: csvPath } = getReportPaths(channelId, reportId, reportTypeId);
 
   try {
-    // Read CSV data
     const csvData = await fs.readFile(csvPath, 'utf-8');
     const parsed = parseCsvAndExtractRange(csvData);
 
-    // Validate against metadata
-    const metadata = await loadReportMetadata(reportId, reportTypeId);
+    const metadata = await loadReportMetadata(channelId, reportId, reportTypeId);
 
     if (metadata) {
-      // Check column match
       if (parsed.headers.join(',') !== metadata.columns.join(',')) {
         debug(`Column mismatch for ${reportId}, expected: ${metadata.columns.join(',')}, got: ${parsed.headers.join(',')}`);
         return null;
       }
 
-      // Check completeness
       if (!metadata.isComplete) {
         debug(`Report ${reportId} marked as incomplete`);
         return null;
@@ -296,26 +302,24 @@ export async function readCachedReport(
  * Save report to cache
  */
 export async function saveReportToCache(
+  channelId: string,
   reportId: string,
   reportTypeId: string,
   csvData: string,
   metadata: ReportMetadata
 ): Promise<void> {
-  const reportTypeDir = getReportTypeDir(reportTypeId);
+  const reportTypeDir = getReportTypeDir(channelId, reportTypeId);
   await fs.mkdir(reportTypeDir, { recursive: true });
 
-  const { csv: csvPath } = getReportPaths(reportId, reportTypeId);
+  const { csv: csvPath } = getReportPaths(channelId, reportId, reportTypeId);
 
-  // Save CSV file
   await fs.writeFile(csvPath, csvData, 'utf-8');
+  await saveReportMetadata(channelId, metadata);
 
-  // Save metadata
-  await saveReportMetadata(metadata);
-
-  // Add to cache index
-  await addCacheEntry({
+  await addCacheEntry(channelId, {
     reportId,
     reportTypeId,
+    channelId,
     startTime: metadata.startTime,
     endTime: metadata.endTime,
     downloadedAt: metadata.downloadedAt,
@@ -331,10 +335,11 @@ export async function saveReportToCache(
  * Delete report from cache
  */
 export async function deleteReportFromCache(
+  channelId: string,
   reportId: string,
   reportTypeId: string
 ): Promise<void> {
-  const { csv: csvPath, metadata: metadataPath } = getReportPaths(reportId, reportTypeId);
+  const { csv: csvPath, metadata: metadataPath } = getReportPaths(channelId, reportId, reportTypeId);
 
   try {
     await fs.unlink(csvPath);
@@ -348,14 +353,15 @@ export async function deleteReportFromCache(
     // Ignore if file doesn't exist
   }
 
-  // Remove from cache index
-  await removeCacheEntry(reportId);
-
+  await removeCacheEntry(channelId, reportId);
   debug(`Deleted report from cache: ${reportId}`);
 }
 
+// ─── Date range utilities ─────────────────────────────────────────────────────
+
 /**
  * Compute overlap between two date ranges
+ * Normalizes all inputs to date-only (YYYY-MM-DD) before comparison
  * Returns null if no overlap
  */
 export function computeDateRangeOverlap(
@@ -364,16 +370,22 @@ export function computeDateRangeOverlap(
   start2: string,
   end2: string
 ): { start: string; end: string } | null {
-  const s1 = new Date(start1).getTime();
-  const e1 = new Date(end1).getTime();
-  const s2 = new Date(start2).getTime();
-  const e2 = new Date(end2).getTime();
+  // Normalize to date-only strings (handle both YYYY-MM-DD and ISO timestamps)
+  const d1 = start1.split('T')[0];
+  const d2 = end1.split('T')[0];
+  const d3 = start2.split('T')[0];
+  const d4 = end2.split('T')[0];
+
+  const s1 = new Date(d1).getTime();
+  const e1 = new Date(d2).getTime();
+  const s2 = new Date(d3).getTime();
+  const e2 = new Date(d4).getTime();
 
   const overlapStart = Math.max(s1, s2);
   const overlapEnd = Math.min(e1, e2);
 
   if (overlapStart > overlapEnd) {
-    return null; // No overlap
+    return null;
   }
 
   return {
@@ -388,11 +400,8 @@ export function computeDateRangeOverlap(
 export function mergeDateRanges(
   ranges: { start: string; end: string }[]
 ): { start: string; end: string }[] {
-  if (ranges.length === 0) {
-    return [];
-  }
+  if (ranges.length === 0) return [];
 
-  // Sort by start date
   const sorted = [...ranges].sort((a, b) =>
     new Date(a.start).getTime() - new Date(b.start).getTime()
   );
@@ -406,15 +415,12 @@ export function mergeDateRanges(
     const lastEnd = new Date(last.end).getTime();
     const currentStart = new Date(current.start).getTime();
 
-    // Check if ranges overlap or are adjacent (within 1 day)
     if (currentStart <= lastEnd + 86400000) {
-      // Merge ranges
       const currentEnd = new Date(current.end).getTime();
       if (currentEnd > lastEnd) {
         last.end = current.end;
       }
     } else {
-      // No overlap, add as new range
       merged.push(current);
     }
   }
@@ -430,9 +436,7 @@ export function findDateGaps(
   requestedStart: string,
   requestedEnd: string
 ): { start: string; end: string }[] {
-  // Sort and merge ranges
   const merged = mergeDateRanges(ranges);
-
   const gaps: { start: string; end: string }[] = [];
   let current = new Date(requestedStart);
 
@@ -440,7 +444,6 @@ export function findDateGaps(
     const rangeStart = new Date(range.start);
     const rangeEnd = new Date(range.end);
 
-    // Gap exists if current is before range start
     if (current < rangeStart) {
       gaps.push({
         start: current.toISOString().split('T')[0],
@@ -448,14 +451,12 @@ export function findDateGaps(
       });
     }
 
-    // Move current to after this range
     const afterRange = new Date(rangeEnd.getTime() + 86400000);
     if (afterRange > current) {
       current = afterRange;
     }
   }
 
-  // Check for gap after last range
   const requestedEndDate = new Date(requestedEnd);
   if (current <= requestedEndDate) {
     gaps.push({
@@ -471,21 +472,18 @@ export function findDateGaps(
  * Analyze cache coverage for requested date range
  */
 export async function analyzeCacheCoverage(
+  channelId: string,
   reportTypeId: string,
   requestedStart: string,
   requestedEnd: string
 ): Promise<CacheCoverage> {
   const cachedReports = await findCachedReports(
+    channelId,
     reportTypeId,
     requestedStart,
     requestedEnd
   );
 
-  const fullyCovered: string[] = [];
-  const partiallyCovered: CacheCoverage['partiallyCovered'] = [];
-  const notCovered: string[] = [];
-
-  // If no cached reports, entire range is not covered
   if (cachedReports.length === 0) {
     return {
       fullyCovered: [],
@@ -494,39 +492,40 @@ export async function analyzeCacheCoverage(
     };
   }
 
-  // Build cached ranges
+  const fullyCovered: string[] = [];
+  const partiallyCovered: CacheCoverage['partiallyCovered'] = [];
+  const notCovered: string[] = [];
+
   const cachedRanges = cachedReports.map(r => ({
-    start: r.startTime,
-    end: r.endTime,
+    start: r.startTime.split('T')[0],
+    end: r.endTime.split('T')[0],
   }));
 
-  // Find gaps
   const gaps = findDateGaps(cachedRanges, requestedStart, requestedEnd);
 
-  // Classify coverage
   for (const cachedReport of cachedReports) {
+    const cachedStart = cachedReport.startTime.split('T')[0];
+    const cachedEnd = cachedReport.endTime.split('T')[0];
+
     const overlap = computeDateRangeOverlap(
-      cachedReport.startTime,
-      cachedReport.endTime,
+      cachedStart,
+      cachedEnd,
       requestedStart,
       requestedEnd
     );
 
     if (!overlap) continue;
 
-    // Check if fully covered
-    if (overlap.start === cachedReport.startTime &&
-        overlap.end === cachedReport.endTime) {
-      fullyCovered.push(`${cachedReport.startTime}/${cachedReport.endTime}`);
+    if (overlap.start === cachedStart && overlap.end === cachedEnd) {
+      fullyCovered.push(`${cachedStart}/${cachedEnd}`);
     } else {
-      // Partial coverage
-      const missingStart = overlap.start < cachedReport.startTime
+      const missingStart = overlap.start < cachedStart
         ? overlap.start
-        : new Date(new Date(cachedReport.endTime).getTime() + 86400000).toISOString().split('T')[0];
+        : new Date(new Date(cachedEnd).getTime() + 86400000).toISOString().split('T')[0];
 
-      const missingEnd = overlap.end > cachedReport.endTime
+      const missingEnd = overlap.end > cachedEnd
         ? overlap.end
-        : new Date(new Date(cachedReport.startTime).getTime() - 86400000).toISOString().split('T')[0];
+        : new Date(new Date(cachedStart).getTime() - 86400000).toISOString().split('T')[0];
 
       partiallyCovered.push({
         range: { start: requestedStart, end: requestedEnd },
@@ -536,14 +535,9 @@ export async function analyzeCacheCoverage(
     }
   }
 
-  // Add gaps to notCovered
   for (const gap of gaps) {
     notCovered.push(`${gap.start}/${gap.end}`);
   }
 
-  return {
-    fullyCovered,
-    partiallyCovered,
-    notCovered,
-  };
+  return { fullyCovered, partiallyCovered, notCovered };
 }

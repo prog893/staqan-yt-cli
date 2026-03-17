@@ -7,7 +7,11 @@ import {
   loadCacheIndex,
   loadReportMetadata,
   parseCsvAndExtractRange,
+  ensureCacheDir,
 } from '../lib/cache';
+import { getChannelId } from '../lib/youtube';
+import { getConfigValue } from '../lib/config';
+import { acquireLock, getLockPath } from '../lib/lock';
 import https from 'https';
 import { createWriteStream, unlinkSync } from 'fs';
 import { unlink } from 'fs/promises';
@@ -15,6 +19,7 @@ import path from 'path';
 import chalk from 'chalk';
 
 interface FetchReportsOptions {
+  channel?: string;
   type?: string;
   types?: string;
   startDate?: string;
@@ -30,7 +35,7 @@ interface FetchReportsOptions {
 async function downloadReport(
   report: { id?: string | null; downloadUrl?: string | null; startTime?: string | null; endTime?: string | null; createTime?: string | null },
   auth: { getAccessToken(): Promise<{ token?: string | null }> }
-): Promise<{ csvData: string; headers: string[]; data: Record<string, string>[] }> {
+): Promise<{ csvData: string; headers: string[]; data: Record<string, string>[]; minDate: string; maxDate: string }> {
   const tmpPath = path.join('/tmp', `${report.id}.csv`);
 
   // Get access token for authenticated request
@@ -89,7 +94,7 @@ async function downloadReport(
     // Ignore cleanup errors
   }
 
-  return { csvData, headers: parsed.headers, data: parsed.data };
+  return { csvData, headers: parsed.headers, data: parsed.data, minDate: parsed.minDate, maxDate: parsed.maxDate };
 }
 
 /**
@@ -99,44 +104,76 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
   initCommand(options);
 
   await withSpinner('Initializing...', 'Failed to fetch reports', async (spinner) => {
-    const auth = await getAuthenticatedClient();
-    const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
-
-    // Step 1: Discover report types
-    spinner.text = 'Discovering report types...';
-
-    const typesResponse = await youtubeReporting.reportTypes.list({
-      onBehalfOfContentOwner: undefined,
-    });
-
-    let reportTypes = typesResponse.data.reportTypes || [];
-
-    // Filter by --type or --types if specified
-    if (options.type) {
-      reportTypes = reportTypes.filter(t => t.id === options.type);
-      debug(`Filtering by single type: ${options.type}`);
-    } else if (options.types) {
-      const requestedIds = options.types.split(',');
-      reportTypes = reportTypes.filter(t => requestedIds.includes(t.id!));
-      debug(`Filtering by multiple types: ${requestedIds.join(', ')}`);
-    }
-
-    if (reportTypes.length === 0) {
-      spinner.fail('No report types found');
+    // Resolve channel handle → canonical channel ID for cache namespacing
+    const channelHandle = options.channel || await getConfigValue('default.channel');
+    if (!channelHandle) {
+      spinner.fail('No channel configured');
       console.log('');
-      error('No report types found matching your criteria.');
+      error('No channel specified. Set a default channel:\n  staqan-yt config set default.channel @yourchannel\nor pass --channel @yourchannel');
       process.exit(1);
     }
 
-    spinner.succeed(`Found ${reportTypes.length} report type(s)`);
-    console.log('');
+    spinner.text = `Resolving channel ID for ${channelHandle}...`;
+    const channelId = await getChannelId(channelHandle);
+    debug(`Using channel ID: ${channelId}`);
 
-    // Step 2: Process each report type
-    let totalDownloaded = 0;
-    let totalSkipped = 0;
-    let totalErrors = 0;
+    // Ensure cache directory exists before touching the lock
+    try {
+      await ensureCacheDir(channelId);
+    } catch (err) {
+      spinner.fail('Failed to create cache directory');
+      error((err as Error).message);
+      process.exit(1);
+    }
 
-    for (const reportType of reportTypes) {
+    // Acquire lock for entire fetch operation
+    const lockPath = getLockPath('reports', channelId);
+    let release: (() => Promise<void>) | null = null;
+
+    try {
+      spinner.text = 'Acquiring lock...';
+      release = await acquireLock(lockPath, { timeout: 60000 }); // 60 second timeout
+
+      spinner.text = 'Initializing...';
+      const auth = await getAuthenticatedClient();
+      const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
+
+      // Step 1: Discover report types
+      spinner.text = 'Discovering report types...';
+
+      const typesResponse = await youtubeReporting.reportTypes.list({
+        onBehalfOfContentOwner: undefined,
+      });
+
+      let reportTypes = typesResponse.data.reportTypes || [];
+
+      // Filter by --type or --types if specified
+      if (options.type) {
+        reportTypes = reportTypes.filter(t => t.id === options.type);
+        debug(`Filtering by single type: ${options.type}`);
+      } else if (options.types) {
+        const requestedIds = options.types.split(',');
+        reportTypes = reportTypes.filter(t => requestedIds.includes(t.id!));
+        debug(`Filtering by multiple types: ${requestedIds.join(', ')}`);
+      }
+
+      if (reportTypes.length === 0) {
+        spinner.fail('No report types found');
+        console.log('');
+        error('No report types found matching your criteria.');
+        if (release) await release(); release = null;
+        process.exit(1);
+      }
+
+      spinner.succeed(`Found ${reportTypes.length} report type(s)`);
+      console.log('');
+
+      // Step 2: Process each report type
+      let totalDownloaded = 0;
+      let totalSkipped = 0;
+      let totalErrors = 0;
+
+      for (const reportType of reportTypes) {
       const reportTypeId = reportType.id!;
       spinner.text = `Processing ${reportTypeId}...`;
 
@@ -195,15 +232,17 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
         continue;
       }
 
-      // Filter by date range if specified
+      // Filter by date range if specified (compare date portions only)
       if (options.startDate || options.endDate) {
-        const allMinDate = reports[reports.length - 1].startTime; // Oldest
-        const allMaxDate = reports[0].endTime; // Newest
-        const filteredStart = options.startDate || allMinDate!;
-        const filteredEnd = options.endDate || allMaxDate!;
+        const allMinDate = reports[reports.length - 1].startTime!.split('T')[0]; // Oldest
+        const allMaxDate = reports[0].endTime!.split('T')[0]; // Newest
+        const filteredStart = (options.startDate || allMinDate).split('T')[0];
+        const filteredEnd = (options.endDate || allMaxDate).split('T')[0];
 
         reports = reports.filter((report: typeof reports[0]) => {
-          return report.startTime! >= filteredStart && report.endTime! <= filteredEnd;
+          const reportStart = report.startTime!.split('T')[0];
+          const reportEnd = report.endTime!.split('T')[0];
+          return reportStart >= filteredStart && reportEnd <= filteredEnd;
         });
 
         debug(`Filtered to ${reports.length} report(s) for date range`);
@@ -220,7 +259,7 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
         const endTime = report.endTime!;
 
         // Check if already cached
-        const cached = await findCachedReports(reportTypeId, startTime, endTime);
+        const cached = await findCachedReports(channelId, reportTypeId, startTime, endTime);
 
         if (cached.length > 0 && !options.force) {
           debug(`Skipping cached report: ${reportId} (${startTime} to ${endTime})`);
@@ -231,10 +270,7 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
         // Download report
         try {
           spinner.text = `Downloading ${reportTypeId}: ${startTime} to ${endTime}...`;
-          const { csvData, headers, data } = await downloadReport(report, auth);
-
-          // Parse CSV to get actual date range
-          const parsed = parseCsvAndExtractRange(csvData);
+          const { csvData, headers, data, minDate, maxDate } = await downloadReport(report, auth);
 
           // Calculate expiration date
           const jobCreated = new Date(matchingJob.createTime || '');
@@ -244,14 +280,15 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
           const expiresAt = new Date(reportCreated.getTime() + expirationDays * 24 * 60 * 60 * 1000);
 
           // Save to cache
-          await saveReportToCache(reportId, reportTypeId, csvData, {
+          await saveReportToCache(channelId, reportId, reportTypeId, csvData, {
             reportId,
             reportTypeId,
+            channelId,
             jobId,
             startTime,
             endTime,
-            startTimeActual: parsed.minDate || startTime,
-            endTimeActual: parsed.maxDate || endTime,
+            startTimeActual: minDate || startTime,
+            endTimeActual: maxDate || endTime,
             downloadedAt: new Date().toISOString(),
             expiresAt: expiresAt.toISOString(),
             downloadUrl: report.downloadUrl!,
@@ -282,12 +319,12 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
     if (options.verify) {
       spinner.text = 'Verifying cached files...';
 
-      const index = await loadCacheIndex();
+      const index = await loadCacheIndex(channelId, channelHandle);
       let verified = 0;
       let corrupted = 0;
 
       for (const entry of index.entries) {
-        const metadata = await loadReportMetadata(entry.reportId, entry.reportTypeId);
+        const metadata = await loadReportMetadata(channelId, entry.reportId, entry.reportTypeId);
 
         if (!metadata) {
           warning(`Missing metadata: ${entry.reportId}`);
@@ -318,6 +355,24 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
     console.log('');
 
     success('Fetch complete!');
+    } catch (err) {
+      if (!release) {
+        // Lock acquisition failed
+        const lockPath = getLockPath('reports', channelId);
+        spinner.fail('Could not acquire lock for reports');
+        console.log('');
+        error('Another fetch operation is in progress. Wait for it to complete, or remove the lock:');
+        error(`  rm ${lockPath}`);
+      } else {
+        // Lock was acquired, error occurred during operation
+        await release();  // Release lock before exiting
+        spinner.fail('Failed while fetching reports');
+        error((err as Error).message);
+      }
+      process.exit(1);
+    } finally {
+      if (release) await release();
+    }
   });
 }
 

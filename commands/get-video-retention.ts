@@ -117,9 +117,9 @@ async function getRetentionCommand(options: RetentionOptions): Promise<void> {
         // Convert rows to table format with readable timestamps
         const totalSeconds = parseDuration(duration);
         const tableData = allRows.map(row => ({
-          timestamp: formatTimestamp((row as unknown[])[0] as number * totalSeconds),
-          retentionPercent: (((row as unknown[])[1] as number) * 100).toFixed(1) + '%',
-          relativePerformance: ((row as unknown[])[2] as number).toFixed(2),
+          timestamp: formatTimestamp(row[0] as number * totalSeconds),
+          retentionPercent: ((row[1] as number) * 100).toFixed(1) + '%',
+          relativePerformance: (row[2] as number).toFixed(2),
         }));
         console.log(formatTable(tableData));
         break;
@@ -130,9 +130,9 @@ async function getRetentionCommand(options: RetentionOptions): Promise<void> {
         const totalSeconds = parseDuration(duration);
         allRows.forEach(row => {
           console.log([
-            formatTimestamp((row as unknown[])[0] as number * totalSeconds),
-            (((row as unknown[])[1] as number) * 100).toFixed(1),
-            ((row as unknown[])[2] as number).toFixed(2)
+            formatTimestamp(row[0] as number * totalSeconds),
+            ((row[1] as number) * 100).toFixed(1),
+            (row[2] as number).toFixed(2)
           ].join('\t'));
         });
         break;
@@ -163,9 +163,9 @@ async function getRetentionCommand(options: RetentionOptions): Promise<void> {
         console.log(chalk.gray('─'.repeat(60)));
 
         allRows.forEach(row => {
-          const timeRatio = (row as unknown[])[0] as number; // 0.0 to 1.0
-          const watchRatio = (row as unknown[])[1] as number; // Percentage still watching
-          const relativePerformance = (row as unknown[])[2] as number; // vs similar videos
+          const timeRatio = row[0] as number; // 0.0 to 1.0
+          const watchRatio = row[1] as number; // Percentage still watching
+          const relativePerformance = row[2] as number; // vs similar videos
 
           // Convert time ratio to actual timestamp
           const elapsedSeconds = timeRatio * totalSeconds;

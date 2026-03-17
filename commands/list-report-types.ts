@@ -61,9 +61,9 @@ async function listReportTypesCommand(options: ReportTypesOptions): Promise<void
         break;
 
       case 'text':
-        Object.entries(grouped).forEach(([category, types]) => {
+        Object.entries(grouped).forEach(([category, types]: [string, typeof reportTypes]) => {
           console.log(`\n${category.toUpperCase()}:`);
-          (types as typeof reportTypes).forEach(rt => {
+          types.forEach(rt => {
             console.log(`  ${rt.id}`);
             console.log(`    Name: ${rt.name}`);
             console.log('');
