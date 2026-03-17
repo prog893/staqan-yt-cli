@@ -236,8 +236,8 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
       if (options.startDate || options.endDate) {
         const allMinDate = reports[reports.length - 1].startTime!.split('T')[0]; // Oldest
         const allMaxDate = reports[0].endTime!.split('T')[0]; // Newest
-        const filteredStart = options.startDate || allMinDate;
-        const filteredEnd = options.endDate || allMaxDate;
+        const filteredStart = (options.startDate || allMinDate).split('T')[0];
+        const filteredEnd = (options.endDate || allMaxDate).split('T')[0];
 
         reports = reports.filter((report: typeof reports[0]) => {
           const reportStart = report.startTime!.split('T')[0];
@@ -357,11 +357,15 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
     success('Fetch complete!');
     } catch (err) {
       if (!release) {
+        // Lock acquisition failed
+        const lockPath = getLockPath('reports', channelId);
         spinner.fail('Could not acquire lock for reports');
         console.log('');
-        error('Another fetch operation is in progress. Wait for it to complete or run: rm ~/.staqan-yt-cli/data/*/reports/.lock');
+        error('Another fetch operation is in progress. Wait for it to complete, or remove the lock:');
+        error(`  rm ${lockPath}`);
       } else {
-        if (release) await release(); release = null;
+        // Lock was acquired, error occurred during operation
+        await release();  // Release lock before exiting
         spinner.fail('Failed while fetching reports');
         error((err as Error).message);
       }
