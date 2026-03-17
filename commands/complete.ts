@@ -21,6 +21,9 @@ const TTL: Record<CompletionType, number> = {
   'report-type': 60 * 60 * 1000,
 };
 
+// report-type completions are credential-scoped (not channel-specific)
+const GLOBAL_CACHE_PATH = path.join(CONFIG_DIR, 'data', 'completion_cache.json');
+
 function getChannelCachePath(channelId: string): string {
   return path.join(CONFIG_DIR, 'data', channelId, 'completion_cache.json');
 }
@@ -33,14 +36,17 @@ async function loadCache(cachePath: string): Promise<CompletionCache> {
   }
 }
 
-async function saveCache(cachePath: string, cache: CompletionCache, channelId: string): Promise<void> {
-  const lockPath = getLockPath('completion', channelId);
+// channelId is optional: provided for per-channel caches (acquires lock),
+// omitted for the global report-type cache (no lock needed).
+async function saveCache(cachePath: string, cache: CompletionCache, channelId?: string): Promise<void> {
   let release: (() => Promise<void>) | null = null;
 
   try {
     await fs.mkdir(path.dirname(cachePath), { recursive: true });
-    // Acquire lock with 2 second timeout (completion is fast)
-    release = await acquireLock(lockPath, { timeout: 2000 });
+    if (channelId) {
+      // Acquire lock with 2 second timeout (completion is fast)
+      release = await acquireLock(getLockPath('completion', channelId), { timeout: 2000 });
+    }
     await fs.writeFile(cachePath, JSON.stringify(cache), { mode: 0o600 });
 
     debug('Completion cache saved');
@@ -58,15 +64,6 @@ async function completeCommand(options: { type: string }): Promise<void> {
     if (!VALID_TYPES.includes(options.type as CompletionType)) process.exit(0);
     const type = options.type as CompletionType;
 
-    // All completion types require a channel to be configured
-    const channel = await getConfigValue('default.channel');
-    if (!channel) process.exit(0);
-
-    // Resolve handle → canonical channel ID for namespacing
-    const channelId = await getChannelId(channel);
-    const cachePath = getChannelCachePath(channelId);
-    const cache = await loadCache(cachePath);
-
     let items: Array<{ id: string; title: string }> | undefined;
 
     // Spinner for cold fetch - only show when running interactively (TTY)
@@ -75,6 +72,14 @@ async function completeCommand(options: { type: string }): Promise<void> {
 
     try {
       if (type === 'video-id' || type === 'playlist-id') {
+        // Video/playlist completions are channel-specific — require configured channel
+        const channel = await getConfigValue('default.channel');
+        if (!channel) process.exit(0);
+
+        const channelId = await getChannelId(channel);
+        const cachePath = getChannelCachePath(channelId);
+        const cache = await loadCache(cachePath);
+
         const entry = cache[type];
         if (entry && Date.now() - entry.fetchedAt < TTL[type]) {
           items = entry.items;
@@ -97,6 +102,10 @@ async function completeCommand(options: { type: string }): Promise<void> {
           }
         }
       } else if (type === 'report-type') {
+        // Report types are credential-scoped (same for any channel on this account)
+        // No channel configuration required
+        const cache = await loadCache(GLOBAL_CACHE_PATH);
+
         const entry = cache[type];
         if (entry && Date.now() - entry.fetchedAt < TTL[type]) {
           items = entry.items;
@@ -115,7 +124,7 @@ async function completeCommand(options: { type: string }): Promise<void> {
           }
           if (items.length > 0) {
             cache[type] = { items, fetchedAt: Date.now() };
-            await saveCache(cachePath, cache, channelId);
+            await saveCache(GLOBAL_CACHE_PATH, cache);
           }
         }
       }

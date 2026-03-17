@@ -281,7 +281,7 @@ export async function readCachedReport(
 
     if (metadata) {
       if (parsed.headers.join(',') !== metadata.columns.join(',')) {
-        debug(`Column mismatch for ${reportId}`);
+        debug(`Column mismatch for ${reportId}, expected: ${metadata.columns.join(',')}, got: ${parsed.headers.join(',')}`);
         return null;
       }
 

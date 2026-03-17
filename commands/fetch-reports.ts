@@ -117,13 +117,21 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
     const channelId = await getChannelId(channelHandle);
     debug(`Using channel ID: ${channelId}`);
 
+    // Ensure cache directory exists before touching the lock
+    try {
+      await ensureCacheDir(channelId);
+    } catch (err) {
+      spinner.fail('Failed to create cache directory');
+      error((err as Error).message);
+      process.exit(1);
+    }
+
     // Acquire lock for entire fetch operation
     const lockPath = getLockPath('reports', channelId);
     let release: (() => Promise<void>) | null = null;
 
     try {
       spinner.text = 'Acquiring lock...';
-      await ensureCacheDir(channelId);
       release = await acquireLock(lockPath, { timeout: 60000 }); // 60 second timeout
 
       spinner.text = 'Initializing...';
@@ -153,6 +161,7 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
         spinner.fail('No report types found');
         console.log('');
         error('No report types found matching your criteria.');
+        if (release) await release(); release = null;
         process.exit(1);
       }
 
@@ -347,10 +356,15 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
 
     success('Fetch complete!');
     } catch (err) {
-      spinner.fail('Failed to acquire reports lock');
-      error((err as Error).message);
-      console.log('');
-      error('Another fetch operation is in progress. Wait for it to complete or run: rm ~/.staqan-yt-cli/data/*/reports/.lock');
+      if (!release) {
+        spinner.fail('Could not acquire lock for reports');
+        console.log('');
+        error('Another fetch operation is in progress. Wait for it to complete or run: rm ~/.staqan-yt-cli/data/*/reports/.lock');
+      } else {
+        if (release) await release(); release = null;
+        spinner.fail('Failed while fetching reports');
+        error((err as Error).message);
+      }
       process.exit(1);
     } finally {
       if (release) await release();
