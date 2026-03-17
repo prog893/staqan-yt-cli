@@ -9,9 +9,9 @@ async function getPlaylistCommand(options: OutputOption & VerboseOption & (Playl
   initCommand(options);
 
   // Dispatch: get-playlist passes --playlist-id (string), get-playlists passes --playlist-ids (string[])
-  const playlistIds: string[] = 'playlist-ids' in options && options['playlist-ids']
-    ? (options as PlaylistIdsOption)['playlist-ids']!
-    : [(options as PlaylistIdOption)['playlist-id']!];
+  const playlistIds: string[] = 'playlistIds' in options && options['playlistIds']
+    ? (options as PlaylistIdsOption).playlistIds!
+    : [(options as PlaylistIdOption).playlistId!];
 
   await withSpinner('Fetching playlist information...', 'Failed to fetch playlist information', async (spinner) => {
     const parsedIds = playlistIds.map(parsePlaylistId);

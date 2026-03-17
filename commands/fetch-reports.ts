@@ -239,6 +239,14 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
         const filteredStart = (options.startDate || allMinDate).split('T')[0];
         const filteredEnd = (options.endDate || allMaxDate).split('T')[0];
 
+        // Validate that start date is not after end date
+        if (filteredStart > filteredEnd) {
+          error('start-date must be before or equal to end-date');
+          console.log(chalk.gray('Provided:') + ` start-date=${filteredStart}, end-date=${filteredEnd}`);
+          console.log('');
+          process.exit(1);
+        }
+
         reports = reports.filter((report: typeof reports[0]) => {
           const reportStart = report.startTime!.split('T')[0];
           const reportEnd = report.endTime!.split('T')[0];

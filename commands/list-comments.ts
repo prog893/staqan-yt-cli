@@ -9,7 +9,7 @@ async function listCommentsCommand(options: ListCommentsOptions): Promise<void> 
   initCommand(options);
 
   // Extract video ID from options
-  const videoIdInput = options['video-id'];
+  const videoIdInput = options.videoId;
   if (!videoIdInput) {
     error('Required: --video-id');
     process.exit(1);

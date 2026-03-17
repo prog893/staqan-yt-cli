@@ -670,15 +670,15 @@ ${commandList}
       local words=(\$words[1] \$words[3,-1])
       local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
-        '{-c,--channel}[Channel handle or ID]:channel:' \\
-        '{-t,--type}[Report type ID]: :_staqan_yt_report_types' \\
-        '{-T,--types}[Report type IDs (comma-separated)]:ids:' \\
+        '(-c --channel)'{-c,--channel}'[Channel handle or ID]:channel:' \\
+        '(-t --type)'{-t,--type}'[Report type ID]: :_staqan_yt_report_types' \\
+        '(-T --types){-T,--types}[Report type IDs (comma-separated)]:ids:' \\
         '--start-date[Start date (YYYY-MM-DD)]:date:' \\
         '--end-date[End date (YYYY-MM-DD)]:date:' \\
-        '{-f,--force}[Re-download even if cached]' \\
+        '(-f --force){-f,--force}[Re-download even if cached]' \\
         '--verify[Verify cached file completeness]' \\
         '--output[Output format]:format:(json table text csv)' \\
-        '{-v,--verbose}[Enable verbose output]'
+        '(-v --verbose){-v,--verbose}[Enable verbose output]'
       ;;
     *)
       _describe 'command' commands

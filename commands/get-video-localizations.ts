@@ -13,7 +13,7 @@ async function getVideoLocalizations(options: GetVideoLocalizationsOptions): Pro
   initCommand(options);
 
   // Extract video IDs from options
-  const videoIds = options['video-ids'];
+  const videoIds = options.videoIds;
   if (!videoIds || videoIds.length === 0) {
     error('Required: --video-ids');
     process.exit(1);
