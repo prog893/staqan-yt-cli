@@ -66,8 +66,8 @@ async function completeCommand(options: { type: string }): Promise<void> {
 
     let items: Array<{ id: string; title: string }> | undefined;
 
-    // Spinner for cold fetch - only show when running interactively (TTY)
-    const isInteractive = process.stdout.isTTY;
+    // Spinner for cold fetch - only show when running interactively (both stdout and stderr TTY)
+    const isInteractive = Boolean(process.stdout.isTTY) && Boolean(process.stderr.isTTY);
     let spinner: ReturnType<typeof ora> | null = null;
 
     try {
@@ -93,8 +93,12 @@ async function completeCommand(options: { type: string }): Promise<void> {
           items = raw
             .filter(v => v.id && v.title)
             .map(v => ({ id: v.id, title: v.title }));
-          if (isInteractive && spinner) {
-            spinner.succeed(`Fetched ${items.length} completion candidates`);
+          try {
+            if (isInteractive && spinner) {
+              spinner.succeed(`Fetched ${items.length} completion candidates`);
+            }
+          } catch {
+            if (spinner) spinner.stop();
           }
           if (items.length > 0) {
             cache[type] = { items, fetchedAt: Date.now() };
@@ -119,8 +123,12 @@ async function completeCommand(options: { type: string }): Promise<void> {
           items = (res.data.reportTypes || [])
             .filter(t => t.id && t.name)
             .map(t => ({ id: t.id!, title: t.name! }));
-          if (isInteractive && spinner) {
-            spinner.succeed(`Fetched ${items.length} report types`);
+          try {
+            if (isInteractive && spinner) {
+              spinner.succeed(`Fetched ${items.length} report types`);
+            }
+          } catch {
+            if (spinner) spinner.stop();
           }
           if (items.length > 0) {
             cache[type] = { items, fetchedAt: Date.now() };
