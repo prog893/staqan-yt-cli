@@ -11,10 +11,6 @@ const CACHE_INDEX_VERSION = '2.0';
 
 // ─── Per-channel path helpers ──────────────────────────────────────────────────
 
-function getChannelDataDir(channelId: string): string {
-  return path.join(DATA_DIR, channelId);
-}
-
 function getChannelReportsDir(channelId: string): string {
   return path.join(DATA_DIR, channelId, 'reports');
 }
@@ -25,24 +21,15 @@ function getChannelCacheIndexPath(channelId: string): string {
 
 /**
  * Ensure per-channel cache directory structure exists
+ *
+ * Note: mkdir with { recursive: true } is idempotent — it succeeds
+ * if the directory already exists, so we call it directly without
+ * an access check. This avoids the TOCTOU window and is more efficient.
  */
 export async function ensureCacheDir(channelId: string): Promise<void> {
-  const channelDir = getChannelDataDir(channelId);
   const reportsDir = getChannelReportsDir(channelId);
-
-  // Check if new channel directory is being created
-  let isNew = false;
-  try {
-    await fs.access(channelDir);
-  } catch {
-    isNew = true;
-  }
-
   await fs.mkdir(reportsDir, { recursive: true });
-
-  if (isNew) {
-    debug(`Created new channel directory: ${channelDir}`);
-  }
+  debug(`Ensured cache directory exists: ${reportsDir}`);
 }
 
 // ─── Cache index ──────────────────────────────────────────────────────────────

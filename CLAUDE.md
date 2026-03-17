@@ -72,9 +72,9 @@ staqan-yt config set default.channel @staqan
 staqan-yt config set default.output csv
 
 # Video operations
-staqan-yt get-video dQw4w9WgXcQ
-staqan-yt get-videos ID1 ID2
-staqan-yt list-videos @channel --limit 5
+staqan-yt get-video --video-id dQw4w9WgXcQ
+staqan-yt get-videos --video-ids ID1 ID2
+staqan-yt list-videos --channel @channel --limit 5
 
 # All output formats
 staqan-yt get-video ID --output json|table|text|csv|pretty
