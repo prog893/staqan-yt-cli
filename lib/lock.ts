@@ -40,7 +40,7 @@ export async function acquireLock(
     try {
       // Try to create lock file exclusively (fails if exists)
       const lockContent = JSON.stringify(lockInfo, null, 2);
-      await fs.writeFile(lockPath, lockContent, { flag: 'wx' });
+      await fs.writeFile(lockPath, lockContent, { flag: 'wx', mode: 0o600 });
 
       debug(`Acquired lock: ${lockPath} (PID ${myPid})`);
 

@@ -1,8 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { CONFIG_DIR } from './utils';
+import { CONFIG_DIR, debug, warning } from './utils';
 import { CacheIndex, CacheIndexEntry, ReportMetadata, CacheCoverage } from '../types';
-import { debug } from './utils';
 
 // Base data directory
 const DATA_DIR = path.join(CONFIG_DIR, 'data');
@@ -63,8 +62,10 @@ export async function loadCacheIndex(channelId: string): Promise<CacheIndex> {
 
     // Validate version matches expected format
     if (index.version !== CACHE_INDEX_VERSION) {
-      debug(`Cache index version mismatch for channel ${channelId}: ${index.version} vs ${CACHE_INDEX_VERSION}`);
-      // Return fresh index to prevent schema incompatibility issues
+      const indexPath = getChannelCacheIndexPath(channelId);
+      warning(`Cache index is outdated (v${index.version} → v${CACHE_INDEX_VERSION}). Cached report data cleared.`);
+      warning(`  To rebuild: staqan-yt fetch-reports --channel ${channelId}`);
+      warning(`  To delete:  ${indexPath}`);
       return {
         version: CACHE_INDEX_VERSION,
         lastUpdated: new Date().toISOString(),
