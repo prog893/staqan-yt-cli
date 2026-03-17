@@ -207,6 +207,16 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       process.exit(1);
     }
 
+    // Validate that start date is not after end date
+    if (requestedStart > requestedEnd) {
+      spinner.fail('Invalid date range');
+      console.log('');
+      error('start-date must be before or equal to end-date');
+      console.log(chalk.gray('Provided:') + ` start-date=${requestedStart}, end-date=${requestedEnd}`);
+      console.log('');
+      process.exit(1);
+    }
+
     if (requestedStart < minDate || requestedEnd > maxDate) {
       spinner.fail('Data not available for requested date range');
       console.log('');
