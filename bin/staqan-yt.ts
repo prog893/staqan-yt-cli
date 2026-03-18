@@ -196,6 +196,7 @@ program
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-l, --limit <number>', 'Limit number of results', '50')
   .option('-t, --type <type>', 'Filter by video type (short or regular)')
+  .option('--privacy <status...>', 'Filter by privacy status: public, private, unlisted (multiple allowed)')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('list-videos', listVideosCommand));
 

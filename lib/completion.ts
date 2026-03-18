@@ -115,7 +115,7 @@ export function getCommandOptions(command: string): string[] {
     'config': ['--show', ...outputOptions, ...verboseOption],
     'get-video': [...outputOptions, ...verboseOption],
     'get-videos': [...outputOptions, ...verboseOption],
-    'list-videos': ['--limit', '-l', '--type', '-t', ...outputOptions, ...verboseOption],
+    'list-videos': ['--limit', '-l', '--type', '-t', '--privacy', 'public', 'private', 'unlisted', ...outputOptions, ...verboseOption],
     'search-videos': ['--global', '-g', '--channel', '-c', '--limit', '-l', ...outputOptions, ...verboseOption],
     'get-channel': [...outputOptions, ...verboseOption],
     'update-video': ['--title', '-t', '--description', '-d', '--dry-run', '--yes', '-y', ...outputOptions, ...verboseOption],
@@ -231,6 +231,22 @@ _staqa_nyt_completion() {
     fi
   done
 
+  # Variadic --privacy scan: walk back to detect if we are still inside a
+  # space-separated privacy value list (e.g. --privacy public <TAB>)
+  if [[ "\${cur}" != -* ]]; then
+    local j
+    for ((j=cword-1; j>=1; j--)); do
+      case "\${words[$j]}" in
+        --privacy)
+          COMPREPLY=( \$(compgen -W "public private unlisted" -- "\${cur}") ); return ;;
+        public|private|unlisted)
+          continue ;;
+        *)
+          break ;;
+      esac
+    done
+  fi
+
   # Flag-based completion - complete after --video-id, --playlist-id, etc.
   case "\${prev}" in
     --video-id)
@@ -257,6 +273,8 @@ _staqa_nyt_completion() {
           COMPREPLY=( \$(compgen -W "short regular" -- "\${cur}") ); return ;;
       esac
       ;;
+    --privacy)
+      COMPREPLY=( \$(compgen -W "public private unlisted" -- "\${cur}") ); return ;;
     --quality)
       COMPREPLY=( \$(compgen -W "maxres standard high medium default" -- "\${cur}") ); return ;;
     --sort|-s)
@@ -303,8 +321,11 @@ _staqa_nyt_completion() {
     get-playlists)
       COMPREPLY=( \$(compgen -W "--playlist-ids --output --verbose" -- "\${cur}") )
       ;;
-    list-videos|list-playlists)
-      COMPREPLY=( \$(compgen -W "--channel --limit --type --output --verbose" -- "\${cur}") )
+    list-videos)
+      COMPREPLY=( \$(compgen -W "--channel --limit --type --privacy --output --verbose" -- "\${cur}") )
+      ;;
+    list-playlists)
+      COMPREPLY=( \$(compgen -W "--channel --limit --output --verbose" -- "\${cur}") )
       ;;
     list-comments)
       COMPREPLY=( \$(compgen -W "--video-id --limit --sort --output --verbose" -- "\${cur}") )
@@ -587,13 +608,23 @@ ${commandList}
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
-    list-videos|list-playlists)
+    list-videos)
       local words=(\$words[1] \$words[3,-1])
       local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--channel[Channel handle or ID]:channel:' \\
         '--limit[Limit number of results]:n:' \\
         '--type[Filter by type]:type:(short regular)' \\
+        '*--privacy[Filter by privacy status (repeatable)]:status:(public private unlisted)' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    list-playlists)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
+      _arguments \\
+        '--channel[Channel handle or ID]:channel:' \\
+        '--limit[Limit number of results]:n:' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;

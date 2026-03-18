@@ -78,6 +78,7 @@ export interface VideoListItem {
   videoType: VideoType;
   channelTitle?: string;  // For global search results
   channelId?: string;     // For global search results
+  privacyStatus?: string; // public | private | unlisted (requires authenticated API call)
 }
 
 // Localization types
@@ -141,6 +142,12 @@ export interface LimitOption {
 
 export interface TypeFilterOption {
   type?: 'short' | 'regular';
+}
+
+export type PrivacyStatus = 'public' | 'private' | 'unlisted';
+
+export interface PrivacyFilterOption {
+  privacy?: PrivacyStatus[];
 }
 
 export interface ChannelOption {
