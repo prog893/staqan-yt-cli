@@ -48,7 +48,7 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
           id: video.id,
           title: video.title,
           published: formatDate(video.publishedAt),
-          privacy: video.privacyStatus || '-',
+          privacy: video.privacyStatus || '-', // '-' sentinel: human-readable placeholder for unauthenticated/missing data
           type: video.videoType,
         }));
         console.log(formatTable(tableData));
@@ -56,6 +56,7 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
 
       case 'text':
         videos.forEach(video => {
+          // '-' sentinel: human-readable placeholder; consistent with table format for tab-delimited consumers
           console.log([video.id, video.title, formatDate(video.publishedAt), video.privacyStatus || '-', video.videoType].join('\t'));
         });
         break;
@@ -65,7 +66,7 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
           id: video.id,
           title: video.title,
           published: video.publishedAt,
-          privacy: video.privacyStatus || '',
+          privacy: video.privacyStatus || '', // empty string: CSV convention — absent field, not a sentinel value
           type: video.videoType,
         }));
         console.log(formatCsv(csvData));

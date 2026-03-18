@@ -115,7 +115,7 @@ export function getCommandOptions(command: string): string[] {
     'config': ['--show', ...outputOptions, ...verboseOption],
     'get-video': [...outputOptions, ...verboseOption],
     'get-videos': [...outputOptions, ...verboseOption],
-    'list-videos': ['--limit', '-l', '--type', '-t', '--privacy', 'public', 'private', 'unlisted', ...outputOptions, ...verboseOption],
+    'list-videos': ['--limit', '-l', '--type', '-t', '--privacy', ...outputOptions, ...verboseOption],
     'search-videos': ['--global', '-g', '--channel', '-c', '--limit', '-l', ...outputOptions, ...verboseOption],
     'get-channel': [...outputOptions, ...verboseOption],
     'update-video': ['--title', '-t', '--description', '-d', '--dry-run', '--yes', '-y', ...outputOptions, ...verboseOption],
@@ -135,7 +135,7 @@ export function getCommandOptions(command: string): string[] {
     'get-thumbnail': ['--quality', ...outputOptions, ...verboseOption],
     'get-playlist': [...outputOptions, ...verboseOption],
     'get-playlists': [...outputOptions, ...verboseOption],
-    'list-playlists': ['--limit', '-l', '--privacy', 'public', 'private', 'unlisted', ...outputOptions, ...verboseOption],
+    'list-playlists': ['--limit', '-l', '--privacy', ...outputOptions, ...verboseOption],
     'list-captions': [...outputOptions, ...verboseOption],
     'get-caption': ['--format', ...verboseOption],
     'list-report-types': ['--output', 'json', 'table', 'text', ...verboseOption],
@@ -238,7 +238,18 @@ _staqa_nyt_completion() {
     for ((j=cword-1; j>=1; j--)); do
       case "\${words[$j]}" in
         --privacy)
-          COMPREPLY=( \$(compgen -W "public private unlisted" -- "\${cur}") ); return ;;
+          # Forward-scan from the flag's position to cword-1 to collect
+          # already-used values, then offer only the remaining ones.
+          local -A _used=()
+          local k
+          for (( k=j+1; k<cword; k++ )); do
+            _used["\${words[$k]}"]=1
+          done
+          local _rem=()
+          for v in public private unlisted; do
+            [[ -z "\${_used[$v]}" ]] && _rem+=("$v")
+          done
+          COMPREPLY=( \$(compgen -W "\${_rem[*]}" -- "\${cur}") ); return ;;
         public|private|unlisted)
           continue ;;
         --video-ids)
