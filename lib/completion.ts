@@ -628,21 +628,63 @@ ${commandList}
     list-videos)
       local words=(\$words[1] \$words[3,-1])
       local CURRENT=\$((\$CURRENT - 1))
+      # Space-separated variadic: walk back to detect if we're inside --privacy's
+      # value list. Pattern from Docker/_docker: use \${words[(r)val]} to check
+      # already-used values, then offer only the remaining ones.
+      if [[ \$words[\$CURRENT] != -* ]]; then
+        local j=\$((\$CURRENT - 1))
+        local -a _pused=()
+        while (( j >= 1 )); do
+          case \$words[\$j] in
+            --privacy)
+              local -a _rem=()
+              local v
+              for v in public private unlisted; do
+                [[ -z "\${_pused[(r)\$v]}" ]] && _rem+=(\$v)
+              done
+              _describe -t privacy-status 'privacy status' _rem
+              return
+              ;;
+            public|private|unlisted) _pused+=(\$words[\$j]); (( j-- )) ;;
+            *) break ;;
+          esac
+        done
+      fi
       _arguments \\
         '--channel[Channel handle or ID]:channel:' \\
         '--limit[Limit number of results]:n:' \\
         '--type[Filter by type]:type:(short regular)' \\
-        '*--privacy[Filter by privacy status (repeatable)]:status:(public private unlisted)' \\
+        '--privacy[Filter by privacy status (variadic: public private unlisted)]:status:(public private unlisted)' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     list-playlists)
       local words=(\$words[1] \$words[3,-1])
       local CURRENT=\$((\$CURRENT - 1))
+      # Same space-separated variadic pre-check as list-videos
+      if [[ \$words[\$CURRENT] != -* ]]; then
+        local j=\$((\$CURRENT - 1))
+        local -a _pused=()
+        while (( j >= 1 )); do
+          case \$words[\$j] in
+            --privacy)
+              local -a _rem=()
+              local v
+              for v in public private unlisted; do
+                [[ -z "\${_pused[(r)\$v]}" ]] && _rem+=(\$v)
+              done
+              _describe -t privacy-status 'privacy status' _rem
+              return
+              ;;
+            public|private|unlisted) _pused+=(\$words[\$j]); (( j-- )) ;;
+            *) break ;;
+          esac
+        done
+      fi
       _arguments \\
         '--channel[Channel handle or ID]:channel:' \\
         '--limit[Limit number of results]:n:' \\
-        '*--privacy[Filter by privacy status (repeatable)]:status:(public private unlisted)' \\
+        '--privacy[Filter by privacy status (variadic: public private unlisted)]:status:(public private unlisted)' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
