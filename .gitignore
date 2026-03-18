@@ -48,3 +48,6 @@ logs/
 # Temporary files
 tmp/
 temp/
+
+# Homebrew tap clone (used by release scripts)
+homebrew-tap/

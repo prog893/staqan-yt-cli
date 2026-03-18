@@ -35,18 +35,18 @@ binContent = binContent.replace(
 writeFileSync(binFilePath, binContent, 'utf-8');
 console.log(`  ✓ Updated bin/staqan-yt.ts`);
 
-// 2. Update Formula/staqan-yt.rb version
-const formulaPath = join(rootDir, 'Formula/staqan-yt.rb');
-let formulaContent = readFileSync(formulaPath, 'utf-8');
+// 2. Update homebrew-tap/Formula/staqan-yt.rb version (tap clone)
+const tapFormulaPath = join(rootDir, 'homebrew-tap/Formula/staqan-yt.rb');
+let formulaContent = readFileSync(tapFormulaPath, 'utf-8');
 formulaContent = formulaContent.replace(
   /version "[^"]+"/,
   `version "${version}"`
 );
-writeFileSync(formulaPath, formulaContent, 'utf-8');
-console.log(`  ✓ Updated Formula/staqan-yt.rb`);
+writeFileSync(tapFormulaPath, formulaContent, 'utf-8');
+console.log(`  ✓ Updated homebrew-tap/Formula/staqan-yt.rb`);
 
-// 3. Add files to npm's commit
-git('git add bin/staqan-yt.ts Formula/staqan-yt.rb package.json');
+// 3. Add files to npm's commit (tap formula is committed separately by postversion)
+git('git add bin/staqan-yt.ts package.json');
 console.log('  ✓ Added files to npm commit');
 
 console.log(`\n✅ Version ${version} synced! npm will now commit and tag.\n`);
