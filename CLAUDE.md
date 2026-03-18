@@ -4,7 +4,9 @@
 
 ### 🚨 NEVER COMMIT DIRECTLY TO MAIN BRANCH 🚨
 
-**EVERY commit MUST be on a feature branch:**
+**Exception: version bumps (`npm version patch/minor`) are committed directly on main.**
+
+**EVERY other commit MUST be on a feature branch:**
 
 ```bash
 # BEFORE making any changes, create a feature branch
@@ -42,10 +44,10 @@ gh pr create
 ### Verify Branch Before Committing
 
 ```bash
-# This MUST NOT be "main"
+# This MUST NOT be "main" — except for version bumps
 git branch --show-current
 
-# If it shows "main", STOP and create feature branch:
+# If it shows "main" and you're NOT doing a version bump, STOP and create feature branch:
 git checkout -b feature/your-feature-name
 ```
 
@@ -358,8 +360,13 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 
 ### Quick Release (After Completing Work)
 
+Version bumps are done **directly on main** (exception to the feature-branch rule).
+
 ```bash
-# Bump patch version
+# Make sure you're on main
+git checkout main
+
+# Bump patch version (creates a commit + tag automatically)
 npm version patch
 
 # Push to GitHub
