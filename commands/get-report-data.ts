@@ -217,35 +217,49 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       process.exit(1);
     }
 
-    if (requestedStart < minDate || requestedEnd > maxDate) {
-      spinner.fail('Data not available for requested date range');
-      console.log('');
-      error(`Data not available for requested date range`);
-      console.log(chalk.gray('Available:') + ` ${minDate} to ${maxDate}`);
-      console.log(chalk.gray('Requested:') + ` ${requestedStart} to ${requestedEnd}`);
-      console.log('');
+    // Adjust date range to available data if needed
+    const adjustedStart = requestedStart < minDate ? minDate : requestedStart;
+    const adjustedEnd = requestedEnd > maxDate ? maxDate : requestedEnd;
+
+    // Validate that adjusted range has overlap (i.e., requested range is not entirely before/after available data)
+    if (adjustedStart > adjustedEnd) {
+      spinner.fail('No overlap between requested range and available data');
+      process.stderr.write('\n');
+      process.stderr.write(chalk.red('Error:') + ' Requested date range has no overlap with available data\n');
+      process.stderr.write(chalk.gray('Requested:') + ` ${requestedStart} to ${requestedEnd}\n`);
+      process.stderr.write(chalk.gray('Available:') + ` ${minDate} to ${maxDate}\n`);
+      process.stderr.write('\n');
+      process.exit(1);
+    }
+
+    // Warn if range was adjusted
+    if (adjustedStart !== requestedStart || adjustedEnd !== requestedEnd) {
+      spinner.warn('Adjusting date range to available data');
+      process.stderr.write('\n');
+      process.stderr.write(chalk.yellow('Warning:') + ' Requested date range extends beyond available data\n');
+      process.stderr.write(chalk.gray('Requested:') + ` ${requestedStart} to ${requestedEnd}\n`);
+      process.stderr.write(chalk.gray('Will return:') + ` ${adjustedStart} to ${adjustedEnd}\n`);
+      process.stderr.write('\n');
 
       if (requestedStart < minDate) {
         const missingDays = Math.ceil((new Date(minDate).getTime() - new Date(requestedStart).getTime()) / (24 * 60 * 60 * 1000));
-        console.log(chalk.red('Missing:') + ` ${requestedStart} to ${minDate} (${missingDays} days, expired and deleted)`);
-        console.log(chalk.yellow('Tip:') + ' Run fetch-reports regularly to keep a local archive and avoid data loss:');
-        console.log(chalk.gray('       ') + chalk.cyan(`staqan-yt fetch-reports --type=${options.type}`));
-        console.log('');
+        process.stderr.write(chalk.red('Missing:') + ` ${requestedStart} to ${minDate} (${missingDays} days, expired and deleted)\n`);
+        process.stderr.write(chalk.yellow('Tip:') + ' Run fetch-reports regularly to keep a local archive and avoid data loss:\n');
+        process.stderr.write(chalk.gray('       ') + chalk.cyan(`staqan-yt fetch-reports --type=${options.type}\n`));
+        process.stderr.write('\n');
       }
 
       if (requestedEnd > maxDate) {
-        console.log(chalk.red('Future dates not available:') + ` ${maxDate} to ${requestedEnd}`);
-        console.log('');
+        process.stderr.write(chalk.red('Future dates not available:') + ` ${maxDate} to ${requestedEnd}\n`);
+        process.stderr.write('\n');
       }
-
-      process.exit(1);
     }
 
     // Step 4: Filter reports by date range (compare date portions only)
     reports = reports.filter((report: typeof reports[0]) => {
       const reportStart = report.startTime!.split('T')[0];
       const reportEnd = report.endTime!.split('T')[0];
-      return reportStart >= requestedStart && reportEnd <= requestedEnd;
+      return reportStart >= adjustedStart && reportEnd <= adjustedEnd;
     });
 
     if (reports.length === 0) {
@@ -257,7 +271,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
     // Step 5: Analyze cache coverage
     spinner.text = 'Analyzing cache coverage...';
-    const coverage = await analyzeCacheCoverage(channelId, options.type, requestedStart, requestedEnd);
+    const coverage = await analyzeCacheCoverage(channelId, options.type, adjustedStart, adjustedEnd);
     debug('Cache coverage:', coverage);
 
     // Step 6: Load cached data
@@ -379,7 +393,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
     }
 
     spinner.succeed(`Retrieved ${cachedReports.length} cached + ${reportsToFetch.length} new report(s)`);
-    console.log('');
+    process.stderr.write('\n');
 
     // Step 8: Filter by video ID if specified
     let filteredData = allData;
@@ -451,11 +465,11 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       const daysUntilExpiration = Math.ceil((expiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
 
       if (daysUntilExpiration <= 7) {
-        console.log('');
-        console.log(chalk.yellow('⚠️  Expiration Notice:'));
-        console.log(chalk.gray('  Report:') + ` ${report.startTime} to ${report.endTime} (cached)`);
-        console.log(chalk.gray('  Expires:') + ' ' + chalk.red(`${expiresAt.toISOString().split('T')[0]} (${daysUntilExpiration} days remaining)`));
-        console.log('');
+        process.stderr.write('\n');
+        process.stderr.write(chalk.yellow('⚠️  Expiration Notice:\n'));
+        process.stderr.write(chalk.gray('  Report:') + ` ${report.startTime} to ${report.endTime} (cached)\n`);
+        process.stderr.write(chalk.gray('  Expires:') + ' ' + chalk.red(`${expiresAt.toISOString().split('T')[0]} (${daysUntilExpiration} days remaining)\n`));
+        process.stderr.write('\n');
       }
     }
 
@@ -467,18 +481,18 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       const daysUntilExpiration = Math.ceil((expiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
 
       if (daysUntilExpiration <= 7) {
-        console.log('');
-        console.log(chalk.yellow('⚠️  Expiration Notice:'));
-        console.log(chalk.gray('  Report:') + ` ${report.startTime} to ${report.endTime} (new)`);
-        console.log(chalk.gray('  Expires:') + ' ' + chalk.red(`${expiresAt.toISOString().split('T')[0]} (${daysUntilExpiration} days remaining)`));
-        console.log(chalk.yellow('  Tip:') + ' Run fetch-reports regularly to keep a local archive:');
-        console.log(chalk.gray('         ') + chalk.cyan(`staqan-yt fetch-reports --type=${options.type}`));
-        console.log('');
+        process.stderr.write('\n');
+        process.stderr.write(chalk.yellow('⚠️  Expiration Notice:\n'));
+        process.stderr.write(chalk.gray('  Report:') + ` ${report.startTime} to ${report.endTime} (new)\n`);
+        process.stderr.write(chalk.gray('  Expires:') + ' ' + chalk.red(`${expiresAt.toISOString().split('T')[0]} (${daysUntilExpiration} days remaining)\n`));
+        process.stderr.write(chalk.yellow('  Tip:') + ' Run fetch-reports regularly to keep a local archive:\n');
+        process.stderr.write(chalk.gray('         ') + chalk.cyan(`staqan-yt fetch-reports --type=${options.type}\n`));
+        process.stderr.write('\n');
       }
     }
 
-    console.log(chalk.green(`✓ Fetched ${filteredData.length} row(s)`));
-    console.log('');
+    process.stderr.write(chalk.green(`✓ Fetched ${filteredData.length} row(s)\n`));
+    process.stderr.write('\n');
   });
 }
 
