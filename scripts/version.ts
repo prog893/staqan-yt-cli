@@ -10,6 +10,7 @@ import { join } from 'path';
 import { execSync } from 'child_process';
 
 const rootDir = join(__dirname, '..');
+const tapDir = join(rootDir, 'homebrew-tap');
 
 /**
  * Execute git command
@@ -36,7 +37,7 @@ writeFileSync(binFilePath, binContent, 'utf-8');
 console.log(`  ✓ Updated bin/staqan-yt.ts`);
 
 // 2. Update homebrew-tap/Formula/staqan-yt.rb version (tap clone)
-const tapFormulaPath = join(rootDir, 'homebrew-tap/Formula/staqan-yt.rb');
+const tapFormulaPath = join(tapDir, 'Formula/staqan-yt.rb');
 let formulaContent = readFileSync(tapFormulaPath, 'utf-8');
 formulaContent = formulaContent.replace(
   /version "[^"]+"/,

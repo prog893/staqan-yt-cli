@@ -6,15 +6,22 @@
  */
 
 import { execSync } from 'child_process';
+import { existsSync } from 'fs';
 import { join } from 'path';
 
 const rootDir = join(__dirname, '..');
+const tapDir = join(rootDir, 'homebrew-tap');
+const tapRemote = 'git@github.com:prog893/homebrew-tap.git';
 
 /**
- * Execute git command and return output
+ * Execute a command and return output
  */
+function exec(cmd: string, cwd: string = rootDir): string {
+  return execSync(cmd, { encoding: 'utf-8', cwd }).trim();
+}
+
 function git(cmd: string): string {
-  return execSync(cmd, { encoding: 'utf-8', cwd: rootDir }).trim();
+  return exec(cmd);
 }
 
 /**
@@ -55,6 +62,22 @@ function runSafetyChecks(): void {
     // git status --porcelain returns empty string if clean
   }
   console.log('  ✓ Working directory is clean');
+
+  // 4. Clone or pull homebrew-tap, verifying it's the right repo
+  if (existsSync(tapDir)) {
+    const remoteUrl = exec('git remote get-url origin', tapDir);
+    if (remoteUrl !== tapRemote) {
+      console.error(`❌ homebrew-tap remote mismatch: expected ${tapRemote}, got ${remoteUrl}`);
+      process.exit(1);
+    }
+    console.log('  ↓ Pulling latest homebrew-tap...');
+    exec('git pull', tapDir);
+    console.log('  ✓ homebrew-tap up to date');
+  } else {
+    console.log('  ↓ Cloning homebrew-tap...');
+    exec(`git clone ${tapRemote} homebrew-tap`);
+    console.log('  ✓ Cloned homebrew-tap');
+  }
 
   console.log('\n✅ All safety checks passed!\n');
 }

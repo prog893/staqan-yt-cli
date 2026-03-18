@@ -2,17 +2,16 @@
 
 /**
  * postversion script - runs after npm commits and tags
- * 1. Clone/pull homebrew-tap, commit updated formula, push
+ * 1. Commit and push updated formula to homebrew-tap repo
  * 2. Push staqan-yt-cli commit and tag to GitHub
  */
 
 import { execSync } from 'child_process';
 import { join } from 'path';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync } from 'fs';
 
 const rootDir = join(__dirname, '..');
 const tapDir = join(rootDir, 'homebrew-tap');
-const tapRemote = 'git@github.com:prog893/homebrew-tap.git';
 
 /**
  * Execute a command and return output
@@ -28,17 +27,7 @@ const version = packageJson.version;
 
 console.log(`\n📤 Pushing release ${version} to GitHub...\n`);
 
-// 1. Clone or pull homebrew-tap
-if (!existsSync(tapDir)) {
-  console.log('  ↓ Cloning homebrew-tap...');
-  exec(`git clone ${tapRemote} homebrew-tap`, rootDir);
-} else {
-  console.log('  ↓ Pulling latest homebrew-tap...');
-  exec('git pull', tapDir);
-}
-console.log('  ✓ homebrew-tap ready');
-
-// 2. Commit and push updated formula to tap repo
+// 1. Commit and push updated formula to tap repo
 //    (version.ts already wrote the new version into homebrew-tap/Formula/staqan-yt.rb)
 exec('git add Formula/staqan-yt.rb', tapDir);
 exec(`git commit -m "staqan-yt ${version}"`, tapDir);
