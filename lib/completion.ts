@@ -135,7 +135,7 @@ export function getCommandOptions(command: string): string[] {
     'get-thumbnail': ['--quality', ...outputOptions, ...verboseOption],
     'get-playlist': [...outputOptions, ...verboseOption],
     'get-playlists': [...outputOptions, ...verboseOption],
-    'list-playlists': ['--limit', '-l', ...outputOptions, ...verboseOption],
+    'list-playlists': ['--limit', '-l', '--privacy', 'public', 'private', 'unlisted', ...outputOptions, ...verboseOption],
     'list-captions': [...outputOptions, ...verboseOption],
     'get-caption': ['--format', ...verboseOption],
     'list-report-types': ['--output', 'json', 'table', 'text', ...verboseOption],
@@ -331,7 +331,7 @@ _staqa_nyt_completion() {
       COMPREPLY=( \$(compgen -W "--channel --limit --type --privacy --output --verbose" -- "\${cur}") )
       ;;
     list-playlists)
-      COMPREPLY=( \$(compgen -W "--channel --limit --output --verbose" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--channel --limit --privacy --output --verbose" -- "\${cur}") )
       ;;
     list-comments)
       COMPREPLY=( \$(compgen -W "--video-id --limit --sort --output --verbose" -- "\${cur}") )
@@ -631,6 +631,7 @@ ${commandList}
       _arguments \\
         '--channel[Channel handle or ID]:channel:' \\
         '--limit[Limit number of results]:n:' \\
+        '*--privacy[Filter by privacy status (repeatable)]:status:(public private unlisted)' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;

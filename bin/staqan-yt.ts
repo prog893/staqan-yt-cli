@@ -388,6 +388,7 @@ program
   .option('-c, --channel <handle>', 'Channel handle or ID')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-l, --limit <number>', 'Limit number of results', '50')
+  .option('--privacy <status...>', 'Filter by privacy status: public, private, unlisted (multiple allowed)')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('list-playlists', listPlaylistsCommand));
 

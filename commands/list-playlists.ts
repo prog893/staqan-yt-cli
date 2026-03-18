@@ -1,11 +1,11 @@
 import chalk from 'chalk';
 import { listChannelPlaylists } from '../lib/youtube';
-import { formatDate, formatNumber, debug, initCommand, withSpinner } from '../lib/utils';
+import { formatDate, formatNumber, error, debug, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
-import { ChannelOption, OutputOption, LimitOption, VerboseOption } from '../types';
+import { ChannelOption, OutputOption, LimitOption, VerboseOption, PrivacyFilterOption, PrivacyStatus } from '../types';
 
-async function listPlaylistsCommand(options: ChannelOption & OutputOption & LimitOption & VerboseOption): Promise<void> {
+async function listPlaylistsCommand(options: ChannelOption & OutputOption & LimitOption & VerboseOption & PrivacyFilterOption): Promise<void> {
   initCommand(options);
 
   await withSpinner('Fetching channel playlists...', 'Failed to fetch playlists', async (spinner) => {
@@ -15,7 +15,20 @@ async function listPlaylistsCommand(options: ChannelOption & OutputOption & Limi
     const limit = parseInt(options.limit || '50');
     debug(`Channel handle: ${channel}, limit: ${limit}`);
 
-    const playlists = await listChannelPlaylists(channel, limit);
+    let playlists = await listChannelPlaylists(channel, limit);
+
+    // Filter by privacy status if specified
+    if (options.privacy && options.privacy.length > 0) {
+      const validStatuses: PrivacyStatus[] = ['public', 'private', 'unlisted'];
+      const invalid = options.privacy.filter(s => !validStatuses.includes(s));
+      if (invalid.length > 0) {
+        error(`Invalid privacy value(s): ${invalid.join(', ')}. Valid values: public, private, unlisted`);
+        process.exit(1);
+      }
+      const privacyFilter = options.privacy;
+      debug(`Filtering by privacy: ${privacyFilter.join(', ')}`);
+      playlists = playlists.filter(p => privacyFilter.includes(p.privacyStatus));
+    }
 
     spinner.succeed(`Found ${playlists.length} playlist(s)`);
     console.log('');

@@ -16,7 +16,7 @@ export interface PlaylistInfo {
   channelTitle: string;
   publishedAt: string;
   itemCount: number;
-  privacyStatus: string;
+  privacyStatus: PrivacyStatus;
   thumbnails: youtube_v3.Schema$ThumbnailDetails;
 }
 
@@ -28,7 +28,7 @@ export interface PlaylistListItem {
   channelTitle: string;
   publishedAt: string;
   itemCount: number;
-  privacyStatus: string;
+  privacyStatus: PrivacyStatus;
 }
 
 // Comment-related types
@@ -59,7 +59,7 @@ export interface VideoInfo {
   thumbnails: youtube_v3.Schema$ThumbnailDetails;
   statistics: VideoStatistics;
   duration: string;
-  privacyStatus: string;
+  privacyStatus: PrivacyStatus;
   videoType: VideoType;
 }
 
