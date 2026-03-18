@@ -231,8 +231,8 @@ _staqa_nyt_completion() {
     fi
   done
 
-  # Variadic --privacy scan: walk back to detect if we are still inside a
-  # space-separated privacy value list (e.g. --privacy public <TAB>)
+  # Variadic flag scan: walk back to detect if we are still inside a
+  # space-separated value list (e.g. --privacy public <TAB>, --video-ids abc <TAB>)
   if [[ "\${cur}" != -* ]]; then
     local j
     for ((j=cword-1; j>=1; j--)); do
@@ -241,8 +241,14 @@ _staqa_nyt_completion() {
           COMPREPLY=( \$(compgen -W "public private unlisted" -- "\${cur}") ); return ;;
         public|private|unlisted)
           continue ;;
-        *)
+        --video-ids)
+          _staqan_yt_complete_type video-id; return ;;
+        --playlist-ids)
+          _staqan_yt_complete_type playlist-id; return ;;
+        -*)
           break ;;
+        *)
+          continue ;;
       esac
     done
   fi
@@ -459,7 +465,7 @@ ${commandList}
       local words=(\$words[1] \$words[3,-1])
       local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
-        '--video-ids[Video IDs]: :_staqan_yt_video_ids' \\
+        '*--video-ids[Video IDs (repeatable)]: :_staqan_yt_video_ids' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
@@ -490,7 +496,7 @@ ${commandList}
       local words=(\$words[1] \$words[3,-1])
       local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
-        '--video-ids[Video IDs]: :_staqan_yt_video_ids' \\
+        '*--video-ids[Video IDs (repeatable)]: :_staqan_yt_video_ids' \\
         '--languages[Comma-separated language codes]:langs:' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'

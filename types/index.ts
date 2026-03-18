@@ -78,7 +78,7 @@ export interface VideoListItem {
   videoType: VideoType;
   channelTitle?: string;  // For global search results
   channelId?: string;     // For global search results
-  privacyStatus?: string; // public | private | unlisted (requires authenticated API call)
+  privacyStatus?: PrivacyStatus; // requires authenticated API call
 }
 
 // Localization types
