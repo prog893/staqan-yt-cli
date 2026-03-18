@@ -58,8 +58,19 @@ git checkout -b feature/your-feature-name
 ### Install & Test Globally
 
 ```bash
-npm link              # Test globally
+npm link              # Test globally (development)
 staqan-yt --help      # Verify installation
+```
+
+### Homebrew Install (production)
+
+```bash
+# First time
+brew tap prog893/tap
+brew install staqan-yt
+
+# After a release
+brew upgrade staqan-yt
 ```
 
 ### Common Commands
@@ -367,10 +378,11 @@ Version bumps are done **directly on main** (exception to the feature-branch rul
 git checkout main
 
 # Bump patch version (creates a commit + tag automatically)
+# This also clones/pulls homebrew-tap, commits the updated formula, and pushes it
 npm version patch
 
-# Push to GitHub
-git push && git push --tags
+# After the release, upgrade locally via Homebrew
+brew upgrade staqan-yt
 ```
 
 ### Semantic Versioning (X.Y.Z)
