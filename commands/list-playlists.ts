@@ -1,12 +1,13 @@
 import chalk from 'chalk';
 import { listChannelPlaylists } from '../lib/youtube';
-import { formatDate, formatNumber, error, debug, initCommand, withSpinner } from '../lib/utils';
+import { formatDate, formatNumber, debug, initCommand, withSpinner, validatePrivacyFilter } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
-import { ChannelOption, OutputOption, LimitOption, VerboseOption, PrivacyFilterOption, PrivacyStatus } from '../types';
+import { ChannelOption, OutputOption, LimitOption, VerboseOption, PrivacyFilterOption } from '../types';
 
 async function listPlaylistsCommand(options: ChannelOption & OutputOption & LimitOption & VerboseOption & PrivacyFilterOption): Promise<void> {
   initCommand(options);
+  validatePrivacyFilter(options.privacy);
 
   await withSpinner('Fetching channel playlists...', 'Failed to fetch playlists', async (spinner) => {
     const channel = await requireChannel(options.channel);
@@ -19,12 +20,6 @@ async function listPlaylistsCommand(options: ChannelOption & OutputOption & Limi
 
     // Filter by privacy status if specified
     if (options.privacy && options.privacy.length > 0) {
-      const validStatuses: PrivacyStatus[] = ['public', 'private', 'unlisted'];
-      const invalid = options.privacy.filter(s => !validStatuses.includes(s));
-      if (invalid.length > 0) {
-        error(`Invalid privacy value(s): ${invalid.join(', ')}. Valid values: public, private, unlisted`);
-        process.exit(1);
-      }
       const privacyFilter = options.privacy;
       debug(`Filtering by privacy: ${privacyFilter.join(', ')}`);
       playlists = playlists.filter(p => privacyFilter.includes(p.privacyStatus));
