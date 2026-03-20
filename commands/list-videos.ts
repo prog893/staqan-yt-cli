@@ -17,6 +17,7 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
     debug(`Channel handle: ${channel}, limit: ${limit}`);
 
     let videos = await getChannelVideos(channel, limit);
+    const totalFetched = videos.length;
 
     // Filter by video type if specified
     if (options.type) {
@@ -33,7 +34,9 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
     }
 
     const typeLabel = options.type ? ` ${options.type}` : '';
-    spinner.succeed(`Found ${videos.length}${typeLabel} video(s)`);
+    const filteredCount = totalFetched - videos.length;
+    const filterSuffix = filteredCount > 0 ? ` (${filteredCount} filtered)` : '';
+    spinner.succeed(`Found ${videos.length}${typeLabel} video(s)${filterSuffix}`);
     console.log('');
 
     const outputFormat = await getOutputFormat(options.output);
