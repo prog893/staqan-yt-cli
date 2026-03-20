@@ -3,6 +3,7 @@
  */
 
 import chalk from 'chalk';
+import { PrivacyStatus } from '../types';
 
 /**
  * Format data as JSON
@@ -243,4 +244,15 @@ function escapeCSV(field: string): string {
     return `"${field.replace(/"/g, '""')}"`;
   }
   return field;
+}
+
+/**
+ * Format a privacy status value with color for terminal pretty output.
+ * Returns chalk.gray('unknown') when status is undefined (e.g. unauthenticated call).
+ */
+export function formatPrivacyStatus(status: PrivacyStatus | undefined): string {
+  if (!status) return chalk.gray('unknown');
+  if (status === 'public') return chalk.green(status);
+  if (status === 'private') return chalk.red(status);
+  return chalk.yellow(status); // unlisted
 }

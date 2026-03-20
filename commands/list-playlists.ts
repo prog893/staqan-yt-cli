@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import { listChannelPlaylists } from '../lib/youtube';
 import { formatDate, formatNumber, debug, initCommand, withSpinner, validatePrivacyFilter } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
-import { formatJson, formatTable, formatCsv } from '../lib/formatters';
+import { formatJson, formatTable, formatCsv, formatPrivacyStatus } from '../lib/formatters';
 import { ChannelOption, OutputOption, LimitOption, VerboseOption, PrivacyFilterOption } from '../types';
 
 async function listPlaylistsCommand(options: ChannelOption & OutputOption & LimitOption & VerboseOption & PrivacyFilterOption): Promise<void> {
@@ -73,12 +73,11 @@ async function listPlaylistsCommand(options: ChannelOption & OutputOption & Limi
       case 'pretty':
       default:
         playlists.forEach((playlist, index) => {
-          const privacyColor = playlist.privacyStatus === 'public' ? chalk.green : playlist.privacyStatus === 'private' ? chalk.red : chalk.yellow;
           console.log(chalk.cyan(`[${index + 1}]`) + ' ' + chalk.bold(playlist.title));
           console.log('  ID: ' + chalk.yellow(playlist.id));
           console.log('  Videos: ' + formatNumber(playlist.itemCount));
           console.log('  Published: ' + formatDate(playlist.publishedAt));
-          console.log('  Privacy: ' + privacyColor(playlist.privacyStatus));
+          console.log('  Privacy: ' + formatPrivacyStatus(playlist.privacyStatus));
           console.log('  URL: ' + chalk.blue(`https://youtube.com/playlist?list=${playlist.id}`));
           console.log('');
         });

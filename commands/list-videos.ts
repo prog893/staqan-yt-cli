@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import { getChannelVideos } from '../lib/youtube';
 import { formatDate, debug, initCommand, withSpinner, validatePrivacyFilter } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
-import { formatJson, formatTable, formatCsv } from '../lib/formatters';
+import { formatJson, formatTable, formatCsv, formatPrivacyStatus } from '../lib/formatters';
 import { ChannelOption, OutputOption, LimitOption, VerboseOption, TypeFilterOption, PrivacyFilterOption } from '../types';
 
 async function channelVideosCommand(options: ChannelOption & OutputOption & LimitOption & VerboseOption & TypeFilterOption & PrivacyFilterOption): Promise<void> {
@@ -79,13 +79,10 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
       default:
         videos.forEach((video, index) => {
           const typeIndicator = video.videoType === 'short' ? chalk.magenta(' [Short]') : '';
-          const privacyColor = video.privacyStatus === 'public' ? chalk.green : video.privacyStatus === 'private' ? chalk.red : chalk.yellow;
           console.log(chalk.cyan(`[${index + 1}]`) + ' ' + chalk.bold(video.title) + typeIndicator);
           console.log('  ID: ' + chalk.yellow(video.id));
           console.log('  Published: ' + formatDate(video.publishedAt));
-          if (video.privacyStatus) {
-            console.log('  Privacy: ' + privacyColor(video.privacyStatus));
-          }
+          console.log('  Privacy: ' + formatPrivacyStatus(video.privacyStatus));
           console.log('  URL: ' + chalk.blue(`https://youtube.com/watch?v=${video.id}`));
           console.log('');
         });
