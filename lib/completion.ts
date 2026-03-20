@@ -128,20 +128,20 @@ export function getCommandOptions(command: string): string[] {
     'get-traffic-sources': [...outputOptions, ...verboseOption],
     'get-video-retention': [...outputOptions, ...verboseOption],
     'get-channel-analytics': ['--report', '--start-date', '--end-date', '--dimensions', '--metrics', ...outputOptions, ...verboseOption],
-    'get-channel-search-terms': ['--limit', '-l', '--content-type', '--start-date', '--end-date', ...outputOptions, ...verboseOption],
+    'get-channel-search-terms': ['--channel', '--limit', '-l', '--content-type', '--start-date', '--end-date', ...outputOptions, ...verboseOption],
     'list-comments': ['--limit', '-l', '--sort', '-s', ...outputOptions, ...verboseOption],
     'get-video-tags': [...outputOptions, ...verboseOption],
     'update-video-tags': ['--tags', '--add', '--remove', '--dry-run', '--yes', '-y', ...outputOptions, ...verboseOption],
     'get-thumbnail': ['--quality', ...outputOptions, ...verboseOption],
     'get-playlist': [...outputOptions, ...verboseOption],
     'get-playlists': [...outputOptions, ...verboseOption],
-    'list-playlists': ['--limit', '-l', '--privacy', ...outputOptions, ...verboseOption],
+    'list-playlists': ['--channel', '--limit', '-l', '--privacy', ...outputOptions, ...verboseOption],
     'list-captions': [...outputOptions, ...verboseOption],
     'get-caption': ['--format', ...verboseOption],
     'list-report-types': ['--output', 'json', 'table', 'text', ...verboseOption],
     'list-report-jobs': ['--type', '--output', 'json', 'table', 'text', ...verboseOption],
     'get-report-data': ['--type', '--video-id', '--start-date', '--end-date', '--output', 'json', 'csv', ...verboseOption],
-    'fetch-reports': ['--type', '-t', '--types', '-T', '--start-date', '--end-date', '--force', '-f', '--verify', ...verboseOption],
+    'fetch-reports': ['--channel', '--type', '-t', '--types', '-T', '--start-date', '--end-date', '--force', '-f', '--verify', ...verboseOption],
   };
 
   return commandOptionMap[command] || [...outputOptions, ...verboseOption];
@@ -353,6 +353,21 @@ _staqa_nyt_completion() {
     get-channel)
       COMPREPLY=( \$(compgen -W "--channel --output --verbose" -- "\${cur}") )
       ;;
+    get-channel-search-terms)
+      COMPREPLY=( \$(compgen -W "--channel --limit --content-type --start-date --end-date --output --verbose" -- "\${cur}") )
+      ;;
+    list-report-types)
+      COMPREPLY=( \$(compgen -W "--output --verbose" -- "\${cur}") )
+      ;;
+    list-report-jobs)
+      COMPREPLY=( \$(compgen -W "--type --output --verbose" -- "\${cur}") )
+      ;;
+    get-report-data)
+      COMPREPLY=( \$(compgen -W "--type --video-id --start-date --end-date --output --verbose" -- "\${cur}") )
+      ;;
+    fetch-reports)
+      COMPREPLY=( \$(compgen -W "--channel --type --types --start-date --end-date --force --verify --verbose" -- "\${cur}") )
+      ;;
     config)
       COMPREPLY=( \$(compgen -W "set get list completion --show --output --verbose" -- "\${cur}") )
       ;;
@@ -475,8 +490,25 @@ ${commandList}
     get-videos)
       local words=(\$words[1] \$words[3,-1])
       local CURRENT=\$((\$CURRENT - 1))
+      # Space-separated variadic: walk back to detect if we're inside --video-ids'
+      # value list. Exclude already-used IDs via compadd -F.
+      if [[ \$words[\$CURRENT] != -* ]]; then
+        local j=\$((\$CURRENT - 1))
+        local -a _vused=()
+        while (( j >= 1 )); do
+          case \$words[\$j] in
+            --video-ids)
+              local -a _all
+              _all=(\${(f)"\$(staqan-yt __complete --type video-id 2>/dev/null | cut -f1)"})
+              compadd -F _vused -- \$_all
+              return ;;
+            --*) break ;;
+            *) _vused+=(\$words[\$j]); (( j-- )) ;;
+          esac
+        done
+      fi
       _arguments \\
-        '*--video-ids[Video IDs (repeatable)]: :_staqan_yt_video_ids' \\
+        '--video-ids[Video IDs (variadic)]: :_staqan_yt_video_ids' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
@@ -506,8 +538,24 @@ ${commandList}
     get-video-localizations)
       local words=(\$words[1] \$words[3,-1])
       local CURRENT=\$((\$CURRENT - 1))
+      # Same variadic pre-check as get-videos
+      if [[ \$words[\$CURRENT] != -* ]]; then
+        local j=\$((\$CURRENT - 1))
+        local -a _vused=()
+        while (( j >= 1 )); do
+          case \$words[\$j] in
+            --video-ids)
+              local -a _all
+              _all=(\${(f)"\$(staqan-yt __complete --type video-id 2>/dev/null | cut -f1)"})
+              compadd -F _vused -- \$_all
+              return ;;
+            --*) break ;;
+            *) _vused+=(\$words[\$j]); (( j-- )) ;;
+          esac
+        done
+      fi
       _arguments \\
-        '*--video-ids[Video IDs (repeatable)]: :_staqan_yt_video_ids' \\
+        '--video-ids[Video IDs (variadic)]: :_staqan_yt_video_ids' \\
         '--languages[Comma-separated language codes]:langs:' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'

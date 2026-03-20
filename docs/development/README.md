@@ -39,6 +39,7 @@ This directory contains comprehensive guides for developing and maintaining the 
 - **[YouTube API Guide](youtube-api-guide.md)** - YouTube Data API v3 patterns and quotas
 - **[Security Guide](security-guide.md)** - OAuth security and input validation
 - **[Architecture Guide](architecture.md)** - Lock strategy, hidden commands, scope boundaries
+- **[Shell Completion Guide](shell-completion-guide.md)** - Bash/zsh completion patterns, variadic flags, and adding new completions
 
 ### Maintenance & Operations
 - **[Git Workflow Guide](git-workflow.md)** - Branch strategy, commits, releases, and protection

@@ -302,6 +302,7 @@ staqan-yt-cli/
 - **[YouTube API Guide](docs/development/youtube-api-guide.md)** - YouTube Data API v3 patterns and quotas
 - **[Security Guide](docs/development/security-guide.md)** - OAuth security and input validation
 - **[Architecture Guide](docs/development/architecture.md)** - Lock strategy, hidden commands, scope boundaries
+- **[Shell Completion Guide](docs/development/shell-completion-guide.md)** - Bash/zsh completion patterns, variadic flags, and adding new completions
 
 ### Maintenance & Operations
 - **[Git Workflow Guide](docs/development/git-workflow.md)** - Branch strategy, commits, releases, and protection
