@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '../lib/auth';
-import { error, debug, initCommand, withSpinner, formatTimestampWithTimezone } from '../lib/utils';
+import { error, warning, debug, initCommand, withSpinner, formatTimestampWithTimezone } from '../lib/utils';
 import { getOutputFormat, getConfigValue } from '../lib/config';
 import { formatJson, formatTable, formatCsv, formatText } from '../lib/formatters';
 import {
@@ -357,24 +357,28 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
         const parsed = parseCsvAndExtractRange(csvData);
 
         if (writeRelease) {
-          // Save to cache
-          await saveReportToCache(channelId, report.id || '', options.type, csvData, {
-            reportId: report.id || '',
-            reportTypeId: options.type,
-            channelId,
-            jobId,
-            startTime: report.startTime || '',
-            endTime: report.endTime || '',
-            startTimeActual: parsed.minDate,
-            endTimeActual: parsed.maxDate,
-            downloadedAt: new Date().toISOString(),
-            expiresAt: expiresAt.toISOString(),
-            downloadUrl: report.downloadUrl || '',
-            columns: headers,
-            isComplete: true,
-            fileSize: csvData.length,
-            row_count: data.length,
-          });
+          // Save to cache (non-fatal: warn on failure so API data is still returned)
+          try {
+            await saveReportToCache(channelId, report.id || '', options.type, csvData, {
+              reportId: report.id || '',
+              reportTypeId: options.type,
+              channelId,
+              jobId,
+              startTime: report.startTime || '',
+              endTime: report.endTime || '',
+              startTimeActual: parsed.minDate,
+              endTimeActual: parsed.maxDate,
+              downloadedAt: new Date().toISOString(),
+              expiresAt: expiresAt.toISOString(),
+              downloadUrl: report.downloadUrl || '',
+              columns: headers,
+              isComplete: true,
+              fileSize: csvData.length,
+              row_count: data.length,
+            });
+          } catch (cacheErr) {
+            warning(`Cache save failed for ${report.id}: ${(cacheErr as Error).message} — data will be re-fetched on next run`);
+          }
         }
 
         allData.push(...data);

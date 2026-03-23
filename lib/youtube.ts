@@ -1,16 +1,15 @@
 import { google, youtube_v3 } from 'googleapis';
 import { promises as fs } from 'fs';
 import path from 'path';
-import os from 'os';
 import { getAuthenticatedClient } from './auth';
 import { normalizeLanguage, getLanguageName } from './language';
 import { acquireLock, getLockPath } from './lock';
 import { VideoInfo, VideoListItem, VideoLocalization, VideoType, PrivacyStatus, PlaylistInfo, PlaylistListItem, CommentInfo, ChannelInfo, CaptionInfo, CaptionFormat } from '../types';
-import { debug, warning } from './utils';
+import { debug, warning, CACHE_DIR } from './utils';
 
 // ─── Handle → channel ID cache ────────────────────────────────────────────────
 
-const HANDLE_CACHE_PATH = path.join(os.homedir(), '.staqan-yt-cli', 'data', 'handle-to-channel-id.json');
+const HANDLE_CACHE_PATH = path.join(CACHE_DIR, 'handle-to-channel-id.json');
 
 async function loadHandleCache(): Promise<Record<string, string>> {
   try {
@@ -32,7 +31,7 @@ async function saveHandleCache(cache: Record<string, string>): Promise<void> {
 
     debug('Handle cache saved');
   } catch (err) {
-    debug('Failed to save handle cache:', (err as Error).message);
+    warning(`Cache save failed (handle cache): ${(err as Error).message} — data will be re-fetched on next run`);
   } finally {
     if (release) await release();
   }

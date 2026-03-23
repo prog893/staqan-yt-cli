@@ -8,6 +8,7 @@ import { createInterface } from 'readline';
 import { ChannelHandle } from '../types';
 
 const CONFIG_DIR = path.join(os.homedir(), '.staqan-yt-cli');
+const CACHE_DIR = path.join(CONFIG_DIR, 'cache');
 const CREDENTIALS_PATH = path.join(CONFIG_DIR, 'credentials.json');
 const TOKEN_PATH = path.join(CONFIG_DIR, 'token.json');
 
@@ -500,6 +501,7 @@ export {
   withSpinner,
   createSpinner,
   CONFIG_DIR,
+  CACHE_DIR,
   CREDENTIALS_PATH,
   TOKEN_PATH,
   ensureConfigDir,

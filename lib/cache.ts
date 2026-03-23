@@ -4,7 +4,7 @@ import { CONFIG_DIR, debug, warning } from './utils';
 import { CacheIndex, CacheIndexEntry, ReportMetadata, CacheCoverage } from '../types';
 
 // Base data directory
-const DATA_DIR = path.join(CONFIG_DIR, 'data');
+export const DATA_DIR = path.join(CONFIG_DIR, 'data');
 
 // Cache index version
 const CACHE_INDEX_VERSION = '2.0';

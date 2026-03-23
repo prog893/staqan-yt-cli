@@ -36,6 +36,7 @@ import listReportTypesCommand = require('../commands/list-report-types');
 import listReportJobsCommand = require('../commands/list-report-jobs');
 import getReportDataCommand = require('../commands/get-report-data');
 import fetchReportsCommand = require('../commands/fetch-reports');
+import cacheCommand = require('../commands/cache');
 import completeCommand = require('../commands/complete');
 
 // Helper function to wrap command actions to handle "help" as an argument
@@ -498,6 +499,14 @@ program
   .option('--verify', 'Verify cached file completeness')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('fetch-reports', fetchReportsCommand));
+
+// Cache management command
+program
+  .command('cache [action]')
+  .description('Manage local cache (completions, handle map)')
+  .option('-y, --yes', 'Skip confirmation prompt')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(withHelpWrapper('cache', cacheCommand));
 
 const completeCmd = new Command('__complete')
   .description('Internal completion helper')
