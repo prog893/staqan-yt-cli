@@ -11,6 +11,11 @@ const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 export const VALID_OUTPUT_FORMATS: OutputFormat[] = ['json', 'table', 'text', 'pretty', 'csv'];
 
 /**
+ * Default lock acquisition timeout (ms)
+ */
+export const DEFAULT_LOCK_TIMEOUT_MS = 60000;
+
+/**
  * Default configuration
  */
 const DEFAULT_CONFIG: Config = {
@@ -21,6 +26,9 @@ const DEFAULT_CONFIG: Config = {
   default: {
     channel: undefined,
     output: 'pretty',
+  },
+  lock: {
+    timeout: DEFAULT_LOCK_TIMEOUT_MS,
   },
 };
 
@@ -55,6 +63,10 @@ export async function loadConfig(): Promise<Config> {
         ...DEFAULT_CONFIG.default,
         ...config.default,
       },
+      lock: {
+        ...DEFAULT_CONFIG.lock,
+        ...config.lock,
+      },
     };
   } catch {
     // File doesn't exist or is invalid - return defaults
@@ -75,6 +87,19 @@ export async function saveConfig(config: Config): Promise<void> {
  */
 export async function setConfigValue(key: ConfigKey, value: string): Promise<void> {
   const config = await loadConfig();
+
+  // lock.timeout: validate and store as a number
+  if (key === 'lock.timeout') {
+    const ms = parseInt(value, 10);
+    if (isNaN(ms) || ms <= 0) {
+      throw new Error(`Invalid lock timeout: ${value}. Must be a positive integer (milliseconds).`);
+    }
+    if (!config.lock) config.lock = {};
+    config.lock.timeout = ms;
+    await saveConfig(config);
+    return;
+  }
+
   const [section, field] = key.split('.') as ['default', 'channel' | 'output'];
 
   if (!config[section]) {
@@ -88,6 +113,21 @@ export async function setConfigValue(key: ConfigKey, value: string): Promise<voi
 
   config[section][field] = value as never;
   await saveConfig(config);
+}
+
+/**
+ * Get the lock acquisition timeout in milliseconds.
+ * Priority: STAQAN_YT_LOCK_TIMEOUT_MS env var > config lock.timeout > 60000ms default
+ */
+export async function getLockTimeout(): Promise<number> {
+  const envVal = process.env.STAQAN_YT_LOCK_TIMEOUT_MS;
+  if (envVal !== undefined) {
+    const ms = parseInt(envVal, 10);
+    if (!isNaN(ms) && ms > 0) return ms;
+  }
+
+  const config = await loadConfig();
+  return config.lock?.timeout ?? DEFAULT_LOCK_TIMEOUT_MS;
 }
 
 /**

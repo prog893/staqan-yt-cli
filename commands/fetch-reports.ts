@@ -10,7 +10,7 @@ import {
   ensureCacheDir,
 } from '../lib/cache';
 import { getChannelId } from '../lib/youtube';
-import { getConfigValue } from '../lib/config';
+import { getConfigValue, getLockTimeout } from '../lib/config';
 import { acquireLock, getLockPath } from '../lib/lock';
 import https from 'https';
 import { createWriteStream, unlinkSync } from 'fs';
@@ -132,7 +132,8 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
 
     try {
       spinner.text = 'Acquiring lock...';
-      release = await acquireLock(lockPath, { timeout: 60000 }); // 60 second timeout
+      const lockTimeout = await getLockTimeout();
+      release = await acquireLock(lockPath, { timeout: lockTimeout });
 
       spinner.text = 'Initializing...';
       const auth = await getAuthenticatedClient();

@@ -45,7 +45,8 @@ async function configCommand(
       console.log(chalk.bold('\nCurrent Configuration:'));
       console.log('');
       console.log(chalk.cyan('default.channel:') + '  ' + (config.default?.channel || chalk.dim('(not set)')));
-      console.log(chalk.cyan('default.output:') + '   ' + (config.default?.output || chalk.dim('text')));
+      console.log(chalk.cyan('default.output:') + '   ' + (config.default?.output || chalk.dim('pretty')));
+      console.log(chalk.cyan('lock.timeout:') + '     ' + (config.lock?.timeout !== undefined ? `${config.lock.timeout}ms` : chalk.dim('60000ms')));
       console.log('');
       return;
     }
@@ -57,18 +58,20 @@ async function configCommand(
         console.log('');
         console.log('Available keys:');
         console.log('  default.channel  - Default channel handle or ID (e.g., @staqan)');
-        console.log('  default.output   - Default output format (text or json)');
+        console.log('  default.output   - Default output format (json|table|text|pretty|csv)');
+        console.log('  lock.timeout     - Lock acquisition timeout in ms (default: 60000)');
         process.exit(1);
       }
 
       // Validate key
-      const validKeys: ConfigKey[] = ['default.channel', 'default.output'];
+      const validKeys: ConfigKey[] = ['default.channel', 'default.output', 'lock.timeout'];
       if (!validKeys.includes(key as ConfigKey)) {
         error(`Invalid config key: ${key}`);
         console.log('');
         console.log('Available keys:');
         console.log('  default.channel  - Default channel handle or ID (e.g., @staqan)');
-        console.log('  default.output   - Default output format (text or json)');
+        console.log('  default.output   - Default output format (json|table|text|pretty|csv)');
+        console.log('  lock.timeout     - Lock acquisition timeout in ms (default: 60000)');
         process.exit(1);
       }
 
