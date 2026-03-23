@@ -12,7 +12,7 @@ import { getChannelVideos, listChannelPlaylists, getChannelId } from '../lib/you
 import { getConfigValue } from '../lib/config';
 import { getAuthenticatedClient } from '../lib/auth';
 import { acquireLock, getLockPath } from '../lib/lock';
-import { CONFIG_DIR, debug } from '../lib/utils';
+import { CACHE_DIR, debug } from '../lib/utils';
 import { CompletionType, CompletionCache } from '../types';
 
 const TTL: Record<CompletionType, number> = {
@@ -22,10 +22,10 @@ const TTL: Record<CompletionType, number> = {
 };
 
 // report-type completions are credential-scoped (not channel-specific)
-const GLOBAL_CACHE_PATH = path.join(CONFIG_DIR, 'data', 'completion_cache.json');
+const GLOBAL_CACHE_PATH = path.join(CACHE_DIR, 'completion_cache.json');
 
 function getChannelCachePath(channelId: string): string {
-  return path.join(CONFIG_DIR, 'data', channelId, 'completion_cache.json');
+  return path.join(CACHE_DIR, channelId, 'completion_cache.json');
 }
 
 async function loadCache(cachePath: string): Promise<CompletionCache> {

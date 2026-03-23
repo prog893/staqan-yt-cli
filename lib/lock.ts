@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import os from 'os';
-import { debug } from './utils';
+import { debug, CACHE_DIR } from './utils';
 
 export interface LockOptions {
   timeout?: number;        // Max wait time (ms) before giving up
@@ -138,9 +138,9 @@ export function getLockPath(type: 'completion' | 'handles' | 'reports', channelI
   switch (type) {
     case 'completion':
       if (!channelId) throw new Error('channelId required for completion lock');
-      return path.join(dataDir, channelId, 'completion_cache.json.lock');
+      return path.join(CACHE_DIR, channelId, 'completion_cache.json.lock');
     case 'handles':
-      return path.join(dataDir, 'handle-to-channel-id.json.lock');
+      return path.join(CACHE_DIR, 'handle-to-channel-id.json.lock');
     case 'reports':
       if (!channelId) throw new Error('channelId required for reports lock');
       return path.join(dataDir, channelId, 'reports', '.lock');

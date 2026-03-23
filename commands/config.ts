@@ -2,23 +2,23 @@ import chalk from 'chalk';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { getConfig, setConfigValue } from '../lib/config';
-import { success, error, info, CONFIG_DIR } from '../lib/utils';
-import { ConfigKey, CompletionCache } from '../types';
+import { success, error, info, CACHE_DIR } from '../lib/utils';
+import { ConfigKey } from '../types';
 import { installCompletion, detectShell } from '../lib/completion';
 
 async function invalidateChannelCache(): Promise<void> {
-  const cachePath = path.join(CONFIG_DIR, 'completion-cache.json');
+  // Per-channel completion caches (video-id, playlist-id) are channel-specific.
+  // When the default channel changes, wipe them all so stale IDs aren't suggested.
   try {
-    const raw = await fs.readFile(cachePath, 'utf-8');
-    const cache: CompletionCache = JSON.parse(raw);
-    for (const key of Object.keys(cache)) {
-      if (key.startsWith('video-id:') || key.startsWith('playlist-id:')) {
-        delete cache[key];
+    const entries = await fs.readdir(CACHE_DIR, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const cachePath = path.join(CACHE_DIR, entry.name, 'completion_cache.json');
+        await fs.unlink(cachePath).catch(() => {});
       }
     }
-    await fs.writeFile(cachePath, JSON.stringify(cache));
   } catch {
-    // Cache may not exist yet — ignore
+    // cache/ may not exist yet — ignore
   }
 }
 
