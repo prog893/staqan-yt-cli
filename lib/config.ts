@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { Config, ConfigKey, OutputFormat } from '../types';
-import { CONFIG_DIR } from './utils';
+import { CONFIG_DIR, warning } from './utils';
 
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 
@@ -94,8 +94,7 @@ export async function setConfigValue(key: ConfigKey, value: string): Promise<voi
     if (isNaN(ms) || ms <= 0) {
       throw new Error(`Invalid lock timeout: ${value}. Must be a positive integer (milliseconds).`);
     }
-    if (!config.lock) config.lock = {};
-    config.lock.timeout = ms;
+    config.lock!.timeout = ms;
     await saveConfig(config);
     return;
   }
@@ -124,6 +123,7 @@ export async function getLockTimeout(): Promise<number> {
   if (envVal !== undefined) {
     const ms = parseInt(envVal, 10);
     if (!isNaN(ms) && ms > 0) return ms;
+    warning(`Invalid STAQAN_YT_LOCK_TIMEOUT_MS value "${envVal}" — must be a positive integer. Using config/default instead.`);
   }
 
   const config = await loadConfig();

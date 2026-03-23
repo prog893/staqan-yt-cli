@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { getConfig, setConfigValue } from '../lib/config';
+import { getConfig, setConfigValue, DEFAULT_LOCK_TIMEOUT_MS } from '../lib/config';
 import { success, error, info, CACHE_DIR } from '../lib/utils';
 import { ConfigKey } from '../types';
 import { installCompletion, detectShell } from '../lib/completion';
@@ -46,7 +46,11 @@ async function configCommand(
       console.log('');
       console.log(chalk.cyan('default.channel:') + '  ' + (config.default?.channel || chalk.dim('(not set)')));
       console.log(chalk.cyan('default.output:') + '   ' + (config.default?.output || chalk.dim('pretty')));
-      console.log(chalk.cyan('lock.timeout:') + '     ' + (config.lock?.timeout !== undefined ? `${config.lock.timeout}ms` : chalk.dim('60000ms')));
+      const lockTimeoutIsDefault = config.lock?.timeout === undefined || config.lock.timeout === DEFAULT_LOCK_TIMEOUT_MS;
+      const lockTimeoutDisplay = lockTimeoutIsDefault
+        ? chalk.dim(`${DEFAULT_LOCK_TIMEOUT_MS}ms (default)`)
+        : `${config.lock!.timeout}ms`;
+      console.log(chalk.cyan('lock.timeout:') + '     ' + lockTimeoutDisplay);
       console.log('');
       return;
     }

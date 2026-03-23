@@ -306,6 +306,17 @@ staqan-yt config set default.output csv
 staqan-yt list-videos --limit 10
 ```
 
+### Configure Lock Timeout
+
+`fetch-reports` uses a file lock to prevent concurrent writes. The default timeout is 60 seconds. Increase it for slow networks or large report sets:
+
+```bash
+staqan-yt config set lock.timeout 120000   # 2 minutes
+
+# Or use an env var for a one-off override
+STAQAN_YT_LOCK_TIMEOUT_MS=120000 staqan-yt fetch-reports --channel @yourchannel
+```
+
 ### View Current Configuration
 
 ```bash

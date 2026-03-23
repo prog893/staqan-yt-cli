@@ -62,6 +62,7 @@ The CLI uses file-based locks with PID checking to prevent concurrent writes.
 - **Automatic stale lock detection**: PID doesn't exist OR age > 30min
 - Acquire with timeout: `acquireLock(lockPath, { timeout })`
 - Always release in `finally` block
+- **Configurable timeout** for `fetch-reports`: use `getLockTimeout()` from `lib/config.ts` instead of hardcoding; honours `STAQAN_YT_LOCK_TIMEOUT_MS` env var > `lock.timeout` config > 60 s default
 
 ### Usage Pattern
 
@@ -226,6 +227,7 @@ staqan-yt-cli/
 
 - `default.channel` - Default channel handle/ID for list-videos and search-videos
 - `default.output` - Default output format: `json`, `table`, `text`, `pretty`, or `csv` (defaults to `pretty`)
+- `lock.timeout` - Lock acquisition timeout in milliseconds for `fetch-reports` (defaults to `60000`; overridden by `STAQAN_YT_LOCK_TIMEOUT_MS` env var)
 
 ### How Configuration Works
 
