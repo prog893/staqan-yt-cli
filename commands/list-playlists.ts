@@ -1,12 +1,13 @@
 import chalk from 'chalk';
 import { listChannelPlaylists } from '../lib/youtube';
-import { formatDate, formatNumber, debug, initCommand, withSpinner } from '../lib/utils';
+import { formatDate, formatNumber, debug, initCommand, withSpinner, validatePrivacyFilter } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
-import { formatJson, formatTable, formatCsv } from '../lib/formatters';
-import { ChannelOption, OutputOption, LimitOption, VerboseOption } from '../types';
+import { formatJson, formatTable, formatCsv, formatPrivacyStatus } from '../lib/formatters';
+import { ChannelOption, OutputOption, LimitOption, VerboseOption, PrivacyFilterOption } from '../types';
 
-async function listPlaylistsCommand(options: ChannelOption & OutputOption & LimitOption & VerboseOption): Promise<void> {
+async function listPlaylistsCommand(options: ChannelOption & OutputOption & LimitOption & VerboseOption & PrivacyFilterOption): Promise<void> {
   initCommand(options);
+  validatePrivacyFilter(options.privacy);
 
   await withSpinner('Fetching channel playlists...', 'Failed to fetch playlists', async (spinner) => {
     const channel = await requireChannel(options.channel);
@@ -15,9 +16,20 @@ async function listPlaylistsCommand(options: ChannelOption & OutputOption & Limi
     const limit = parseInt(options.limit || '50');
     debug(`Channel handle: ${channel}, limit: ${limit}`);
 
-    const playlists = await listChannelPlaylists(channel, limit);
+    let playlists = await listChannelPlaylists(channel, limit);
+    const totalFetched = playlists.length;
 
-    spinner.succeed(`Found ${playlists.length} playlist(s)`);
+    // Filter by privacy status if specified
+    if (options.privacy && options.privacy.length > 0) {
+      const privacyFilter = options.privacy;
+      debug(`Filtering by privacy: ${privacyFilter.join(', ')}`);
+      playlists = playlists.filter(p => privacyFilter.includes(p.privacyStatus));
+    }
+
+    const filterSuffix = totalFetched !== playlists.length
+      ? ` (${totalFetched - playlists.length} filtered by privacy)`
+      : '';
+    spinner.succeed(`Found ${playlists.length} playlist(s)${filterSuffix}`);
     console.log('');
 
     const outputFormat = await getOutputFormat(options.output);
@@ -61,15 +73,11 @@ async function listPlaylistsCommand(options: ChannelOption & OutputOption & Limi
       case 'pretty':
       default:
         playlists.forEach((playlist, index) => {
-          const privacyIndicator = playlist.privacyStatus === 'private'
-            ? chalk.red(' [Private]')
-            : playlist.privacyStatus === 'unlisted'
-              ? chalk.yellow(' [Unlisted]')
-              : '';
-          console.log(chalk.cyan(`[${index + 1}]`) + ' ' + chalk.bold(playlist.title) + privacyIndicator);
+          console.log(chalk.cyan(`[${index + 1}]`) + ' ' + chalk.bold(playlist.title));
           console.log('  ID: ' + chalk.yellow(playlist.id));
           console.log('  Videos: ' + formatNumber(playlist.itemCount));
           console.log('  Published: ' + formatDate(playlist.publishedAt));
+          console.log('  Privacy: ' + formatPrivacyStatus(playlist.privacyStatus));
           console.log('  URL: ' + chalk.blue(`https://youtube.com/playlist?list=${playlist.id}`));
           console.log('');
         });

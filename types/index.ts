@@ -16,7 +16,7 @@ export interface PlaylistInfo {
   channelTitle: string;
   publishedAt: string;
   itemCount: number;
-  privacyStatus: string;
+  privacyStatus: PrivacyStatus;
   thumbnails: youtube_v3.Schema$ThumbnailDetails;
 }
 
@@ -28,7 +28,9 @@ export interface PlaylistListItem {
   channelTitle: string;
   publishedAt: string;
   itemCount: number;
-  privacyStatus: string;
+  // Required (not optional): playlists.list always returns status in the same
+  // API response — no extra authenticated call needed, unlike VideoListItem.
+  privacyStatus: PrivacyStatus;
 }
 
 // Comment-related types
@@ -59,7 +61,7 @@ export interface VideoInfo {
   thumbnails: youtube_v3.Schema$ThumbnailDetails;
   statistics: VideoStatistics;
   duration: string;
-  privacyStatus: string;
+  privacyStatus: PrivacyStatus;
   videoType: VideoType;
 }
 
@@ -78,6 +80,9 @@ export interface VideoListItem {
   videoType: VideoType;
   channelTitle?: string;  // For global search results
   channelId?: string;     // For global search results
+  // Optional: requires a separate authenticated videos.list call (see fetchPrivacyStatuses).
+  // Contrast with PlaylistListItem where privacy is always present in the same response.
+  privacyStatus?: PrivacyStatus;
 }
 
 // Localization types
@@ -141,6 +146,12 @@ export interface LimitOption {
 
 export interface TypeFilterOption {
   type?: 'short' | 'regular';
+}
+
+export type PrivacyStatus = 'public' | 'private' | 'unlisted';
+
+export interface PrivacyFilterOption {
+  privacy?: PrivacyStatus[];
 }
 
 export interface ChannelOption {

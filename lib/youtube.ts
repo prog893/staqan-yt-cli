@@ -5,7 +5,7 @@ import os from 'os';
 import { getAuthenticatedClient } from './auth';
 import { normalizeLanguage, getLanguageName } from './language';
 import { acquireLock, getLockPath } from './lock';
-import { VideoInfo, VideoListItem, VideoLocalization, VideoType, PlaylistInfo, PlaylistListItem, CommentInfo, ChannelInfo, CaptionInfo, CaptionFormat } from '../types';
+import { VideoInfo, VideoListItem, VideoLocalization, VideoType, PrivacyStatus, PlaylistInfo, PlaylistListItem, CommentInfo, ChannelInfo, CaptionInfo, CaptionFormat } from '../types';
 import { debug, warning } from './utils';
 
 // ─── Handle → channel ID cache ────────────────────────────────────────────────
@@ -216,6 +216,25 @@ async function getChannelInfo(handleOrId: string): Promise<ChannelInfo> {
 }
 
 /**
+ * Batch-fetch privacy statuses for a list of video IDs (50 per API call).
+ */
+async function fetchPrivacyStatuses(videoIds: string[]): Promise<Map<string, PrivacyStatus>> {
+  if (videoIds.length === 0) return new Map();
+  const youtube = await getYouTubeClient();
+  const result = new Map<string, PrivacyStatus>();
+  for (let i = 0; i < videoIds.length; i += 50) {
+    const batch = videoIds.slice(i, i + 50);
+    const response = await youtube.videos.list({ part: ['status'], id: batch });
+    for (const item of response.data.items || []) {
+      if (item.id && item.status?.privacyStatus) {
+        result.set(item.id, item.status.privacyStatus as PrivacyStatus);
+      }
+    }
+  }
+  return result;
+}
+
+/**
  * Get all videos from a channel
  */
 async function getChannelVideos(channelHandle: string, maxResults = 50): Promise<VideoListItem[]> {
@@ -258,13 +277,18 @@ async function getChannelVideos(channelHandle: string, maxResults = 50): Promise
     nextPageToken = playlistResponse.nextPageToken || undefined;
   } while (nextPageToken && rawVideos.length < maxResults);
 
-  // Check video types for all videos
-  const videoTypes = await checkVideoTypes(rawVideos.map(v => v.id));
+  const ids = rawVideos.map(v => v.id);
 
-  // Add videoType to each video
+  // Fetch video types and privacy statuses in parallel
+  const [videoTypes, privacyStatuses] = await Promise.all([
+    checkVideoTypes(ids),
+    fetchPrivacyStatuses(ids),
+  ]);
+
   return rawVideos.map(video => ({
     ...video,
     videoType: videoTypes.get(video.id) || 'regular',
+    privacyStatus: privacyStatuses.get(video.id),
   }));
 }
 
@@ -303,7 +327,7 @@ async function getVideoInfo(videoIds: string[]): Promise<VideoInfo[]> {
       commentCount: parseInt(item.statistics?.commentCount || '0'),
     },
     duration: item.contentDetails!.duration!,
-    privacyStatus: item.status!.privacyStatus!,
+    privacyStatus: item.status!.privacyStatus! as PrivacyStatus,
     videoType: videoTypes.get(item.id!) || 'regular',
   }));
 }
@@ -695,7 +719,7 @@ async function getPlaylistInfo(playlistId: string): Promise<PlaylistInfo> {
     channelTitle: item.snippet!.channelTitle!,
     publishedAt: item.snippet!.publishedAt!,
     itemCount: item.contentDetails!.itemCount || 0,
-    privacyStatus: item.status!.privacyStatus!,
+    privacyStatus: item.status!.privacyStatus! as PrivacyStatus,
     thumbnails: item.snippet!.thumbnails!,
   };
 }
@@ -733,7 +757,7 @@ async function getPlaylistsById(playlistIds: string[]): Promise<PlaylistInfo[]> 
       channelTitle: item.snippet!.channelTitle!,
       publishedAt: item.snippet!.publishedAt!,
       itemCount: item.contentDetails!.itemCount || 0,
-      privacyStatus: item.status!.privacyStatus!,
+      privacyStatus: item.status!.privacyStatus! as PrivacyStatus,
       thumbnails: item.snippet!.thumbnails!,
     })));
   }
@@ -775,7 +799,7 @@ async function listChannelPlaylists(channelHandle: string, maxResults = 50): Pro
       channelTitle: item.snippet!.channelTitle!,
       publishedAt: item.snippet!.publishedAt!,
       itemCount: item.contentDetails!.itemCount || 0,
-      privacyStatus: item.status!.privacyStatus!,
+      privacyStatus: item.status!.privacyStatus! as PrivacyStatus,
     })));
 
     nextPageToken = playlistResponse.nextPageToken || undefined;

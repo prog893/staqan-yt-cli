@@ -1,12 +1,13 @@
 import chalk from 'chalk';
 import { getChannelVideos } from '../lib/youtube';
-import { formatDate, debug, initCommand, withSpinner } from '../lib/utils';
+import { formatDate, debug, initCommand, withSpinner, validatePrivacyFilter } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
-import { formatJson, formatTable, formatCsv } from '../lib/formatters';
-import { ChannelOption, OutputOption, LimitOption, VerboseOption, TypeFilterOption } from '../types';
+import { formatJson, formatTable, formatCsv, formatPrivacyStatus } from '../lib/formatters';
+import { ChannelOption, OutputOption, LimitOption, VerboseOption, TypeFilterOption, PrivacyFilterOption } from '../types';
 
-async function channelVideosCommand(options: ChannelOption & OutputOption & LimitOption & VerboseOption & TypeFilterOption): Promise<void> {
+async function channelVideosCommand(options: ChannelOption & OutputOption & LimitOption & VerboseOption & TypeFilterOption & PrivacyFilterOption): Promise<void> {
   initCommand(options);
+  validatePrivacyFilter(options.privacy);
 
   await withSpinner('Fetching channel videos...', 'Failed to fetch videos', async (spinner) => {
     const channel = await requireChannel(options.channel);
@@ -16,6 +17,7 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
     debug(`Channel handle: ${channel}, limit: ${limit}`);
 
     let videos = await getChannelVideos(channel, limit);
+    const totalFetched = videos.length;
 
     // Filter by video type if specified
     if (options.type) {
@@ -23,9 +25,23 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
       debug(`Filtering by video type: ${typeFilter}`);
       videos = videos.filter(v => v.videoType === typeFilter);
     }
+    const afterTypeFilter = videos.length;
+
+    // Filter by privacy status if specified
+    if (options.privacy && options.privacy.length > 0) {
+      const privacyFilter = options.privacy;
+      debug(`Filtering by privacy: ${privacyFilter.join(', ')}`);
+      videos = videos.filter(v => v.privacyStatus && privacyFilter.includes(v.privacyStatus));
+    }
 
     const typeLabel = options.type ? ` ${options.type}` : '';
-    spinner.succeed(`Found ${videos.length}${typeLabel} video(s)`);
+    const filterParts: string[] = [];
+    const typeFiltered = totalFetched - afterTypeFilter;
+    const privacyFiltered = afterTypeFilter - videos.length;
+    if (typeFiltered > 0) filterParts.push(`${typeFiltered} filtered by type`);
+    if (privacyFiltered > 0) filterParts.push(`${privacyFiltered} filtered by privacy`);
+    const filterSuffix = filterParts.length > 0 ? ` (${filterParts.join(', ')})` : '';
+    spinner.succeed(`Found ${videos.length}${typeLabel} video(s)${filterSuffix}`);
     console.log('');
 
     const outputFormat = await getOutputFormat(options.output);
@@ -40,6 +56,7 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
           id: video.id,
           title: video.title,
           published: formatDate(video.publishedAt),
+          privacy: video.privacyStatus || '-', // '-' sentinel: human-readable placeholder for unauthenticated/missing data
           type: video.videoType,
         }));
         console.log(formatTable(tableData));
@@ -47,7 +64,8 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
 
       case 'text':
         videos.forEach(video => {
-          console.log([video.id, video.title, formatDate(video.publishedAt), video.videoType].join('\t'));
+          // '-' sentinel: human-readable placeholder; consistent with table format for tab-delimited consumers
+          console.log([video.id, video.title, formatDate(video.publishedAt), video.privacyStatus || '-', video.videoType].join('\t'));
         });
         break;
 
@@ -56,6 +74,7 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
           id: video.id,
           title: video.title,
           published: video.publishedAt,
+          privacy: video.privacyStatus || '', // empty string: CSV convention — absent field, not a sentinel value
           type: video.videoType,
         }));
         console.log(formatCsv(csvData));
@@ -68,6 +87,7 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
           console.log(chalk.cyan(`[${index + 1}]`) + ' ' + chalk.bold(video.title) + typeIndicator);
           console.log('  ID: ' + chalk.yellow(video.id));
           console.log('  Published: ' + formatDate(video.publishedAt));
+          console.log('  Privacy: ' + formatPrivacyStatus(video.privacyStatus));
           console.log('  URL: ' + chalk.blue(`https://youtube.com/watch?v=${video.id}`));
           console.log('');
         });

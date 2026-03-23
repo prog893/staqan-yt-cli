@@ -306,6 +306,25 @@ function chunkDateRange(startDate: string, endDate: string): { start: string; en
 }
 
 /**
+ * Validate --privacy flag values before any API calls.
+ * Exits with an error message if any value is not public/private/unlisted.
+ *
+ * Accepts string[] (not PrivacyStatus[]) because Commander.js parses option
+ * values as raw strings before this validation runs. The call site's option
+ * type is PrivacyStatus[], but at runtime the values are unvalidated strings
+ * until this function confirms them.
+ */
+function validatePrivacyFilter(privacy: string[] | undefined): void {
+  if (!privacy || privacy.length === 0) return;
+  const valid = ['public', 'private', 'unlisted'];
+  const invalid = privacy.filter(s => !valid.includes(s));
+  if (invalid.length > 0) {
+    error(`Invalid privacy value(s): ${invalid.join(', ')}. Valid values: public, private, unlisted`);
+    process.exit(1);
+  }
+}
+
+/**
  * Initialize a command: enable verbose mode if requested.
  * Call at the top of every command before any async work.
  */
@@ -508,4 +527,5 @@ export {
   chunkDateRange,
   sleep,
   retryWithBackoff,
+  validatePrivacyFilter,
 };
