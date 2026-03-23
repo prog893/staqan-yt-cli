@@ -28,6 +28,8 @@ export interface PlaylistListItem {
   channelTitle: string;
   publishedAt: string;
   itemCount: number;
+  // Required (not optional): playlists.list always returns status in the same
+  // API response — no extra authenticated call needed, unlike VideoListItem.
   privacyStatus: PrivacyStatus;
 }
 
@@ -78,7 +80,9 @@ export interface VideoListItem {
   videoType: VideoType;
   channelTitle?: string;  // For global search results
   channelId?: string;     // For global search results
-  privacyStatus?: PrivacyStatus; // requires authenticated API call
+  // Optional: requires a separate authenticated videos.list call (see fetchPrivacyStatuses).
+  // Contrast with PlaylistListItem where privacy is always present in the same response.
+  privacyStatus?: PrivacyStatus;
 }
 
 // Localization types

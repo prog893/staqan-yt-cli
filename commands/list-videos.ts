@@ -25,6 +25,7 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
       debug(`Filtering by video type: ${typeFilter}`);
       videos = videos.filter(v => v.videoType === typeFilter);
     }
+    const afterTypeFilter = videos.length;
 
     // Filter by privacy status if specified
     if (options.privacy && options.privacy.length > 0) {
@@ -34,8 +35,12 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
     }
 
     const typeLabel = options.type ? ` ${options.type}` : '';
-    const filteredCount = totalFetched - videos.length;
-    const filterSuffix = filteredCount > 0 ? ` (${filteredCount} filtered)` : '';
+    const filterParts: string[] = [];
+    const typeFiltered = totalFetched - afterTypeFilter;
+    const privacyFiltered = afterTypeFilter - videos.length;
+    if (typeFiltered > 0) filterParts.push(`${typeFiltered} filtered by type`);
+    if (privacyFiltered > 0) filterParts.push(`${privacyFiltered} filtered by privacy`);
+    const filterSuffix = filterParts.length > 0 ? ` (${filterParts.join(', ')})` : '';
     spinner.succeed(`Found ${videos.length}${typeLabel} video(s)${filterSuffix}`);
     console.log('');
 
