@@ -308,6 +308,12 @@ Another fetch operation is in progress. Wait for it to complete or run: rm ~/.st
 1. **Wait** for the other operation to complete (check with `ps aux | grep staqan-yt`)
 2. **Remove stale lock** if process crashed: `rm ~/.staqan-yt-cli/data/{channelId}/reports/.lock`
 3. **Verify channel** - locks are per-channel, ensure you're using the correct channel
+4. **Increase timeout** if the operation legitimately takes longer than 60 s (slow networks / large report sets):
+   ```bash
+   staqan-yt config set lock.timeout 120000   # 2 minutes
+   # or one-shot via env var:
+   STAQAN_YT_LOCK_TIMEOUT_MS=120000 staqan-yt fetch-reports --channel @yourchannel
+   ```
 
 **Lock file locations:**
 - Completion cache: `data/{channelId}/completion_cache.json.lock`

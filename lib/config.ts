@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { Config, ConfigKey, OutputFormat } from '../types';
-import { CONFIG_DIR } from './utils';
+import { CONFIG_DIR, warning } from './utils';
 
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 
@@ -9,6 +9,11 @@ const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
  * Valid output formats
  */
 export const VALID_OUTPUT_FORMATS: OutputFormat[] = ['json', 'table', 'text', 'pretty', 'csv'];
+
+/**
+ * Default lock acquisition timeout (ms)
+ */
+export const DEFAULT_LOCK_TIMEOUT_MS = 60000;
 
 /**
  * Default configuration
@@ -22,6 +27,9 @@ const DEFAULT_CONFIG: Config = {
     channel: undefined,
     output: 'pretty',
   },
+  lock: {
+    timeout: DEFAULT_LOCK_TIMEOUT_MS,
+  },
 };
 
 /**
@@ -32,6 +40,20 @@ async function ensureConfigDir(): Promise<void> {
     await fs.access(CONFIG_DIR);
   } catch {
     await fs.mkdir(CONFIG_DIR, { recursive: true });
+  }
+}
+
+/**
+ * Load raw configuration from file without merging defaults.
+ * Returns null if the file doesn't exist or is invalid.
+ */
+async function loadRawConfig(): Promise<Config | null> {
+  try {
+    await ensureConfigDir();
+    const data = await fs.readFile(CONFIG_PATH, 'utf-8');
+    return JSON.parse(data) as Config;
+  } catch {
+    return null;
   }
 }
 
@@ -55,6 +77,10 @@ export async function loadConfig(): Promise<Config> {
         ...DEFAULT_CONFIG.default,
         ...config.default,
       },
+      lock: {
+        ...DEFAULT_CONFIG.lock,
+        ...config.lock,
+      },
     };
   } catch {
     // File doesn't exist or is invalid - return defaults
@@ -75,6 +101,18 @@ export async function saveConfig(config: Config): Promise<void> {
  */
 export async function setConfigValue(key: ConfigKey, value: string): Promise<void> {
   const config = await loadConfig();
+
+  // lock.timeout: validate and store as a number
+  if (key === 'lock.timeout') {
+    const ms = parseInt(value, 10);
+    if (isNaN(ms) || ms <= 0) {
+      throw new Error(`Invalid lock timeout: ${value}. Must be a positive integer (milliseconds).`);
+    }
+    config.lock!.timeout = ms;
+    await saveConfig(config);
+    return;
+  }
+
   const [section, field] = key.split('.') as ['default', 'channel' | 'output'];
 
   if (!config[section]) {
@@ -91,13 +129,42 @@ export async function setConfigValue(key: ConfigKey, value: string): Promise<voi
 }
 
 /**
+ * Get the lock acquisition timeout in milliseconds.
+ * Priority: STAQAN_YT_LOCK_TIMEOUT_MS env var > config lock.timeout > 60000ms default
+ */
+export async function getLockTimeout(): Promise<number> {
+  const envVal = process.env.STAQAN_YT_LOCK_TIMEOUT_MS;
+  if (envVal !== undefined) {
+    const ms = parseInt(envVal, 10);
+    if (!isNaN(ms) && ms > 0) return ms;
+    warning(`Invalid STAQAN_YT_LOCK_TIMEOUT_MS value "${envVal}" — must be a positive integer. Using config/default instead.`);
+  }
+
+  const config = await loadConfig();
+  return config.lock?.timeout ?? DEFAULT_LOCK_TIMEOUT_MS;
+}
+
+/**
  * Get a configuration value by key path (e.g., "default.channel")
- * Returns undefined if not set
+ * Returns undefined if not set (i.e. only the built-in default would apply).
+ *
+ * For lock.timeout we read the raw (un-merged) config so that a value that
+ * was never explicitly stored is reported as "not set" rather than the
+ * DEFAULT_LOCK_TIMEOUT_MS that loadConfig() injects via DEFAULT_CONFIG.
  */
 export async function getConfigValue(key: ConfigKey): Promise<string | undefined> {
+  if (key === 'lock.timeout') {
+    const raw = await loadRawConfig();
+    const explicit = raw?.lock?.timeout;
+    if (explicit === undefined) return undefined;
+    // lock.timeout is stored as a number but getConfigValue's contract is
+    // string | undefined (consistent with all other keys).  Callers that need
+    // the numeric value should use getLockTimeout() instead.
+    return String(explicit);
+  }
+
   const config = await loadConfig();
   const [section, field] = key.split('.') as ['default', 'channel' | 'output'];
-
   return config[section]?.[field];
 }
 

@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { getConfig, setConfigValue } from '../lib/config';
+import { getConfig, getConfigValue, setConfigValue, DEFAULT_LOCK_TIMEOUT_MS } from '../lib/config';
 import { success, error, info, CACHE_DIR } from '../lib/utils';
 import { ConfigKey } from '../types';
 import { installCompletion, detectShell } from '../lib/completion';
@@ -45,7 +45,14 @@ async function configCommand(
       console.log(chalk.bold('\nCurrent Configuration:'));
       console.log('');
       console.log(chalk.cyan('default.channel:') + '  ' + (config.default?.channel || chalk.dim('(not set)')));
-      console.log(chalk.cyan('default.output:') + '   ' + (config.default?.output || chalk.dim('text')));
+      console.log(chalk.cyan('default.output:') + '   ' + (config.default?.output || chalk.dim('pretty')));
+      // getConfigValue returns undefined when lock.timeout was never explicitly
+      // stored, so we correctly show "(default)" only when the user hasn't set it.
+      const explicitLockTimeout = await getConfigValue('lock.timeout');
+      const lockTimeoutDisplay = explicitLockTimeout === undefined
+        ? chalk.dim(`${DEFAULT_LOCK_TIMEOUT_MS}ms (default)`)
+        : `${explicitLockTimeout}ms`;
+      console.log(chalk.cyan('lock.timeout:') + '     ' + lockTimeoutDisplay);
       console.log('');
       return;
     }
@@ -57,18 +64,20 @@ async function configCommand(
         console.log('');
         console.log('Available keys:');
         console.log('  default.channel  - Default channel handle or ID (e.g., @staqan)');
-        console.log('  default.output   - Default output format (text or json)');
+        console.log('  default.output   - Default output format (json|table|text|pretty|csv)');
+        console.log('  lock.timeout     - Lock acquisition timeout in ms (default: 60000)');
         process.exit(1);
       }
 
       // Validate key
-      const validKeys: ConfigKey[] = ['default.channel', 'default.output'];
+      const validKeys: ConfigKey[] = ['default.channel', 'default.output', 'lock.timeout'];
       if (!validKeys.includes(key as ConfigKey)) {
         error(`Invalid config key: ${key}`);
         console.log('');
         console.log('Available keys:');
         console.log('  default.channel  - Default channel handle or ID (e.g., @staqan)');
-        console.log('  default.output   - Default output format (text or json)');
+        console.log('  default.output   - Default output format (json|table|text|pretty|csv)');
+        console.log('  lock.timeout     - Lock acquisition timeout in ms (default: 60000)');
         process.exit(1);
       }
 
@@ -76,7 +85,8 @@ async function configCommand(
       if (key === 'default.channel') {
         await invalidateChannelCache();
       }
-      success(`Set ${chalk.cyan(key)} = ${chalk.yellow(value)}`);
+      const displayValue = key === 'lock.timeout' ? `${value}ms` : value;
+      success(`Set ${chalk.cyan(key)} = ${chalk.yellow(displayValue)}`);
       return;
     }
 
@@ -87,12 +97,10 @@ async function configCommand(
         process.exit(1);
       }
 
-      const config = await getConfig();
-      const [section, field] = key.split('.') as ['default', 'channel' | 'output'];
-      const currentValue = config[section]?.[field];
+      const currentValue = await getConfigValue(key as ConfigKey);
 
-      if (currentValue) {
-        console.log(currentValue);
+      if (currentValue !== undefined) {
+        console.log(key === 'lock.timeout' ? `${currentValue}ms` : currentValue);
       } else {
         info(`${key} is not set`);
       }

@@ -370,6 +370,24 @@ _staqa_nyt_completion() {
       ;;
     config)
       COMPREPLY=( \$(compgen -W "set get list completion --show --output --verbose" -- "\${cur}") )
+      return
+      ;;
+    set|get)
+      # \${cmd} is the first non-flag positional arg (set by the loop above).
+      # For "staqan-yt config set <TAB>", cmd="config", so this guard is correct.
+      # We also verify via \${words[*]} to be safe if flags precede the subcommand.
+      if [[ "\${cmd}" == "config" ]]; then
+        COMPREPLY=( \$(compgen -W "default.channel default.output lock.timeout" -- "\${cur}") )
+        return
+      fi
+      ;;
+    default.output)
+      COMPREPLY=( \$(compgen -W "json table text pretty csv" -- "\${cur}") )
+      return
+      ;;
+    lock.timeout)
+      COMPREPLY=( \$(compgen -W "30000 60000 120000 300000" -- "\${cur}") )
+      return
       ;;
     *)
       ;;
@@ -836,7 +854,8 @@ _staqa_nyt_config() {
 
   local -a config_keys=(
     'default.channel:Default channel handle'
-    'default.output:Default output format'
+    'default.output:Default output format (json|table|text|pretty|csv)'
+    'lock.timeout:Lock acquisition timeout in ms (default: 60000)'
   )
 
   if (( CURRENT == 3 )); then
@@ -849,6 +868,13 @@ _staqa_nyt_config() {
         _describe 'key' config_keys ;;
       completion)
         _values 'shell' bash zsh auto ;;
+    esac
+  elif (( CURRENT == 5 )) && [[ \$words[3] == 'set' ]]; then
+    case \$words[4] in
+      default.output)
+        _values 'format' json table text pretty csv ;;
+      lock.timeout)
+        _values 'ms' 30000 60000 120000 300000 ;;
     esac
   fi
 }

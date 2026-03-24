@@ -339,9 +339,12 @@ export interface Config {
     directory?: string;
     verifyOnLoad?: boolean;
   };
+  lock?: {
+    timeout?: number;  // Lock acquisition timeout in milliseconds (default: 60000)
+  };
 }
 
-export type ConfigKey = 'default.channel' | 'default.output';
+export type ConfigKey = 'default.channel' | 'default.output' | 'lock.timeout';
 
 // Completion types
 export type CompletionType = 'video-id' | 'playlist-id' | 'report-type';
