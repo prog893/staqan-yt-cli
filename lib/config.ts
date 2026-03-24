@@ -157,6 +157,9 @@ export async function getConfigValue(key: ConfigKey): Promise<string | undefined
     const raw = await loadRawConfig();
     const explicit = raw?.lock?.timeout;
     if (explicit === undefined) return undefined;
+    // lock.timeout is stored as a number but getConfigValue's contract is
+    // string | undefined (consistent with all other keys).  Callers that need
+    // the numeric value should use getLockTimeout() instead.
     return String(explicit);
   }
 

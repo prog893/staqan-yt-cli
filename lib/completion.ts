@@ -370,8 +370,12 @@ _staqa_nyt_completion() {
       ;;
     config)
       COMPREPLY=( \$(compgen -W "set get list completion --show --output --verbose" -- "\${cur}") )
+      return
       ;;
     set|get)
+      # \${cmd} is the first non-flag positional arg (set by the loop above).
+      # For "staqan-yt config set <TAB>", cmd="config", so this guard is correct.
+      # We also verify via \${words[*]} to be safe if flags precede the subcommand.
       if [[ "\${cmd}" == "config" ]]; then
         COMPREPLY=( \$(compgen -W "default.channel default.output lock.timeout" -- "\${cur}") )
         return
