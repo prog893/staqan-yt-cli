@@ -74,33 +74,33 @@ If no `--metrics` specified, fetches:
 
 Each dimension runs as a separate API query and outputs its own section. Results are sorted by views descending.
 
-| Dimension | Description |
-|---|---|
-| `country` | Two-letter ISO country code |
-| `day` | Daily breakdown (YYYY-MM-DD) |
-| `month` | Monthly breakdown (YYYY-MM) |
-| `deviceType` | Desktop, mobile, tablet, TV, game console, etc. |
-| `operatingSystem` | Android, iOS, Windows, macOS, etc. |
-| `subscribedStatus` | Subscribed vs. unsubscribed viewers |
-| `ageGroup` | Viewer age brackets |
-| `gender` | Viewer gender |
-| `sharingService` | Platform used to share the video |
-| `insightTrafficSourceType` | Search, suggested, external, browse, etc. |
-| `insightPlaybackLocationType` | Watch page, embedded, channel page, etc. |
-| `liveOrOnDemand` | Live vs. on-demand playback |
-| `creatorContentType` | Livestream, shorts, story, video on demand |
-| `youtubeProduct` | Core YouTube, Gaming, Kids, Music |
-| `province` | US state (requires `country==US`) |
-| `dma` | Nielsen market area (US) |
-| `city` | City-level (available from Jan 2022) |
+| Dimension | Description | Notes |
+|---|---|---|
+| `country` | Two-letter ISO country code | ✅ Works |
+| `day` | Daily breakdown (YYYY-MM-DD) | ✅ Works |
+| `month` | Monthly breakdown (YYYY-MM) | ⚠️ Date range must span full calendar months |
+| `deviceType` | Desktop, mobile, tablet, TV, game console, etc. | ✅ Works |
+| `operatingSystem` | Android, iOS, Windows, macOS, etc. | ✅ Works |
+| `subscribedStatus` | Subscribed vs. unsubscribed viewers | ✅ Works |
+| `insightTrafficSourceType` | Search, suggested, external, browse, etc. | ✅ Works |
+| `insightPlaybackLocationType` | Watch page, embedded, channel page, etc. | ✅ Works |
+| `liveOrOnDemand` | Live vs. on-demand playback | ✅ Works |
+| `creatorContentType` | Livestream, shorts, story, video on demand | ✅ Works |
+| `youtubeProduct` | Core YouTube, Gaming, Kids, Music | ✅ Works |
+| `ageGroup` | Viewer age brackets | ❌ Not supported for video-level queries |
+| `gender` | Viewer gender | ❌ Not supported for video-level queries |
+| `sharingService` | Platform used to share the video | ❌ Not supported for video-level queries |
+| `province` | US state | ⚠️ Requires `country==US` filter (not supported via CLI) |
+| `dma` | Nielsen market area (US) | ⚠️ Requires additional filters |
+| `city` | City-level (from Jan 2022) | ⚠️ Requires additional filters |
 
-> **Note:** `province`, `dma`, and `city` require additional geographic filters and are not included in `--all`.
+> **Note:** `ageGroup`, `gender`, and `sharingService` are only available at channel level via `get-channel-analytics`.
 >
 > **Note:** There is no subtitle or language dimension in the YouTube Analytics API. Subtitle language breakdowns are not supported.
 
 ### `--all` Preset Dimensions
 
-`--all` is equivalent to `--dimensions country day deviceType operatingSystem subscribedStatus ageGroup gender insightTrafficSourceType`. These eight dimensions are safe for any video without additional filters.
+`--all` is equivalent to `--dimensions country day deviceType operatingSystem subscribedStatus insightTrafficSourceType insightPlaybackLocationType liveOrOnDemand creatorContentType youtubeProduct`. These ten dimensions are live-tested to work for any video-level query without additional filters.
 
 ### Date Range Behavior
 

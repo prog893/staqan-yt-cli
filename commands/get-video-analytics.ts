@@ -6,17 +6,21 @@ import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { AnalyticsOptions } from '../types';
 
-// Standard dimensions for --all (verified against YouTube Analytics API docs)
-// Excludes: province/dma/city (require extra filters), elapsedVideoTimeRatio (retention-specific)
+// Standard dimensions for --all (live-tested against YouTube Analytics API v2)
+// Excluded: ageGroup/gender/sharingService (channel-level only, fail on video queries)
+//           province/city (require extra geo filters)
+//           month (requires date range spanning full calendar months)
 const ALL_DIMENSIONS = [
   'country',
   'day',
   'deviceType',
   'operatingSystem',
   'subscribedStatus',
-  'ageGroup',
-  'gender',
   'insightTrafficSourceType',
+  'insightPlaybackLocationType',
+  'liveOrOnDemand',
+  'creatorContentType',
+  'youtubeProduct',
 ];
 
 interface BreakdownRow {
@@ -114,7 +118,7 @@ async function fetchDimensionSection(
         startDate: chunk.start,
         endDate: chunk.end,
         metrics,
-        dimensions: `${dimension},video`,
+        dimensions: dimension,
         filters: `video==${parsedId}`,
       });
     });
@@ -183,7 +187,12 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
 
     debug(`Date range: ${startDate} to ${endDate}`);
 
-    const metrics = options.metrics || 'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares';
+    // Breakdown dimensions only support a subset of metrics (engagement metrics
+    // like likes/comments/shares are rejected by the API for most dimensions).
+    // Use the safe intersection for breakdown mode; full set for aggregate.
+    const DEFAULT_AGGREGATE_METRICS = 'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares';
+    const DEFAULT_BREAKDOWN_METRICS = 'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage';
+    const metrics = options.metrics || (effectiveDimensions.length > 0 ? DEFAULT_BREAKDOWN_METRICS : DEFAULT_AGGREGATE_METRICS);
     const dateChunks = chunkDateRange(startDate, endDate);
     debug(`Split into ${dateChunks.length} chunk(s) of 90 days`);
 
