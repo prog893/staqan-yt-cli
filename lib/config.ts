@@ -146,18 +146,21 @@ export async function getLockTimeout(): Promise<number> {
 
 /**
  * Get a configuration value by key path (e.g., "default.channel")
- * Returns undefined if not set
+ * Returns undefined if not set (i.e. only the built-in default would apply).
+ *
+ * For lock.timeout we read the raw (un-merged) config so that a value that
+ * was never explicitly stored is reported as "not set" rather than the
+ * DEFAULT_LOCK_TIMEOUT_MS that loadConfig() injects via DEFAULT_CONFIG.
  */
 export async function getConfigValue(key: ConfigKey): Promise<string | undefined> {
-  const config = await loadConfig();
-
   if (key === 'lock.timeout') {
     const raw = await loadRawConfig();
     const explicit = raw?.lock?.timeout;
     if (explicit === undefined) return undefined;
-    return String(config.lock?.timeout ?? DEFAULT_LOCK_TIMEOUT_MS);
+    return String(explicit);
   }
 
+  const config = await loadConfig();
   const [section, field] = key.split('.') as ['default', 'channel' | 'output'];
   return config[section]?.[field];
 }

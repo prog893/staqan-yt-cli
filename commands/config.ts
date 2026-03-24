@@ -46,10 +46,12 @@ async function configCommand(
       console.log('');
       console.log(chalk.cyan('default.channel:') + '  ' + (config.default?.channel || chalk.dim('(not set)')));
       console.log(chalk.cyan('default.output:') + '   ' + (config.default?.output || chalk.dim('pretty')));
-      const lockTimeoutIsDefault = config.lock?.timeout === undefined || config.lock.timeout === DEFAULT_LOCK_TIMEOUT_MS;
-      const lockTimeoutDisplay = lockTimeoutIsDefault
+      // getConfigValue returns undefined when lock.timeout was never explicitly
+      // stored, so we correctly show "(default)" only when the user hasn't set it.
+      const explicitLockTimeout = await getConfigValue('lock.timeout');
+      const lockTimeoutDisplay = explicitLockTimeout === undefined
         ? chalk.dim(`${DEFAULT_LOCK_TIMEOUT_MS}ms (default)`)
-        : `${config.lock!.timeout}ms`;
+        : `${explicitLockTimeout}ms`;
       console.log(chalk.cyan('lock.timeout:') + '     ' + lockTimeoutDisplay);
       console.log('');
       return;
