@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { getConfig, setConfigValue, DEFAULT_LOCK_TIMEOUT_MS } from '../lib/config';
+import { getConfig, getConfigValue, setConfigValue, DEFAULT_LOCK_TIMEOUT_MS } from '../lib/config';
 import { success, error, info, CACHE_DIR } from '../lib/utils';
 import { ConfigKey } from '../types';
 import { installCompletion, detectShell } from '../lib/completion';
@@ -83,7 +83,8 @@ async function configCommand(
       if (key === 'default.channel') {
         await invalidateChannelCache();
       }
-      success(`Set ${chalk.cyan(key)} = ${chalk.yellow(value)}`);
+      const displayValue = key === 'lock.timeout' ? `${value}ms` : value;
+      success(`Set ${chalk.cyan(key)} = ${chalk.yellow(displayValue)}`);
       return;
     }
 
@@ -94,12 +95,10 @@ async function configCommand(
         process.exit(1);
       }
 
-      const config = await getConfig();
-      const [section, field] = key.split('.') as ['default', 'channel' | 'output'];
-      const currentValue = config[section]?.[field];
+      const currentValue = await getConfigValue(key as ConfigKey);
 
-      if (currentValue) {
-        console.log(currentValue);
+      if (currentValue !== undefined) {
+        console.log(key === 'lock.timeout' ? `${currentValue}ms` : currentValue);
       } else {
         info(`${key} is not set`);
       }

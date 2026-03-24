@@ -44,6 +44,20 @@ async function ensureConfigDir(): Promise<void> {
 }
 
 /**
+ * Load raw configuration from file without merging defaults.
+ * Returns null if the file doesn't exist or is invalid.
+ */
+async function loadRawConfig(): Promise<Config | null> {
+  try {
+    await ensureConfigDir();
+    const data = await fs.readFile(CONFIG_PATH, 'utf-8');
+    return JSON.parse(data) as Config;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Load configuration from file
  * Returns default config if file doesn't exist
  */
@@ -136,8 +150,15 @@ export async function getLockTimeout(): Promise<number> {
  */
 export async function getConfigValue(key: ConfigKey): Promise<string | undefined> {
   const config = await loadConfig();
-  const [section, field] = key.split('.') as ['default', 'channel' | 'output'];
 
+  if (key === 'lock.timeout') {
+    const raw = await loadRawConfig();
+    const explicit = raw?.lock?.timeout;
+    if (explicit === undefined) return undefined;
+    return String(config.lock?.timeout ?? DEFAULT_LOCK_TIMEOUT_MS);
+  }
+
+  const [section, field] = key.split('.') as ['default', 'channel' | 'output'];
   return config[section]?.[field];
 }
 
