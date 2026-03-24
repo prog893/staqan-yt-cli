@@ -6,9 +6,19 @@ import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { AnalyticsOptions } from '../types';
 
+// Standard dimensions for --all
+const ALL_DIMENSIONS = ['country', 'day', 'deviceType', 'operatingSystem', 'subscribedStatus'];
+
 interface BreakdownRow {
   dimensionValue: string;
   metrics: { [key: string]: number };
+}
+
+interface DimensionSection {
+  dimension: string;
+  rows: BreakdownRow[];
+  metricNames: string[];
+  totalDataPoints: number;
 }
 
 function aggregateByDimension(
@@ -19,7 +29,6 @@ function aggregateByDimension(
   const dimensionColIndex = columnHeaders.findIndex(h => h.name === dimension);
   if (dimensionColIndex === -1) return [];
 
-  // Group rows by dimension value
   const rowsByDimension = new Map<string, unknown[][]>();
   for (const row of allRows) {
     const dimValue = String(row[dimensionColIndex]);
@@ -29,7 +38,6 @@ function aggregateByDimension(
     rowsByDimension.get(dimValue)!.push(row);
   }
 
-  // Aggregate metrics within each group
   const breakdownRows: BreakdownRow[] = [];
   for (const [dimValue, rows] of rowsByDimension) {
     const metrics: { [key: string]: number } = {};
@@ -52,10 +60,7 @@ function aggregateByDimension(
     breakdownRows.push({ dimensionValue: dimValue, metrics });
   }
 
-  // Sort by views descending (or first numeric metric)
-  const sortKey = 'views';
-  breakdownRows.sort((a, b) => (b.metrics[sortKey] || 0) - (a.metrics[sortKey] || 0));
-
+  breakdownRows.sort((a, b) => (b.metrics['views'] || 0) - (a.metrics['views'] || 0));
   return breakdownRows;
 }
 
@@ -78,6 +83,49 @@ function formatMetricName(name: string): string {
     .trim();
 }
 
+async function fetchDimensionSection(
+  youtubeAnalytics: ReturnType<typeof google.youtubeAnalytics>,
+  parsedId: string,
+  dimension: string,
+  metrics: string,
+  dateChunks: { start: string; end: string }[],
+  onProgress: (text: string) => void
+): Promise<DimensionSection> {
+  const allRows: unknown[][] = [];
+  let columnHeaders: { name?: string | null }[] = [];
+
+  for (let i = 0; i < dateChunks.length; i++) {
+    const chunk = dateChunks[i];
+    onProgress(`[${dimension}] chunk ${i + 1}/${dateChunks.length} (${chunk.start} to ${chunk.end})...`);
+
+    const analyticsResponse = await retryWithBackoff(async () => {
+      return await youtubeAnalytics.reports.query({
+        ids: 'channel==MINE',
+        startDate: chunk.start,
+        endDate: chunk.end,
+        metrics,
+        dimensions: `${dimension},video`,
+        filters: `video==${parsedId}`,
+      });
+    });
+
+    if (i === 0 && analyticsResponse.data.columnHeaders) {
+      columnHeaders = analyticsResponse.data.columnHeaders;
+    }
+
+    if (analyticsResponse.data.rows && analyticsResponse.data.rows.length > 0) {
+      allRows.push(...analyticsResponse.data.rows);
+    }
+  }
+
+  const breakdownRows = aggregateByDimension(allRows, columnHeaders, dimension);
+  const metricNames = columnHeaders
+    .map(h => h.name || '')
+    .filter(name => name !== dimension && name !== 'video' && name !== '');
+
+  return { dimension, rows: breakdownRows, metricNames, totalDataPoints: allRows.length };
+}
+
 async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void> {
   initCommand(options);
 
@@ -91,7 +139,8 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
     const parsedId = parseVideoId(videoId);
     debug('Parsed video ID', parsedId);
 
-    const dimension = options.dimension;
+    // Resolve effective dimensions
+    const effectiveDimensions = options.all ? ALL_DIMENSIONS : (options.dimensions ?? []);
 
     const auth = await getAuthenticatedClient();
     const youtube = google.youtube({ version: 'v3', auth });
@@ -125,97 +174,81 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
     debug(`Date range: ${startDate} to ${endDate}`);
 
     const metrics = options.metrics || 'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares';
-
-    // Use specified dimension, or default to 'video' for aggregate mode
-    const apiDimensions = dimension || 'video';
-
     const dateChunks = chunkDateRange(startDate, endDate);
     debug(`Split into ${dateChunks.length} chunk(s) of 90 days`);
 
-    const allRows: unknown[][] = [];
-    let columnHeaders: { name?: string | null }[] = [];
-
-    for (let i = 0; i < dateChunks.length; i++) {
-      const chunk = dateChunks[i];
-      spinner.text = `Fetching chunk ${i + 1}/${dateChunks.length} (${chunk.start} to ${chunk.end})...`;
-
-      const analyticsResponse = await retryWithBackoff(async () => {
-        return await youtubeAnalytics.reports.query({
-          ids: 'channel==MINE',
-          startDate: chunk.start,
-          endDate: chunk.end,
-          metrics,
-          dimensions: apiDimensions,
-          filters: `video==${parsedId}`,
-        });
-      });
-
-      if (i === 0 && analyticsResponse.data.columnHeaders) {
-        columnHeaders = analyticsResponse.data.columnHeaders;
-      }
-
-      if (analyticsResponse.data.rows && analyticsResponse.data.rows.length > 0) {
-        allRows.push(...analyticsResponse.data.rows);
-      }
-    }
-
     const outputFormat = await getOutputFormat(options.output);
 
-    if (dimension) {
-      // --- Breakdown mode ---
-      spinner.succeed(`Retrieved ${allRows.length} row(s) of analytics data`);
+    // ── Breakdown mode ────────────────────────────────────────────────────────
+    if (effectiveDimensions.length > 0) {
+      const sections: DimensionSection[] = [];
 
-      const breakdownRows = aggregateByDimension(allRows, columnHeaders, dimension);
-      const metricNames = columnHeaders
-        .map(h => h.name || '')
-        .filter(name => name !== dimension && name !== 'video' && name !== '');
+      for (const dim of effectiveDimensions) {
+        const section = await fetchDimensionSection(
+          youtubeAnalytics, parsedId, dim, metrics, dateChunks,
+          (text) => { spinner.text = text; }
+        );
+        sections.push(section);
+      }
+
+      spinner.succeed(`Retrieved breakdown for ${effectiveDimensions.length} dimension(s)`);
 
       switch (outputFormat) {
-        case 'csv': {
-          if (breakdownRows.length === 0) {
-            process.stderr.write(chalk.yellow('⚠ No analytics data available for this time period.\n'));
-            return;
+        case 'csv':
+          for (const section of sections) {
+            if (section.rows.length === 0) continue;
+            // Section header as a comment row
+            console.log(`# ${section.dimension}`);
+            const csvHeaders = [{ name: section.dimension }, ...section.metricNames.map(n => ({ name: n }))];
+            const csvRows = section.rows.map(br => [
+              br.dimensionValue,
+              ...section.metricNames.map(m => br.metrics[m] ?? 0),
+            ]);
+            console.log(convertToCSV(csvHeaders, csvRows));
+            console.log('');
           }
-          // Build CSV with dimension + metric columns
-          const csvHeaders = [{ name: dimension }, ...metricNames.map(n => ({ name: n }))];
-          const csvRows = breakdownRows.map(br => [
-            br.dimensionValue,
-            ...metricNames.map(m => br.metrics[m] ?? 0),
-          ]);
-          console.log(convertToCSV(csvHeaders, csvRows));
           break;
-        }
 
         case 'json':
           console.log(formatJson({
             videoId: parsedId,
             title,
             dateRange: { startDate, endDate },
-            dimension,
-            breakdown: breakdownRows.map(br => ({
-              [dimension]: br.dimensionValue,
-              ...br.metrics,
+            breakdowns: sections.map(s => ({
+              dimension: s.dimension,
+              rows: s.rows.map(br => ({
+                [s.dimension]: br.dimensionValue,
+                ...br.metrics,
+              })),
             })),
           }));
           break;
 
-        case 'table': {
-          const tableData = breakdownRows.map(br => {
-            const row: Record<string, string> = { [dimension]: br.dimensionValue };
-            metricNames.forEach(m => {
-              row[m] = formatMetricValue(m, br.metrics[m] ?? 0);
+        case 'table':
+          for (const section of sections) {
+            console.log(chalk.bold(`\n── ${formatMetricName(section.dimension)} ──`));
+            if (section.rows.length === 0) {
+              console.log(chalk.yellow('  No data available.'));
+              continue;
+            }
+            const tableData = section.rows.map(br => {
+              const row: Record<string, string> = { [section.dimension]: br.dimensionValue };
+              section.metricNames.forEach(m => {
+                row[m] = formatMetricValue(m, br.metrics[m] ?? 0);
+              });
+              return row;
             });
-            return row;
-          });
-          console.log(formatTable(tableData));
+            console.log(formatTable(tableData));
+          }
           break;
-        }
 
         case 'text':
-          breakdownRows.forEach(br => {
-            const values = [br.dimensionValue, ...metricNames.map(m => String(br.metrics[m] ?? 0))];
-            console.log(values.join('\t'));
-          });
+          for (const section of sections) {
+            section.rows.forEach(br => {
+              const values = [section.dimension, br.dimensionValue, ...section.metricNames.map(m => String(br.metrics[m] ?? 0))];
+              console.log(values.join('\t'));
+            });
+          }
           break;
 
         case 'pretty':
@@ -224,37 +257,68 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
           console.log(chalk.bold.cyan(title));
           console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
           console.log(chalk.gray('Date Range: ') + `${startDate} to ${endDate}`);
-          console.log(chalk.gray('Dimension: ') + chalk.magenta(dimension));
-          console.log('');
-
-          if (breakdownRows.length === 0) {
-            console.log(chalk.yellow('No analytics data available for this time period.'));
-            console.log('');
-            return;
+          if (options.all) {
+            console.log(chalk.gray('Mode: ') + chalk.magenta('--all (standard dimensions)'));
           }
-
-          console.log(chalk.bold(`Analytics Breakdown by ${formatMetricName(dimension)}:`));
           console.log('');
 
-          breakdownRows.forEach((br, i) => {
-            const rank = chalk.dim(`${i + 1}.`);
-            console.log(`${rank} ${chalk.bold(br.dimensionValue)}`);
-            metricNames.forEach(name => {
-              const formattedName = formatMetricName(name);
-              const formattedValue = formatMetricValue(name, br.metrics[name] ?? 0);
-              console.log(chalk.gray(`     ${formattedName}: `) + chalk.white(formattedValue));
-            });
+          for (const section of sections) {
+            console.log(chalk.bold.underline(`Breakdown by ${formatMetricName(section.dimension)}`));
             console.log('');
-          });
 
-          console.log(chalk.dim(`Note: ${breakdownRows.length} ${dimension} value(s) from ${allRows.length} data point(s)`));
-          console.log('');
+            if (section.rows.length === 0) {
+              console.log(chalk.yellow('  No data available for this dimension.'));
+              console.log('');
+              continue;
+            }
+
+            section.rows.forEach((br, i) => {
+              const rank = chalk.dim(`${i + 1}.`);
+              console.log(`${rank} ${chalk.bold(br.dimensionValue)}`);
+              section.metricNames.forEach(name => {
+                const formattedName = formatMetricName(name);
+                const formattedValue = formatMetricValue(name, br.metrics[name] ?? 0);
+                console.log(chalk.gray(`     ${formattedName}: `) + chalk.white(formattedValue));
+              });
+              console.log('');
+            });
+
+            console.log(chalk.dim(`  ${section.rows.length} value(s) from ${section.totalDataPoints} data point(s)`));
+            console.log('');
+          }
           break;
         }
       }
 
+    // ── Aggregate mode (no dimensions) ───────────────────────────────────────
     } else {
-      // --- Aggregate mode (original behavior) ---
+      const allRows: unknown[][] = [];
+      let columnHeaders: { name?: string | null }[] = [];
+
+      for (let i = 0; i < dateChunks.length; i++) {
+        const chunk = dateChunks[i];
+        spinner.text = `Fetching chunk ${i + 1}/${dateChunks.length} (${chunk.start} to ${chunk.end})...`;
+
+        const analyticsResponse = await retryWithBackoff(async () => {
+          return await youtubeAnalytics.reports.query({
+            ids: 'channel==MINE',
+            startDate: chunk.start,
+            endDate: chunk.end,
+            metrics,
+            dimensions: 'video',
+            filters: `video==${parsedId}`,
+          });
+        });
+
+        if (i === 0 && analyticsResponse.data.columnHeaders) {
+          columnHeaders = analyticsResponse.data.columnHeaders;
+        }
+
+        if (analyticsResponse.data.rows && analyticsResponse.data.rows.length > 0) {
+          allRows.push(...analyticsResponse.data.rows);
+        }
+      }
+
       spinner.succeed(`Retrieved ${allRows.length} row(s) of analytics data`);
 
       const aggregated: { [key: string]: number } = {};
@@ -265,9 +329,7 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
         let total = 0;
         allRows.forEach(row => {
           const value = row[index];
-          if (typeof value === 'number') {
-            total += value;
-          }
+          if (typeof value === 'number') total += value;
         });
 
         if (name.includes('average') || name.includes('Percentage')) {

@@ -187,7 +187,8 @@ export interface AnalyticsOptions extends OutputOption, VerboseOption, VideoIdOp
   startDate?: string;
   endDate?: string;
   metrics?: string;
-  dimension?: string;
+  dimensions?: string[];
+  all?: boolean;
 }
 
 export interface SearchTermsOptions extends OutputOption, VerboseOption, VideoIdOption {
