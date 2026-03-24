@@ -6,8 +6,18 @@ import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { AnalyticsOptions } from '../types';
 
-// Standard dimensions for --all
-const ALL_DIMENSIONS = ['country', 'day', 'deviceType', 'operatingSystem', 'subscribedStatus'];
+// Standard dimensions for --all (verified against YouTube Analytics API docs)
+// Excludes: province/dma/city (require extra filters), elapsedVideoTimeRatio (retention-specific)
+const ALL_DIMENSIONS = [
+  'country',
+  'day',
+  'deviceType',
+  'operatingSystem',
+  'subscribedStatus',
+  'ageGroup',
+  'gender',
+  'insightTrafficSourceType',
+];
 
 interface BreakdownRow {
   dimensionValue: string;

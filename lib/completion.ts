@@ -264,11 +264,11 @@ _staqa_nyt_completion() {
             _used_dims["\${words[$k]}"]=1
           done
           local _rem_dims=()
-          for v in country subtitleLanguage day month deviceType operatingSystem subscribedStatus; do
+          for v in country day month deviceType operatingSystem subscribedStatus ageGroup gender sharingService insightTrafficSourceType insightPlaybackLocationType liveOrOnDemand creatorContentType youtubeProduct province dma city; do
             [[ -z "\${_used_dims[$v]}" ]] && _rem_dims+=("$v")
           done
           COMPREPLY=( \$(compgen -W "\${_rem_dims[*]}" -- "\${cur}") ); return ;;
-        country|subtitleLanguage|day|month|deviceType|operatingSystem|subscribedStatus)
+        country|day|month|deviceType|operatingSystem|subscribedStatus|ageGroup|gender|sharingService|insightTrafficSourceType|insightPlaybackLocationType|liveOrOnDemand|creatorContentType|youtubeProduct|province|dma|city)
           continue ;;
         -*)
           break ;;
@@ -638,13 +638,13 @@ ${commandList}
             --dimensions)
               local -a _drem=()
               local v
-              for v in country subtitleLanguage day month deviceType operatingSystem subscribedStatus; do
+              for v in country day month deviceType operatingSystem subscribedStatus ageGroup gender sharingService insightTrafficSourceType insightPlaybackLocationType liveOrOnDemand creatorContentType youtubeProduct province dma city; do
                 [[ -z "\${_dused[(r)\$v]}" ]] && _drem+=(\$v)
               done
               _describe -t analytics-dimensions 'dimension' _drem
               return
               ;;
-            country|subtitleLanguage|day|month|deviceType|operatingSystem|subscribedStatus) _dused+=(\$words[\$j]); (( j-- )) ;;
+            country|day|month|deviceType|operatingSystem|subscribedStatus|ageGroup|gender|sharingService|insightTrafficSourceType|insightPlaybackLocationType|liveOrOnDemand|creatorContentType|youtubeProduct|province|dma|city) _dused+=(\$words[\$j]); (( j-- )) ;;
             *) break ;;
           esac
         done
@@ -654,7 +654,7 @@ ${commandList}
         '--start-date[Start date (YYYY-MM-DD)]:date:' \\
         '--end-date[End date (YYYY-MM-DD)]:date:' \\
         '--metrics[Metrics to fetch]:metrics:' \\
-        '--dimensions[Breakdown dimensions (variadic)]:dim:(country subtitleLanguage day month deviceType operatingSystem subscribedStatus)' \\
+        '--dimensions[Breakdown dimensions (variadic)]:dim:(country day month deviceType operatingSystem subscribedStatus ageGroup gender sharingService insightTrafficSourceType insightPlaybackLocationType liveOrOnDemand creatorContentType youtubeProduct province dma city)' \\
         '--all[Breakdown by all standard dimensions]' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
