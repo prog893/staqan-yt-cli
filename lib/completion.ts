@@ -123,7 +123,7 @@ export function getCommandOptions(command: string): string[] {
     'get-video-localization': ['--language', ...outputOptions, ...verboseOption],
     'put-video-localization': ['--language', '--title', '--description', ...outputOptions, ...verboseOption],
     'update-video-localization': ['--language', '--title', '--description', ...outputOptions, ...verboseOption],
-    'get-video-analytics': ['--start-date', '--end-date', '--metrics', ...outputOptions, ...verboseOption],
+    'get-video-analytics': ['--start-date', '--end-date', '--metrics', '--dimensions', '--all', ...outputOptions, ...verboseOption],
     'get-search-terms': ['--limit', '-l', ...outputOptions, ...verboseOption],
     'get-traffic-sources': [...outputOptions, ...verboseOption],
     'get-video-retention': [...outputOptions, ...verboseOption],
@@ -256,6 +256,20 @@ _staqa_nyt_completion() {
           _staqan_yt_complete_type video-id; return ;;
         --playlist-ids)
           _staqan_yt_complete_type playlist-id; return ;;
+        --dimensions)
+          # Forward-scan to collect already-used dimension values, offer remaining
+          local -A _used_dims=()
+          local k
+          for (( k=j+1; k<cword; k++ )); do
+            _used_dims["\${words[$k]}"]=1
+          done
+          local _rem_dims=()
+          for v in country subtitleLanguage day month deviceType operatingSystem subscribedStatus; do
+            [[ -z "\${_used_dims[$v]}" ]] && _rem_dims+=("$v")
+          done
+          COMPREPLY=( \$(compgen -W "\${_rem_dims[*]}" -- "\${cur}") ); return ;;
+        country|subtitleLanguage|day|month|deviceType|operatingSystem|subscribedStatus)
+          continue ;;
         -*)
           break ;;
         *)
@@ -320,8 +334,11 @@ _staqa_nyt_completion() {
     get-video-localization|put-video-localization|update-video-localization)
       COMPREPLY=( \$(compgen -W "--video-id --language --title --description --output --verbose" -- "\${cur}") )
       ;;
-    get-video-analytics|get-channel-analytics)
-      COMPREPLY=( \$(compgen -W "--video-id --start-date --end-date --metrics --report --dimensions --output --verbose" -- "\${cur}") )
+    get-video-analytics)
+      COMPREPLY=( \$(compgen -W "--video-id --start-date --end-date --metrics --dimensions --all --output --verbose" -- "\${cur}") )
+      ;;
+    get-channel-analytics)
+      COMPREPLY=( \$(compgen -W "--start-date --end-date --metrics --report --dimensions --output --verbose" -- "\${cur}") )
       ;;
     get-search-terms|get-traffic-sources|get-video-retention|get-video-tags|list-captions)
       COMPREPLY=( \$(compgen -W "--video-id --output --verbose" -- "\${cur}") )
@@ -612,11 +629,33 @@ ${commandList}
     get-video-analytics)
       local words=(\$words[1] \$words[3,-1])
       local CURRENT=\$((\$CURRENT - 1))
+      # Space-separated variadic: walk back to detect if we're inside --dimensions
+      if [[ \$words[\$CURRENT] != -* ]]; then
+        local j=\$((\$CURRENT - 1))
+        local -a _dused=()
+        while (( j >= 1 )); do
+          case \$words[\$j] in
+            --dimensions)
+              local -a _drem=()
+              local v
+              for v in country subtitleLanguage day month deviceType operatingSystem subscribedStatus; do
+                [[ -z "\${_dused[(r)\$v]}" ]] && _drem+=(\$v)
+              done
+              _describe -t analytics-dimensions 'dimension' _drem
+              return
+              ;;
+            country|subtitleLanguage|day|month|deviceType|operatingSystem|subscribedStatus) _dused+=(\$words[\$j]); (( j-- )) ;;
+            *) break ;;
+          esac
+        done
+      fi
       _arguments \\
         '--video-id[Video ID]: :_staqan_yt_video_ids' \\
         '--start-date[Start date (YYYY-MM-DD)]:date:' \\
         '--end-date[End date (YYYY-MM-DD)]:date:' \\
         '--metrics[Metrics to fetch]:metrics:' \\
+        '--dimensions[Breakdown dimensions (variadic)]:dim:(country subtitleLanguage day month deviceType operatingSystem subscribedStatus)' \\
+        '--all[Breakdown by all standard dimensions]' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
