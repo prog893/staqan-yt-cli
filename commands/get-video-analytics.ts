@@ -103,14 +103,14 @@ async function fetchDimensionSection(
   dimension: string,
   metrics: string,
   dateChunks: { start: string; end: string }[],
-  onProgress: (text: string) => void
+  onProgress: () => void
 ): Promise<DimensionSection> {
   const allRows: unknown[][] = [];
   let columnHeaders: { name?: string | null }[] = [];
 
   for (let i = 0; i < dateChunks.length; i++) {
     const chunk = dateChunks[i];
-    onProgress(`[${dimension}] chunk ${i + 1}/${dateChunks.length} (${chunk.start} to ${chunk.end})...`);
+    onProgress();
 
     const analyticsResponse = await retryWithBackoff(async () => {
       return await youtubeAnalytics.reports.query({
@@ -123,7 +123,7 @@ async function fetchDimensionSection(
       });
     });
 
-    if (i === 0 && analyticsResponse.data.columnHeaders) {
+    if (columnHeaders.length === 0 && analyticsResponse.data.columnHeaders) {
       columnHeaders = analyticsResponse.data.columnHeaders;
     }
 
@@ -200,17 +200,29 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
 
     // ── Breakdown mode ────────────────────────────────────────────────────────
     if (effectiveDimensions.length > 0) {
-      const sections: DimensionSection[] = [];
+      const totalChunks = effectiveDimensions.length * dateChunks.length;
+      let completedChunks = 0;
+      spinner.text = `Fetching dimensions... (0/${totalChunks} chunks)`;
 
-      for (const dim of effectiveDimensions) {
-        const section = await fetchDimensionSection(
-          youtubeAnalytics, parsedId, dim, metrics, dateChunks,
-          (text) => { spinner.text = text; }
-        );
-        sections.push(section);
-      }
+      const sections = await Promise.all(
+        effectiveDimensions.map(dim =>
+          fetchDimensionSection(
+            youtubeAnalytics, parsedId, dim, metrics, dateChunks,
+            () => {
+              completedChunks++;
+              spinner.text = `Fetching dimensions... (${completedChunks}/${totalChunks} chunks)`;
+            }
+          )
+        )
+      );
 
       spinner.succeed(`Retrieved breakdown for ${effectiveDimensions.length} dimension(s)`);
+
+      const hasAnyData = sections.some(s => s.rows.length > 0);
+      if (!hasAnyData) {
+        process.stderr.write(chalk.yellow('⚠ No analytics data available for this time period.\n'));
+        return;
+      }
 
       switch (outputFormat) {
         case 'csv':
@@ -263,6 +275,8 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
 
         case 'text':
           for (const section of sections) {
+            if (section.rows.length === 0) continue;
+            console.log('# ' + [section.dimension, ...section.metricNames].join('\t'));
             section.rows.forEach(br => {
               const values = [section.dimension, br.dimensionValue, ...section.metricNames.map(m => String(br.metrics[m] ?? 0))];
               console.log(values.join('\t'));
