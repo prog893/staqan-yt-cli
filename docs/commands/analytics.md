@@ -6,21 +6,22 @@ Commands for retrieving YouTube Analytics data and performance metrics.
 
 ## get-video-analytics
 
-Get video performance analytics (views, watch time, CTR, etc.).
+Get video performance analytics (views, watch time, CTR, etc.). Supports aggregate totals or breakdown by one or more dimensions.
 
 ### Usage
 
 ```bash
-staqan-yt get-video-analytics --video-id <videoId>
+staqan-yt get-video-analytics --video-id <videoId> [options]
 ```
 
 ### Options
 
 - `--video-id <id>` - YouTube video ID or video URL (required)
-
 - `--start-date <date>` - Start date (YYYY-MM-DD), defaults to upload date
 - `--end-date <date>` - End date (YYYY-MM-DD), defaults to today
 - `--metrics <metrics>` - Comma-separated list of metrics to fetch
+- `--dimensions <dims...>` - One or more breakdown dimensions (variadic, see list below)
+- `--all` - Breakdown by all standard dimensions (country, day, deviceType, operatingSystem, subscribedStatus, ageGroup, gender, insightTrafficSourceType)
 - `--output <format>` - Output format: json, table, text, pretty, csv (default: pretty)
 - `-v, --verbose` - Enable verbose output with debug information
 - `-h, --help` - Show help
@@ -28,55 +29,95 @@ staqan-yt get-video-analytics --video-id <videoId>
 ### Examples
 
 ```bash
-# Get all analytics (default date range: upload date to today)
+# Aggregate totals (upload date to today)
 staqan-yt get-video-analytics --video-id dQw4w9WgXcQ
+
+# Breakdown by country
+staqan-yt get-video-analytics --video-id dQw4w9WgXcQ --dimensions country
+
+# Breakdown by multiple dimensions (separate section per dimension)
+staqan-yt get-video-analytics --video-id dQw4w9WgXcQ --dimensions country day deviceType
+
+# Comprehensive breakdown across all standard dimensions
+staqan-yt get-video-analytics --video-id dQw4w9WgXcQ --all
 
 # Specify date range
 staqan-yt get-video-analytics --video-id dQw4w9WgXcQ \
   --start-date=2026-01-01 \
   --end-date=2026-01-31
 
-# Get specific metrics only
+# Custom metrics with dimension breakdown
 staqan-yt get-video-analytics --video-id dQw4w9WgXcQ \
-  --metrics views,estimatedMinutesWatched,averageViewDuration
+  --dimensions country \
+  --metrics views,estimatedMinutesWatched
 
-# Export to CSV
-staqan-yt get-video-analytics --video-id dQw4w9WgXcQ --output csv > analytics.csv
+# Export country breakdown to CSV
+staqan-yt get-video-analytics --video-id dQw4w9WgXcQ \
+  --dimensions country --output csv > country_breakdown.csv
 
-# Export to JSON for processing
-staqan-yt get-video-analytics --video-id dQw4w9WgXcQ --output json
+# Export full --all breakdown as JSON
+staqan-yt get-video-analytics --video-id dQw4w9WgXcQ --all --output json
 ```
 
 ### Default Metrics
 
 If no `--metrics` specified, fetches:
 - `views` - Total views
-- `estimatedMinutesWatched` - Total watch time
-- `averageViewDuration` - Average view duration (seconds)
-- `subscribersGained` - Subscribers gained
-- `subscribersLost` - Subscribers lost
-- `likes` - Total likes
-- `dislikes` - Total dislikes (if available)
-
-### Available Metrics
-
-Common metrics:
-- `views` - Total views
 - `estimatedMinutesWatched` - Total watch time (minutes)
 - `averageViewDuration` - Average view duration (seconds)
-- `subscribersGained` / `subscribersLost` - Subscriber changes
-- `likes` / `dislikes` - Likes/dislikes
-- `shares` - Number of shares
-- `annotationClicks` - Annotation clicks
+- `averageViewPercentage` - Average % of video watched
+- `likes` / `dislikes` - Likes and dislikes
+- `comments` - Comment count
+- `shares` - Share count
 
-Full list: [YouTube Analytics Metrics](https://developers.google.com/youtube/analytics/v3/dimsmets/mets)
+### Available Breakdown Dimensions
+
+Each dimension runs as a separate API query and outputs its own section. Results are sorted by views descending.
+
+| Dimension | Description | Notes |
+|---|---|---|
+| `country` | Two-letter ISO country code | ✅ Works |
+| `day` | Daily breakdown (YYYY-MM-DD) | ✅ Works |
+| `month` | Monthly breakdown (YYYY-MM) | ⚠️ Date range must span full calendar months |
+| `deviceType` | Desktop, mobile, tablet, TV, game console, etc. | ✅ Works |
+| `operatingSystem` | Android, iOS, Windows, macOS, etc. | ✅ Works |
+| `subscribedStatus` | Subscribed vs. unsubscribed viewers | ✅ Works |
+| `insightTrafficSourceType` | Search, suggested, external, browse, etc. | ✅ Works |
+| `insightPlaybackLocationType` | Watch page, embedded, channel page, etc. | ✅ Works |
+| `liveOrOnDemand` | Live vs. on-demand playback | ✅ Works |
+| `creatorContentType` | Livestream, shorts, story, video on demand | ✅ Works |
+| `youtubeProduct` | Core YouTube, Gaming, Kids, Music | ✅ Works |
+| `ageGroup` | Viewer age brackets | ❌ Not supported for video-level queries |
+| `gender` | Viewer gender | ❌ Not supported for video-level queries |
+| `sharingService` | Platform used to share the video | ❌ Not supported for video-level queries |
+| `province` | US state | ⚠️ Requires `country==US` filter (not supported via CLI) |
+| `dma` | Nielsen market area (US) | ⚠️ Requires additional filters |
+| `city` | City-level (from Jan 2022) | ⚠️ Requires additional filters |
+
+> **Note:** `ageGroup`, `gender`, and `sharingService` are only available at channel level via `get-channel-analytics`.
+>
+> **Note:** There is no subtitle or language dimension in the YouTube Analytics API. Subtitle language breakdowns are not supported.
+
+### `--all` Preset Dimensions
+
+`--all` is equivalent to `--dimensions country day deviceType operatingSystem subscribedStatus insightTrafficSourceType insightPlaybackLocationType liveOrOnDemand creatorContentType youtubeProduct`. These ten dimensions are live-tested to work for any video-level query without additional filters.
 
 ### Date Range Behavior
 
 - **No dates specified**: Upload date to today
 - **Start date only**: Start date to today
 - **Both dates**: Specified range
-- **Max range**: YouTube Analytics API limits to ~500 days
+- Long date ranges are automatically split into 90-day chunks and merged
+
+### Output by Format
+
+| Format | Aggregate mode | Breakdown mode |
+|---|---|---|
+| `pretty` | Metric list | Ranked sections per dimension |
+| `table` | Metric/value table | One table per dimension |
+| `json` | `{ columnHeaders, rows }` | `{ breakdowns: [{ dimension, rows }] }` |
+| `csv` | Raw rows | `# dimension` header + rows per section |
+| `text` | `metric\tvalue` | `dimension\tvalue\tmetric...` |
 
 ---
 
@@ -426,6 +467,16 @@ staqan-yt get-channel-analytics @yourchannel \
   --metrics views \
   --start-date=$(date -v-30d +%Y-%m-%d) \
   --output csv > daily_views.csv
+```
+
+### Dimension Breakdown Across Multiple Videos
+
+```bash
+# Country breakdown for every video, combined into one CSV
+staqan-yt list-videos @yourchannel --output json | \
+  jq -r '.[].id' | \
+  xargs -I {} sh -c \
+    'staqan-yt get-video-analytics --video-id {} --dimensions country --output csv | tail -n +2'
 ```
 
 ### Find Top Performing Content
