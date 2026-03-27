@@ -17,7 +17,7 @@ A powerful command-line interface for managing YouTube videos and metadata using
 ### Homebrew (Recommended)
 
 ```bash
-brew tap prog893/staqan-yt https://github.com/prog893/staqan-yt-cli.git
+brew tap prog893/tap
 brew install staqan-yt
 ```
 
