@@ -35,7 +35,7 @@ sudo mv staqan-yt /usr/local/bin/
 
 **Important:** v1.3.0 introduces breaking changes. All commands now use required named flags instead of positional arguments.
 
-See [MIGRATION.md](MIGRATION.md) for detailed migration guide.
+See [BREAKING-CHANGES.md](BREAKING-CHANGES.md) for detailed migration guide.
 
 ## Quick Start
 
