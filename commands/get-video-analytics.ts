@@ -63,13 +63,16 @@ function aggregateByDimension(
 
       if (name.includes('average') || name.includes('Percentage')) {
         // Views-weighted average: sum(value * views) / sum(views)
-        // Falls back to equal weighting if views column is absent
+        // Requires views column for accurate weighting
+        if (viewsColIndex === -1) {
+          throw new Error(`Metric "${name}" requires "views" to be included in the request`);
+        }
         let weightedSum = 0;
         let totalViews = 0;
         rows.forEach(row => {
           const value = row[index];
           if (typeof value !== 'number') return;
-          const rawViews = viewsColIndex !== -1 ? row[viewsColIndex] : 1;
+          const rawViews = row[viewsColIndex];
           const viewCount = typeof rawViews === 'number' ? rawViews : 1;
           weightedSum += value * viewCount;
           totalViews += viewCount;
@@ -167,7 +170,15 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
     debug('Parsed video ID', parsedId);
 
     // Resolve effective dimensions (normalized and deduped)
-    let effectiveDimensions = options.all ? ALL_DIMENSIONS : (options.dimensions ?? []);
+    let effectiveDimensions: string[] = [];
+    if (options.all && options.dimensions) {
+      // Merge ALL_DIMENSIONS with explicit dimensions
+      effectiveDimensions = [...ALL_DIMENSIONS, ...options.dimensions];
+    } else if (options.all) {
+      effectiveDimensions = ALL_DIMENSIONS;
+    } else {
+      effectiveDimensions = options.dimensions ?? [];
+    }
     effectiveDimensions = [...new Set(effectiveDimensions.map(d => d.trim()))];
 
     const auth = await getAuthenticatedClient();
@@ -240,8 +251,8 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
         const start = new Date(startDate);
         const end = new Date(endDate);
         const isFullCalendarMonth =
-          start.getDate() === 1 &&
-          (new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate() === end.getDate() ||
+          start.getUTCDate() === 1 &&
+          (new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 1, 0)).getUTCDate() === end.getUTCDate() ||
            end >= new Date());
 
         if (!isFullCalendarMonth) {
@@ -428,13 +439,16 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
 
         if (name.includes('average') || name.includes('Percentage')) {
           // Views-weighted average: sum(value * views) / sum(views)
-          // Falls back to equal weighting if views column is absent
+          // Requires views column for accurate weighting
+          if (viewsColIndex === -1) {
+            throw new Error(`Metric "${name}" requires "views" to be included in the request`);
+          }
           let weightedSum = 0;
           let totalViews = 0;
           allRows.forEach(row => {
             const value = row[index];
             if (typeof value !== 'number') return;
-            const rawViews = viewsColIndex !== -1 ? row[viewsColIndex] : 1;
+            const rawViews = row[viewsColIndex];
             const viewCount = typeof rawViews === 'number' ? rawViews : 1;
             weightedSum += value * viewCount;
             totalViews += viewCount;

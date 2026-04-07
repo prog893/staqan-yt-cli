@@ -78,7 +78,7 @@ If no `--metrics` specified, fetches:
 - `averageViewDuration` - Average view duration (seconds)
 - `averageViewPercentage` - Average % of video watched
 
-> **Note:** Interactive metrics like `likes`, `dislikes`, `comments`, and `shares` are not available in breakdown mode and are automatically excluded to avoid API rejections. Use aggregate mode (without dimensions) to retrieve these metrics.
+> **Note:** Breakdown mode defaults to excluding interactive metrics (`likes`, `dislikes`, `comments`, `shares`) to avoid API rejections. Use aggregate mode (without `--dimensions`) to retrieve these metrics.
 
 ### Available Breakdown Dimensions
 
@@ -493,6 +493,7 @@ echo "video-id,country,views,estimatedMinutesWatched,averageViewDuration,average
 for vid in "${VIDEO_IDS[@]}"; do
   staqan-yt get-video-analytics --video-id "$vid" --dimensions country --output csv | \
     tail -n +2 | \
+    awk '$1 != "country"' | \
     awk -v vid="$vid" '{print vid "," $0}'
 done
 ```
