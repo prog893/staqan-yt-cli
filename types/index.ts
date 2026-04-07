@@ -182,11 +182,27 @@ export interface UpdateLocalizationOptions extends VerboseOption, VideoIdOption 
   description?: string;
 }
 
+// Video analytics dimensions (validated at runtime)
+export type VideoAnalyticsDimension =
+  | 'country'
+  | 'day'
+  | 'month'
+  | 'deviceType'
+  | 'operatingSystem'
+  | 'subscribedStatus'
+  | 'insightTrafficSourceType'
+  | 'insightPlaybackLocationType'
+  | 'liveOrOnDemand'
+  | 'creatorContentType'
+  | 'youtubeProduct';
+
 // Analytics command options
 export interface AnalyticsOptions extends OutputOption, VerboseOption, VideoIdOption {
   startDate?: string;
   endDate?: string;
   metrics?: string;
+  dimensions?: VideoAnalyticsDimension[];
+  all?: boolean;
 }
 
 export interface SearchTermsOptions extends OutputOption, VerboseOption, VideoIdOption {

@@ -296,6 +296,8 @@ program
   .option('--start-date <date>', 'Start date (YYYY-MM-DD), defaults to upload date')
   .option('--end-date <date>', 'End date (YYYY-MM-DD), defaults to today')
   .option('--metrics <metrics>', 'Comma-separated list of metrics to fetch')
+  .option('--dimensions <dimensions...>', 'Breakdown dimensions (variadic): country, day, month, deviceType, operatingSystem, subscribedStatus, insightTrafficSourceType, insightPlaybackLocationType, liveOrOnDemand, creatorContentType, youtubeProduct')
+  .option('--all', 'Breakdown by 4 standard dimensions: country, creatorContentType, subscribedStatus, youtubeProduct (largest tested combination that works reliably)')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('get-video-analytics', getVideoAnalytics));
