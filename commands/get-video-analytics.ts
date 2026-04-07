@@ -52,6 +52,8 @@ function aggregateByDimension(
     rowsByDimension.get(dimValue)!.push(row);
   }
 
+  const viewsColIndex = columnHeaders.findIndex(h => h.name === 'views');
+
   const breakdownRows: BreakdownRow[] = [];
   for (const [dimValue, rows] of rowsByDimension) {
     const metrics: { [key: string]: number } = {};
@@ -59,15 +61,26 @@ function aggregateByDimension(
       const name = header.name || '';
       if (name === dimension || name === 'video') return;
 
-      let total = 0;
-      rows.forEach(row => {
-        const value = row[index];
-        if (typeof value === 'number') total += value;
-      });
-
       if (name.includes('average') || name.includes('Percentage')) {
-        metrics[name] = rows.length > 0 ? total / rows.length : 0;
+        // Views-weighted average: sum(value * views) / sum(views)
+        // Falls back to equal weighting if views column is absent
+        let weightedSum = 0;
+        let totalViews = 0;
+        rows.forEach(row => {
+          const value = row[index];
+          if (typeof value !== 'number') return;
+          const rawViews = viewsColIndex !== -1 ? row[viewsColIndex] : 1;
+          const viewCount = typeof rawViews === 'number' ? rawViews : 1;
+          weightedSum += value * viewCount;
+          totalViews += viewCount;
+        });
+        metrics[name] = totalViews > 0 ? weightedSum / totalViews : 0;
       } else {
+        let total = 0;
+        rows.forEach(row => {
+          const value = row[index];
+          if (typeof value === 'number') total += value;
+        });
         metrics[name] = total;
       }
     });
@@ -153,8 +166,9 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
     const parsedId = parseVideoId(videoId);
     debug('Parsed video ID', parsedId);
 
-    // Resolve effective dimensions
-    const effectiveDimensions = options.all ? ALL_DIMENSIONS : (options.dimensions ?? []);
+    // Resolve effective dimensions (normalized and deduped)
+    let effectiveDimensions = options.all ? ALL_DIMENSIONS : (options.dimensions ?? []);
+    effectiveDimensions = [...new Set(effectiveDimensions.map(d => d.trim()))];
 
     const auth = await getAuthenticatedClient();
     const youtube = google.youtube({ version: 'v3', auth });
@@ -186,6 +200,58 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
     const startDate = options.startDate || publishedAt.split('T')[0];
 
     debug(`Date range: ${startDate} to ${endDate}`);
+
+    // Validate dimensions before making any API requests
+    const allowedVideoDimensions = new Set([
+      'country', 'day', 'month', 'deviceType', 'operatingSystem',
+      'subscribedStatus', 'insightTrafficSourceType', 'insightPlaybackLocationType',
+      'liveOrOnDemand', 'creatorContentType', 'youtubeProduct'
+    ]);
+
+    const geoDimensionsRequiringFilters = new Set(['province', 'dma', 'city']);
+
+    for (const dim of effectiveDimensions) {
+      // Reject channel-only dimensions
+      if (['ageGroup', 'gender', 'sharingService'].includes(dim)) {
+        spinner.fail(`Invalid dimension: "${dim}"`);
+        error(`Dimension "${dim}" is only available at channel level, not for video queries.`);
+        error(`Use get-channel-analytics for channel-level demographic breakdowns.`);
+        process.exit(1);
+      }
+
+      // Reject geo dimensions that require additional filters
+      if (geoDimensionsRequiringFilters.has(dim)) {
+        spinner.fail(`Invalid dimension: "${dim}"`);
+        error(`Dimension "${dim}" requires additional geo filters not supported via CLI.`);
+        error(`Use the YouTube Analytics API directly for this dimension.`);
+        process.exit(1);
+      }
+
+      // Validate against allowed video dimensions
+      if (!allowedVideoDimensions.has(dim)) {
+        spinner.fail(`Unknown dimension: "${dim}"`);
+        error(`Dimension "${dim}" is not supported for video-level queries.`);
+        error(`Supported dimensions: ${[...allowedVideoDimensions].join(', ')}`);
+        process.exit(1);
+      }
+
+      // Validate month dimension requires full calendar month date range
+      if (dim === 'month') {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const isFullCalendarMonth =
+          start.getDate() === 1 &&
+          (new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate() === end.getDate() ||
+           end >= new Date());
+
+        if (!isFullCalendarMonth) {
+          spinner.fail(`Invalid date range for "month" dimension`);
+          error(`The "month" dimension requires the date range to span full calendar months.`);
+          error(`Start date must be the 1st of a month and end date must be the last day of a month.`);
+          process.exit(1);
+        }
+      }
+    }
 
     // Breakdown dimensions only support a subset of metrics (engagement metrics
     // like likes/comments/shares are rejected by the API for most dimensions).
@@ -278,7 +344,7 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
             if (section.rows.length === 0) continue;
             console.log('# ' + [section.dimension, ...section.metricNames].join('\t'));
             section.rows.forEach(br => {
-              const values = [section.dimension, br.dimensionValue, ...section.metricNames.map(m => String(br.metrics[m] ?? 0))];
+              const values = [br.dimensionValue, ...section.metricNames.map(m => String(br.metrics[m] ?? 0))];
               console.log(values.join('\t'));
             });
           }
@@ -354,20 +420,32 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
 
       spinner.succeed(`Retrieved ${allRows.length} row(s) of analytics data`);
 
+      const viewsColIndex = columnHeaders.findIndex(h => h.name === 'views');
       const aggregated: { [key: string]: number } = {};
       columnHeaders.forEach((header, index) => {
         const name = header.name || '';
         if (name === 'video') return;
 
-        let total = 0;
-        allRows.forEach(row => {
-          const value = row[index];
-          if (typeof value === 'number') total += value;
-        });
-
         if (name.includes('average') || name.includes('Percentage')) {
-          aggregated[name] = allRows.length > 0 ? total / allRows.length : 0;
+          // Views-weighted average: sum(value * views) / sum(views)
+          // Falls back to equal weighting if views column is absent
+          let weightedSum = 0;
+          let totalViews = 0;
+          allRows.forEach(row => {
+            const value = row[index];
+            if (typeof value !== 'number') return;
+            const rawViews = viewsColIndex !== -1 ? row[viewsColIndex] : 1;
+            const viewCount = typeof rawViews === 'number' ? rawViews : 1;
+            weightedSum += value * viewCount;
+            totalViews += viewCount;
+          });
+          aggregated[name] = totalViews > 0 ? weightedSum / totalViews : 0;
         } else {
+          let total = 0;
+          allRows.forEach(row => {
+            const value = row[index];
+            if (typeof value === 'number') total += value;
+          });
           aggregated[name] = total;
         }
       });

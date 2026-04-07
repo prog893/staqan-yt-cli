@@ -21,7 +21,7 @@ staqan-yt get-video-analytics --video-id <videoId> [options]
 - `--end-date <date>` - End date (YYYY-MM-DD), defaults to today
 - `--metrics <metrics>` - Comma-separated list of metrics to fetch
 - `--dimensions <dims...>` - One or more breakdown dimensions (variadic, see list below)
-- `--all` - Breakdown by all standard dimensions (country, day, deviceType, operatingSystem, subscribedStatus, ageGroup, gender, insightTrafficSourceType)
+- `--all` - Breakdown by all standard dimensions (country, day, deviceType, operatingSystem, subscribedStatus, insightTrafficSourceType, insightPlaybackLocationType, liveOrOnDemand, creatorContentType, youtubeProduct)
 - `--output <format>` - Output format: json, table, text, pretty, csv (default: pretty)
 - `-v, --verbose` - Enable verbose output with debug information
 - `-h, --help` - Show help
@@ -62,6 +62,8 @@ staqan-yt get-video-analytics --video-id dQw4w9WgXcQ --all --output json
 ### Default Metrics
 
 If no `--metrics` specified, fetches:
+
+**Aggregate mode** (no `--dimensions` or `--all`):
 - `views` - Total views
 - `estimatedMinutesWatched` - Total watch time (minutes)
 - `averageViewDuration` - Average view duration (seconds)
@@ -69,6 +71,14 @@ If no `--metrics` specified, fetches:
 - `likes` / `dislikes` - Likes and dislikes
 - `comments` - Comment count
 - `shares` - Share count
+
+**Breakdown mode** (when using `--dimensions` or `--all`):
+- `views` - Total views
+- `estimatedMinutesWatched` - Total watch time (minutes)
+- `averageViewDuration` - Average view duration (seconds)
+- `averageViewPercentage` - Average % of video watched
+
+> **Note:** Interactive metrics like `likes`, `dislikes`, `comments`, and `shares` are not available in breakdown mode and are automatically excluded to avoid API rejections. Use aggregate mode (without dimensions) to retrieve these metrics.
 
 ### Available Breakdown Dimensions
 
@@ -472,11 +482,19 @@ staqan-yt get-channel-analytics @yourchannel \
 ### Dimension Breakdown Across Multiple Videos
 
 ```bash
-# Country breakdown for every video, combined into one CSV
-staqan-yt list-videos @yourchannel --output json | \
-  jq -r '.[].id' | \
-  xargs -I {} sh -c \
-    'staqan-yt get-video-analytics --video-id {} --dimensions country --output csv | tail -n +2'
+# Country breakdown for every video, combined into a single CSV with video-id column
+# First, get all video IDs
+VIDEO_IDS=($(staqan-yt list-videos --channel @yourchannel --output json | jq -r '.[].id'))
+
+# Print CSV header once
+echo "video-id,country,views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage"
+
+# For each video, fetch analytics and prepend video-id to each row
+for vid in "${VIDEO_IDS[@]}"; do
+  staqan-yt get-video-analytics --video-id "$vid" --dimensions country --output csv | \
+    tail -n +2 | \
+    awk -v vid="$vid" '{print vid "," $0}'
+done
 ```
 
 ### Find Top Performing Content
