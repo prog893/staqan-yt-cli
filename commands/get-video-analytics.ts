@@ -7,19 +7,18 @@ import { formatJson, formatTable } from '../lib/formatters';
 import { AnalyticsOptions } from '../types';
 
 // Standard dimensions for --all (live-tested against YouTube Analytics API v2)
+// NOTE: Maximum 4 dimensions work together in a single API call
+// Tested with both regular videos and Shorts (2+ years old and recent)
+// This combination was found to work reliably across different video types
 // Excluded: ageGroup/gender/sharingService (channel-level only, fail on video queries)
 //           province/city (require extra geo filters)
 //           month (requires date range spanning full calendar months)
+//           day, deviceType, operatingSystem, insightTrafficSourceType, insightPlaybackLocationType, liveOrOnDemand
+//             (cannot be added to the 4-dimension combination - API rejects 5+ dimensions)
 const ALL_DIMENSIONS = [
   'country',
-  'day',
-  'deviceType',
-  'operatingSystem',
-  'subscribedStatus',
-  'insightTrafficSourceType',
-  'insightPlaybackLocationType',
-  'liveOrOnDemand',
   'creatorContentType',
+  'subscribedStatus',
   'youtubeProduct',
 ];
 

@@ -84,11 +84,30 @@ If no `--metrics` specified, fetches:
 
 All specified dimensions are combined into a single API query. If the YouTube Analytics API rejects a dimension combination, the error will be displayed.
 
-**Important**: When using multiple dimensions (e.g., `--dimensions country day`), results show unique combinations of all dimensions rather than separate sections per dimension. For example:
-- Single dimension `--dimensions country`: Aggregated data per country
-- Multiple dimensions `--dimensions country day`: Data for each country-day combination (e.g., "country=US, day=2024-01-01")
+**Important - Time Granularity Change:**
 
-This provides more detailed, accurate data from the API rather than pre-aggregated sections.
+When using multiple dimensions, results show **unique combinations** of all dimensions (not separate sections):
+
+- **Single dimension** `--dimensions country`: Aggregated data per country (e.g., "US: 1000 views", "CA: 500 views")
+- **Multiple dimensions** `--dimensions country day`: Unique country-day combinations (e.g., "country=US, day=2024-01-01: 500 views", "country=CA, day=2024-01-01: 300 views")
+
+**Why this matters:**
+- ✅ **More granular**: See how dimensions interact (e.g., which countries drive traffic on which days)
+- ✅ **More accurate**: Returns exactly what YouTube Analytics API provides (no pre-aggregation)
+- ✅ **More rows**: With N dimensions, you get unique combinations instead of N separate sections
+
+**Example impact:**
+- **Before**: `--dimensions country day` → 2 sections (country totals + day totals)
+- **After**: `--dimensions country day` → country-day combinations (e.g., "US on 2024-01-01", "CA on 2024-01-01")
+
+This provides **full API granularity** rather than pre-aggregated summaries.
+
+**Dimension Combinations:**
+
+- **Maximum 4 dimensions** can be combined in a single API call
+- **`--all` flag** uses: `country, creatorContentType, subscribedStatus, youtubeProduct`
+- Not all dimension combinations are compatible (API will reject incompatible ones)
+- **See:** [Dimension Compatibility Guide](../dimension-compatibility.md) for complete compatibility matrix and testing results
 
 | Dimension | Description | Notes |
 |---|---|---|
@@ -115,6 +134,8 @@ This provides more detailed, accurate data from the API rather than pre-aggregat
 > **Note:** There is no subtitle or language dimension in the YouTube Analytics API. Subtitle language breakdowns are not supported.
 >
 > **Note:** This CLI follows AWS CLI principles - if the YouTube API rejects a dimension combination, the API error is displayed directly. This ensures you have accurate information about what the API supports.
+>
+> **See also:** [Dimension Compatibility Reference](../dimension-compatibility.md) for detailed information about compatible dimension combinations and common error messages.
 
 ### `--all` Preset Dimensions
 
