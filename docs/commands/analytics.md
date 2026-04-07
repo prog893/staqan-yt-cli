@@ -35,7 +35,7 @@ staqan-yt get-video-analytics --video-id dQw4w9WgXcQ
 # Breakdown by country
 staqan-yt get-video-analytics --video-id dQw4w9WgXcQ --dimensions country
 
-# Breakdown by multiple dimensions (separate section per dimension)
+# Breakdown by multiple dimensions (combined in single API call)
 staqan-yt get-video-analytics --video-id dQw4w9WgXcQ --dimensions country day deviceType
 
 # Comprehensive breakdown across all standard dimensions
@@ -82,7 +82,13 @@ If no `--metrics` specified, fetches:
 
 ### Available Breakdown Dimensions
 
-Each dimension runs as a separate API query and outputs its own section. Results are sorted by views descending.
+All specified dimensions are combined into a single API query. If the YouTube Analytics API rejects a dimension combination, the error will be displayed.
+
+**Important**: When using multiple dimensions (e.g., `--dimensions country day`), results show unique combinations of all dimensions rather than separate sections per dimension. For example:
+- Single dimension `--dimensions country`: Aggregated data per country
+- Multiple dimensions `--dimensions country day`: Data for each country-day combination (e.g., "country=US, day=2024-01-01")
+
+This provides more detailed, accurate data from the API rather than pre-aggregated sections.
 
 | Dimension | Description | Notes |
 |---|---|---|
@@ -107,10 +113,12 @@ Each dimension runs as a separate API query and outputs its own section. Results
 > **Note:** `ageGroup`, `gender`, and `sharingService` are only available at channel level via `get-channel-analytics`.
 >
 > **Note:** There is no subtitle or language dimension in the YouTube Analytics API. Subtitle language breakdowns are not supported.
+>
+> **Note:** This CLI follows AWS CLI principles - if the YouTube API rejects a dimension combination, the API error is displayed directly. This ensures you have accurate information about what the API supports.
 
 ### `--all` Preset Dimensions
 
-`--all` is equivalent to `--dimensions country day deviceType operatingSystem subscribedStatus insightTrafficSourceType insightPlaybackLocationType liveOrOnDemand creatorContentType youtubeProduct`. These ten dimensions are live-tested to work for any video-level query without additional filters.
+`--all` is equivalent to `--dimensions country day deviceType operatingSystem subscribedStatus insightTrafficSourceType insightPlaybackLocationType liveOrOnDemand creatorContentType youtubeProduct`. All ten dimensions are combined into a single API call.
 
 ### Date Range Behavior
 

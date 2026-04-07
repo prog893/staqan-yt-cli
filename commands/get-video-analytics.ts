@@ -116,7 +116,7 @@ function formatMetricName(name: string): string {
 async function fetchDimensionSection(
   youtubeAnalytics: ReturnType<typeof google.youtubeAnalytics>,
   parsedId: string,
-  dimension: string,
+  dimensions: string[],
   metrics: string,
   dateChunks: { start: string; end: string }[],
   onProgress: () => void
@@ -128,32 +128,61 @@ async function fetchDimensionSection(
     const chunk = dateChunks[i];
     onProgress();
 
-    const analyticsResponse = await retryWithBackoff(async () => {
-      return await youtubeAnalytics.reports.query({
-        ids: 'channel==MINE',
-        startDate: chunk.start,
-        endDate: chunk.end,
-        metrics,
-        dimensions: dimension,
-        filters: `video==${parsedId}`,
+    try {
+      const analyticsResponse = await retryWithBackoff(async () => {
+        return await youtubeAnalytics.reports.query({
+          ids: 'channel==MINE',
+          startDate: chunk.start,
+          endDate: chunk.end,
+          metrics,
+          dimensions: dimensions.join(','),
+          filters: `video==${parsedId}`,
+        });
       });
-    });
 
-    if (columnHeaders.length === 0 && analyticsResponse.data.columnHeaders) {
-      columnHeaders = analyticsResponse.data.columnHeaders;
-    }
+      if (columnHeaders.length === 0 && analyticsResponse.data.columnHeaders) {
+        columnHeaders = analyticsResponse.data.columnHeaders;
+      }
 
-    if (analyticsResponse.data.rows && analyticsResponse.data.rows.length > 0) {
-      allRows.push(...analyticsResponse.data.rows);
+      if (analyticsResponse.data.rows && analyticsResponse.data.rows.length > 0) {
+        allRows.push(...analyticsResponse.data.rows);
+      }
+    } catch (err: any) {
+      if (err.response?.data?.error) {
+        throw new Error(`YouTube Analytics API error: ${err.response.data.error.message}`);
+      }
+      throw err;
     }
   }
 
-  const breakdownRows = aggregateByDimension(allRows, columnHeaders, dimension);
+  // For single dimension, aggregate by that dimension
+  // For multiple dimensions, display raw multi-dimensional results
+  const breakdownRows = dimensions.length === 1
+    ? aggregateByDimension(allRows, columnHeaders, dimensions[0])
+    : allRows.map(row => ({
+        dimensionValue: dimensions.map(dim => {
+          const colIndex = columnHeaders.findIndex(h => h.name === dim);
+          return colIndex !== -1 ? `${dim}=${String(row[colIndex])}` : '';
+        }).filter(Boolean).join(', '),
+        metrics: columnHeaders.reduce((acc, header, index) => {
+          const name = header.name;
+          if (name && !dimensions.includes(name) && name !== 'video' && name !== '') {
+            acc[name] = typeof row[index] === 'number' ? row[index] as number : 0;
+          }
+          return acc;
+        }, {} as { [key: string]: number }),
+      }));
+
   const metricNames = columnHeaders
     .map(h => h.name || '')
-    .filter(name => name !== dimension && name !== 'video' && name !== '');
+    .filter(name => !dimensions.includes(name) && name !== 'video' && name !== '');
 
-  return { dimension, rows: breakdownRows, metricNames, totalDataPoints: allRows.length };
+  return {
+    dimension: dimensions.join(','),
+    rows: breakdownRows,
+    metricNames,
+    totalDataPoints: allRows.length
+  };
 }
 
 async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void> {
@@ -212,58 +241,6 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
 
     debug(`Date range: ${startDate} to ${endDate}`);
 
-    // Validate dimensions before making any API requests
-    const allowedVideoDimensions = new Set([
-      'country', 'day', 'month', 'deviceType', 'operatingSystem',
-      'subscribedStatus', 'insightTrafficSourceType', 'insightPlaybackLocationType',
-      'liveOrOnDemand', 'creatorContentType', 'youtubeProduct'
-    ]);
-
-    const geoDimensionsRequiringFilters = new Set(['province', 'dma', 'city']);
-
-    for (const dim of effectiveDimensions) {
-      // Reject channel-only dimensions
-      if (['ageGroup', 'gender', 'sharingService'].includes(dim)) {
-        spinner.fail(`Invalid dimension: "${dim}"`);
-        error(`Dimension "${dim}" is only available at channel level, not for video queries.`);
-        error(`Use get-channel-analytics for channel-level demographic breakdowns.`);
-        process.exit(1);
-      }
-
-      // Reject geo dimensions that require additional filters
-      if (geoDimensionsRequiringFilters.has(dim)) {
-        spinner.fail(`Invalid dimension: "${dim}"`);
-        error(`Dimension "${dim}" requires additional geo filters not supported via CLI.`);
-        error(`Use the YouTube Analytics API directly for this dimension.`);
-        process.exit(1);
-      }
-
-      // Validate against allowed video dimensions
-      if (!allowedVideoDimensions.has(dim)) {
-        spinner.fail(`Unknown dimension: "${dim}"`);
-        error(`Dimension "${dim}" is not supported for video-level queries.`);
-        error(`Supported dimensions: ${[...allowedVideoDimensions].join(', ')}`);
-        process.exit(1);
-      }
-
-      // Validate month dimension requires full calendar month date range
-      if (dim === 'month') {
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        const isFullCalendarMonth =
-          start.getUTCDate() === 1 &&
-          (new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 1, 0)).getUTCDate() === end.getUTCDate() ||
-           end >= new Date());
-
-        if (!isFullCalendarMonth) {
-          spinner.fail(`Invalid date range for "month" dimension`);
-          error(`The "month" dimension requires the date range to span full calendar months.`);
-          error(`Start date must be the 1st of a month and end date must be the last day of a month.`);
-          process.exit(1);
-        }
-      }
-    }
-
     // Breakdown dimensions only support a subset of metrics (engagement metrics
     // like likes/comments/shares are rejected by the API for most dimensions).
     // Use the safe intersection for breakdown mode; full set for aggregate.
@@ -277,21 +254,19 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
 
     // ── Breakdown mode ────────────────────────────────────────────────────────
     if (effectiveDimensions.length > 0) {
-      const totalChunks = effectiveDimensions.length * dateChunks.length;
+      const totalChunks = dateChunks.length;
       let completedChunks = 0;
       spinner.text = `Fetching dimensions... (0/${totalChunks} chunks)`;
 
-      const sections = await Promise.all(
-        effectiveDimensions.map(dim =>
-          fetchDimensionSection(
-            youtubeAnalytics, parsedId, dim, metrics, dateChunks,
-            () => {
-              completedChunks++;
-              spinner.text = `Fetching dimensions... (${completedChunks}/${totalChunks} chunks)`;
-            }
-          )
-        )
+      // Combine all dimensions into single API call
+      const section = await fetchDimensionSection(
+        youtubeAnalytics, parsedId, effectiveDimensions, metrics, dateChunks,
+        () => {
+          completedChunks++;
+          spinner.text = `Fetching dimensions... (${completedChunks}/${totalChunks} chunks)`;
+        }
       );
+      const sections = [section];
 
       spinner.succeed(`Retrieved breakdown for ${effectiveDimensions.length} dimension(s)`);
 
