@@ -296,7 +296,7 @@ program
   .option('--start-date <date>', 'Start date (YYYY-MM-DD), defaults to upload date')
   .option('--end-date <date>', 'End date (YYYY-MM-DD), defaults to today')
   .option('--metrics <metrics>', 'Comma-separated list of metrics to fetch')
-  .option('--dimensions <dimensions...>', 'Breakdown dimensions (variadic): country, day, month, deviceType, operatingSystem, subscribedStatus, ageGroup, gender, sharingService, insightTrafficSourceType, insightPlaybackLocationType, liveOrOnDemand, creatorContentType, youtubeProduct, province, dma, city')
+  .option('--dimensions <dimensions...>', 'Breakdown dimensions (variadic): country, day, month, deviceType, operatingSystem, subscribedStatus, insightTrafficSourceType, insightPlaybackLocationType, liveOrOnDemand, creatorContentType, youtubeProduct (see compatibility table for filter-dependent dimensions)')
   .option('--all', 'Breakdown by all standard dimensions: country, day, deviceType, operatingSystem, subscribedStatus, insightTrafficSourceType, insightPlaybackLocationType, liveOrOnDemand, creatorContentType, youtubeProduct')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
