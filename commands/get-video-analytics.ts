@@ -155,22 +155,77 @@ async function fetchDimensionSection(
   }
 
   // For single dimension, aggregate by that dimension
-  // For multiple dimensions, display raw multi-dimensional results
+  // For multiple dimensions, group by composite key and aggregate
   const breakdownRows = dimensions.length === 1
     ? aggregateByDimension(allRows, columnHeaders, dimensions[0])
-    : allRows.map(row => ({
-        dimensionValue: dimensions.map(dim => {
-          const colIndex = columnHeaders.findIndex(h => h.name === dim);
-          return colIndex !== -1 ? `${dim}=${String(row[colIndex])}` : '';
-        }).filter(Boolean).join(', '),
-        metrics: columnHeaders.reduce((acc, header, index) => {
-          const name = header.name;
-          if (name && !dimensions.includes(name) && name !== 'video' && name !== '') {
-            acc[name] = typeof row[index] === 'number' ? row[index] as number : 0;
+    : (() => {
+        // Group rows by composite dimension key
+        const dimensionColIndices = dimensions.map(dim =>
+          columnHeaders.findIndex(h => h.name === dim)
+        );
+
+        const compositeKey = (row: unknown[]) => {
+          return dimensionColIndices.map((colIndex, i) => {
+            if (colIndex === -1) return '';
+            return `${dimensions[i]}=${String(row[colIndex])}`;
+          }).filter(Boolean).join(', ');
+        };
+
+        const rowsByKey = new Map<string, unknown[][]>();
+        for (const row of allRows) {
+          const key = compositeKey(row);
+          if (!rowsByKey.has(key)) {
+            rowsByKey.set(key, []);
           }
-          return acc;
-        }, {} as { [key: string]: number }),
-      }));
+          rowsByKey.get(key)!.push(row);
+        }
+
+        const viewsColIndex = columnHeaders.findIndex(h => h.name === 'views');
+
+        // Aggregate each group
+        const aggregatedRows: BreakdownRow[] = [];
+        for (const [dimensionValue, rows] of rowsByKey) {
+          const metrics: { [key: string]: number } = {};
+
+          for (const header of columnHeaders) {
+            const name = header.name;
+            if (!name || name === 'video' || dimensions.includes(name)) continue;
+
+            const colIndex = columnHeaders.indexOf(header);
+            let total = 0;
+            let weightedSum = 0;
+            let totalViews = 0;
+
+            for (const row of rows) {
+              const value = row[colIndex];
+              if (typeof value !== 'number') continue;
+
+              if (name.includes('average') || name.includes('Percentage')) {
+                // Views-weighted average
+                if (viewsColIndex === -1) {
+                  throw new Error(`Metric "${name}" requires "views" to be included in the request`);
+                }
+                const rawViews = row[viewsColIndex];
+                const viewCount = typeof rawViews === 'number' ? rawViews : 1;
+                weightedSum += value * viewCount;
+                totalViews += viewCount;
+              } else {
+                total += value;
+              }
+            }
+
+            metrics[name] = (name.includes('average') || name.includes('Percentage'))
+              ? (totalViews > 0 ? weightedSum / totalViews : 0)
+              : total;
+          }
+
+          aggregatedRows.push({ dimensionValue, metrics });
+        }
+
+        // Sort by views descending
+        aggregatedRows.sort((a, b) => (b.metrics['views'] || 0) - (a.metrics['views'] || 0));
+        return aggregatedRows;
+      })();
 
   const metricNames = columnHeaders
     .map(h => h.name || '')
@@ -208,6 +263,22 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
       effectiveDimensions = options.dimensions ?? [];
     }
     effectiveDimensions = [...new Set(effectiveDimensions.map(d => d.trim()))];
+
+    // Warn about video-incompatible dimensions
+    const VIDEO_INCOMPATIBLE_DIMS = new Set([
+      'ageGroup',
+      'gender',
+      'sharingService',
+      'province',
+      'dma',
+      'city'
+    ]);
+    const invalidDims = effectiveDimensions.filter(d => VIDEO_INCOMPATIBLE_DIMS.has(d));
+    if (invalidDims.length > 0) {
+      process.stderr.write(chalk.yellow(`⚠️  Warning: Dimensions ${invalidDims.map(d => `"${d}"`).join(', ')} may not work for video-level queries.\n`));
+      process.stderr.write(chalk.yellow(`   These are typically channel-level only or require additional filters.\n`));
+      process.stderr.write(chalk.yellow(`   The API will reject them if incompatible. See docs/dimension-compatibility.md for details.\n\n`));
+    }
 
     const auth = await getAuthenticatedClient();
     const youtube = google.youtube({ version: 'v3', auth });

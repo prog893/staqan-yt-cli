@@ -107,7 +107,7 @@ This provides **full API granularity** rather than pre-aggregated summaries.
 - **Maximum 4 dimensions** can be combined in a single API call
 - **`--all` flag** uses: `country, creatorContentType, subscribedStatus, youtubeProduct`
 - Not all dimension combinations are compatible (API will reject incompatible ones)
-- **See:** [Dimension Compatibility Guide](../dimension-compatibility.md) for complete compatibility matrix and testing results
+- **See:** [Dimension Compatibility Guide](https://github.com/prog893/staqan-yt-cli/blob/main/docs/dimension-compatibility.md) for complete compatibility matrix and testing results
 
 | Dimension | Description | Notes |
 |---|---|---|
@@ -135,7 +135,7 @@ This provides **full API granularity** rather than pre-aggregated summaries.
 >
 > **Note:** This CLI follows AWS CLI principles - if the YouTube API rejects a dimension combination, the API error is displayed directly. This ensures you have accurate information about what the API supports.
 >
-> **See also:** [Dimension Compatibility Reference](../dimension-compatibility.md) for detailed information about compatible dimension combinations and common error messages.
+> **See also:** [Dimension Compatibility Reference](https://github.com/prog893/staqan-yt-cli/blob/main/docs/dimension-compatibility.md) for detailed information about compatible dimension combinations and common error messages.
 
 ### `--all` Preset Dimensions
 

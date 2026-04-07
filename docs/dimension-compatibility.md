@@ -43,8 +43,6 @@ The YouTube Analytics API documentation lists these as "core dimensions":
 
 ### ✅ Always Works (Single Dimensions)
 
-### ✅ Always Works (Single Dimensions)
-
 These dimensions work individually:
 - `country` - Two-letter ISO country code
 - `day` - Daily breakdown (YYYY-MM-DD)
@@ -78,7 +76,7 @@ These dimensions work individually:
 ### Maximum Combination (4 Dimensions)
 
 **✅ Best for `--all` flag:**
-```
+```text
 country, creatorContentType, subscribedStatus, youtubeProduct
 ```
 
