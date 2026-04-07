@@ -277,7 +277,7 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
     if (invalidDims.length > 0) {
       process.stderr.write(chalk.yellow(`⚠️  Warning: Dimensions ${invalidDims.map(d => `"${d}"`).join(', ')} may not work for video-level queries.\n`));
       process.stderr.write(chalk.yellow(`   These are typically channel-level only or require additional filters.\n`));
-      process.stderr.write(chalk.yellow(`   The API will reject them if incompatible. See docs/dimension-compatibility.md for details.\n\n`));
+      process.stderr.write(chalk.yellow(`   The API will reject them if incompatible. See https://github.com/prog893/staqan-yt-cli/blob/main/docs/dimension-compatibility.md for details.\n\n`));
     }
 
     const auth = await getAuthenticatedClient();
