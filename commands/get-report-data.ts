@@ -167,12 +167,21 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
     // Step 2: Check if reports are available
     spinner.text = 'Fetching available reports...';
 
-    const reportsResponse = await youtubeReporting.jobs.reports.list({
-      jobId,
-      onBehalfOfContentOwner: undefined,
-    });
+    spinner.text = 'Fetching available reports...';
 
-    let reports = reportsResponse.data.reports || [];
+    const allFetchedReports: any[] = [];
+    let reportsPageToken: string | undefined;
+    do {
+      const reportsResponse = await youtubeReporting.jobs.reports.list({
+        jobId,
+        onBehalfOfContentOwner: undefined,
+        pageToken: reportsPageToken,
+      });
+      const pageReports = reportsResponse.data.reports || [];
+      allFetchedReports.push(...pageReports);
+      reportsPageToken = reportsResponse.data.nextPageToken || undefined;
+    } while (reportsPageToken);
+    let reports = allFetchedReports;
 
     if (reports.length === 0) {
       // Job exists but no reports yet (within 48h window)
@@ -217,9 +226,27 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       process.exit(1);
     }
 
-    // Adjust date range to available data if needed
-    const adjustedStart = requestedStart < minDate ? minDate : requestedStart;
-    const adjustedEnd = requestedEnd > maxDate ? maxDate : requestedEnd;
+    // Adjust date range to available data if needed.
+    // Consider both API range and local cache — cache may contain data that
+    // has expired from the API, or may be the only source if API returns nothing.
+    const cacheEntries = await findCachedReports(channelId, options.type, requestedStart, requestedEnd);
+    let effectiveMinDate = minDate;
+    let effectiveMaxDate = maxDate;
+    if (cacheEntries.length > 0) {
+      const cacheEarliest = cacheEntries.reduce((min, e) => {
+        const s = e.startTime.split('T')[0];
+        return s < min ? s : min;
+      }, '9999-99-99');
+      const cacheLatest = cacheEntries.reduce((max, e) => {
+        const s = e.endTime.split('T')[0];
+        return s > max ? s : max;
+      }, '');
+      if (cacheEarliest < effectiveMinDate) effectiveMinDate = cacheEarliest;
+      if (cacheLatest > effectiveMaxDate) effectiveMaxDate = cacheLatest;
+    }
+
+    const adjustedStart = requestedStart < effectiveMinDate ? effectiveMinDate : requestedStart;
+    const adjustedEnd = requestedEnd > effectiveMaxDate ? effectiveMaxDate : requestedEnd;
 
     // Validate that adjusted range has overlap (i.e., requested range is not entirely before/after available data)
     if (adjustedStart > adjustedEnd) {
@@ -227,7 +254,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       process.stderr.write('\n');
       process.stderr.write(chalk.red('Error:') + ' Requested date range has no overlap with available data\n');
       process.stderr.write(chalk.gray('Requested:') + ` ${requestedStart} to ${requestedEnd}\n`);
-      process.stderr.write(chalk.gray('Available:') + ` ${minDate} to ${maxDate}\n`);
+      process.stderr.write(chalk.gray('Available:') + ` ${effectiveMinDate} to ${effectiveMaxDate}\n`);
       process.stderr.write('\n');
       process.exit(1);
     }
@@ -241,28 +268,33 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       process.stderr.write(chalk.gray('Will return:') + ` ${adjustedStart} to ${adjustedEnd}\n`);
       process.stderr.write('\n');
 
-      if (requestedStart < minDate) {
-        const missingDays = Math.ceil((new Date(minDate).getTime() - new Date(requestedStart).getTime()) / (24 * 60 * 60 * 1000));
-        process.stderr.write(chalk.red('Missing:') + ` ${requestedStart} to ${minDate} (${missingDays} days, expired and deleted)\n`);
+      if (requestedStart < effectiveMinDate) {
+        const missingDays = Math.ceil((new Date(effectiveMinDate).getTime() - new Date(requestedStart).getTime()) / (24 * 60 * 60 * 1000));
+        process.stderr.write(chalk.red('Missing:') + ` ${requestedStart} to ${effectiveMinDate} (${missingDays} days, expired and deleted)
+`);
         process.stderr.write(chalk.yellow('Tip:') + ' Run fetch-reports regularly to keep a local archive and avoid data loss:\n');
         process.stderr.write(chalk.gray('       ') + chalk.cyan(`staqan-yt fetch-reports --type=${options.type}\n`));
         process.stderr.write('\n');
       }
 
-      if (requestedEnd > maxDate) {
-        process.stderr.write(chalk.red('Future dates not available:') + ` ${maxDate} to ${requestedEnd}\n`);
+      if (requestedEnd > effectiveMaxDate) {
+        process.stderr.write(chalk.red('Future dates not available:') + ` ${effectiveMaxDate} to ${requestedEnd}\n`);
         process.stderr.write('\n');
       }
     }
 
     // Step 4: Filter reports by date range (compare date portions only)
-    reports = reports.filter((report: typeof reports[0]) => {
+    // These are API reports — used for fetching data not yet in cache.
+    const filteredReports = reports.filter((report: typeof reports[0]) => {
       const reportStart = report.startTime!.split('T')[0];
       const reportEnd = report.endTime!.split('T')[0];
       return reportStart >= adjustedStart && reportEnd <= adjustedEnd;
     });
+    reports = filteredReports;
 
-    if (reports.length === 0) {
+    // It's okay if no API reports match — data may still be available from cache
+    // (e.g. expired from API but present in local archive).
+    if (reports.length === 0 && cacheEntries.length === 0) {
       spinner.fail('No reports match the specified date range');
       console.log('');
       error('No reports match the specified date range.');
@@ -460,7 +492,59 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
         break;
     }
 
-    // Step 10: Show expiration warning for the reports used
+    // Step 10: Warn about missing dates in the returned data
+    if (filteredData.length > 0) {
+      const returnedDates = new Set(filteredData.map(row => row.date));
+      // Generate expected date range
+      const rangeStart = new Date(adjustedStart);
+      const rangeEnd = new Date(adjustedEnd);
+      const expectedDates: string[] = [];
+      const current = new Date(rangeStart);
+      while (current <= rangeEnd) {
+        expectedDates.push(current.toISOString().split('T')[0].replace(/-/g, ''));
+        current.setDate(current.getDate() + 1);
+      }
+      const missingDates = expectedDates.filter(d => !returnedDates.has(d));
+      if (missingDates.length > 0) {
+        // Format missing dates for display (group consecutive only)
+        const formattedMissing = missingDates.map(d => `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`);
+        const gaps: { start: string; end: string }[] = [];
+        let gapStart = formattedMissing[0];
+        let gapEnd = formattedMissing[0];
+        for (let i = 1; i < formattedMissing.length; i++) {
+          const prev = new Date(formattedMissing[i - 1]);
+          const curr = new Date(formattedMissing[i]);
+          const diffDays = Math.round((curr.getTime() - prev.getTime()) / (24 * 60 * 60 * 1000));
+          if (diffDays === 1) {
+            gapEnd = formattedMissing[i];
+          } else {
+            gaps.push({ start: gapStart, end: gapEnd });
+            gapStart = formattedMissing[i];
+            gapEnd = formattedMissing[i];
+          }
+        }
+        gaps.push({ start: gapStart, end: gapEnd });
+
+        process.stderr.write('\n');
+        process.stderr.write(chalk.yellow('⚠️  Incomplete Data:\n'));
+        process.stderr.write(chalk.gray(`  Requested: ${adjustedStart} to ${adjustedEnd} (${expectedDates.length} days)\n`));
+        process.stderr.write(chalk.gray(`  Returned:  ${returnedDates.size} of ${expectedDates.length} days\n`));
+        process.stderr.write(chalk.gray('  Missing:\n'));
+        for (const gap of gaps) {
+          const days = Math.round((new Date(gap.end).getTime() - new Date(gap.start).getTime()) / (24 * 60 * 60 * 1000)) + 1;
+          if (gap.start === gap.end) {
+            process.stderr.write(chalk.red(`    ${gap.start}\n`));
+          } else {
+            process.stderr.write(chalk.red(`    ${gap.start} → ${gap.end} (${days} days)\n`));
+          }
+        }
+        process.stderr.write(chalk.yellow('  Tip:') + ' Data may have expired from YouTube or was never archived.\n');
+        process.stderr.write(chalk.gray('       ') + 'Run ' + chalk.cyan(`staqan-yt fetch-reports --type=${options.type}`) + ' to archive available data.\n');
+        process.stderr.write('\n');
+      }
+    }
+
+    // Step 11: Show expiration warning for the reports used
     const now = new Date();
     const jobCreated = new Date(matchingJob.createTime || '');
 
