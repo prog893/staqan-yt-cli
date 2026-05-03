@@ -6,6 +6,7 @@ import { formatJson, formatTable, formatCsv, formatText } from '../lib/formatter
 import {
   analyzeCacheCoverage,
   findCachedReports,
+  loadReportMetadata,
   readCachedReport,
   saveReportToCache,
   parseCsvAndExtractRange,
@@ -229,18 +230,29 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
     // Adjust date range to available data if needed.
     // Consider both API range and local cache — cache may contain data that
     // has expired from the API, or may be the only source if API returns nothing.
+    // Use actual CSV data dates (from metadata) rather than API report windows
+    // which span 2 calendar days and would overstate coverage.
     const cacheEntries = await findCachedReports(channelId, options.type, requestedStart, requestedEnd);
     let effectiveMinDate = minDate;
     let effectiveMaxDate = maxDate;
     if (cacheEntries.length > 0) {
-      const cacheEarliest = cacheEntries.reduce((min, e) => {
-        const s = e.startTime.split('T')[0];
-        return s < min ? s : min;
-      }, '9999-99-99');
-      const cacheLatest = cacheEntries.reduce((max, e) => {
-        const s = e.endTime.split('T')[0];
-        return s > max ? s : max;
-      }, '');
+      const cacheDates = await Promise.all(
+        cacheEntries.map(async (e) => {
+          const meta = await loadReportMetadata(channelId, e.reportId, options.type);
+          if (meta?.startTimeActual) {
+            const s = meta.startTimeActual;
+            return {
+              min: `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`,
+              max: meta.endTimeActual
+                ? `${meta.endTimeActual.slice(0, 4)}-${meta.endTimeActual.slice(4, 6)}-${meta.endTimeActual.slice(6, 8)}`
+                : `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`,
+            };
+          }
+          return { min: e.startTime.split('T')[0], max: e.endTime.split('T')[0] };
+        })
+      );
+      const cacheEarliest = cacheDates.reduce((min, d) => d.min < min ? d.min : min, '9999-99-99');
+      const cacheLatest = cacheDates.reduce((max, d) => d.max > max ? d.max : max, '');
       if (cacheEarliest < effectiveMinDate) effectiveMinDate = cacheEarliest;
       if (cacheLatest > effectiveMaxDate) effectiveMaxDate = cacheLatest;
     }
@@ -269,16 +281,17 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       process.stderr.write('\n');
 
       if (requestedStart < effectiveMinDate) {
-        const missingDays = Math.ceil((new Date(effectiveMinDate).getTime() - new Date(requestedStart).getTime()) / (24 * 60 * 60 * 1000));
-        process.stderr.write(chalk.red('Missing:') + ` ${requestedStart} to ${effectiveMinDate} (${missingDays} days, expired and deleted)
-`);
+        const dayBeforeMin = new Date(new Date(effectiveMinDate).getTime() - 86400000).toISOString().split('T')[0];
+        const missingDays = Math.ceil((new Date(dayBeforeMin).getTime() - new Date(requestedStart).getTime()) / (24 * 60 * 60 * 1000)) + 1;
+        process.stderr.write(chalk.red('Missing:') + ` ${requestedStart} to ${dayBeforeMin} (${missingDays} days, expired and deleted)\n`);
         process.stderr.write(chalk.yellow('Tip:') + ' Run fetch-reports regularly to keep a local archive and avoid data loss:\n');
         process.stderr.write(chalk.gray('       ') + chalk.cyan(`staqan-yt fetch-reports --type=${options.type}\n`));
         process.stderr.write('\n');
       }
 
       if (requestedEnd > effectiveMaxDate) {
-        process.stderr.write(chalk.red('Future dates not available:') + ` ${effectiveMaxDate} to ${requestedEnd}\n`);
+        const dayAfterMax = new Date(new Date(effectiveMaxDate).getTime() + 86400000).toISOString().split('T')[0];
+        process.stderr.write(chalk.red('Future dates not available:') + ` ${dayAfterMax} to ${requestedEnd}\n`);
         process.stderr.write('\n');
       }
     }
@@ -307,7 +320,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
     debug('Cache coverage:', coverage);
 
     // Step 6: Load cached data
-    const allData: Record<string, string>[] = [];
+    let allData: Record<string, string>[] = [];
     const cachedReports: CacheIndexEntry[] = [];
 
     for (const range of coverage.fullyCovered) {
@@ -430,6 +443,26 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
     spinner.succeed(`Retrieved ${cachedReports.length} cached + ${reportsToFetch.length} new report(s)`);
     process.stderr.write('\n');
+
+    // Deduplicate rows by (date, video_id) — YouTube may serve duplicate
+    // reports with slightly different values for the same day; keep last seen.
+    const seen = new Map<string, number>();
+    allData = allData.filter((row, i) => {
+      const key = `${row.date}|${row.video_id}`;
+      const prev = seen.get(key);
+      if (prev !== undefined) {
+        // Keep the later entry (overwrite)
+        return i === prev;
+      }
+      seen.set(key, i);
+      return true;
+    });
+    // Deduplicate: last-write-wins (Map preserves insertion order)
+    const dedupMap = new Map<string, Record<string, string>>();
+    for (const row of allData) {
+      dedupMap.set(`${row.date}|${row.video_id}`, row);
+    }
+    allData = [...dedupMap.values()];
 
     // Step 8: Filter by video ID if specified
     let filteredData = allData;
