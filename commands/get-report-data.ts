@@ -301,7 +301,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
     const filteredReports = reports.filter((report: typeof reports[0]) => {
       const reportStart = report.startTime!.split('T')[0];
       const reportEnd = report.endTime!.split('T')[0];
-      return reportStart >= adjustedStart && reportEnd <= adjustedEnd;
+      return reportStart <= adjustedEnd && reportEnd >= adjustedStart;
     });
     reports = filteredReports;
 
@@ -444,20 +444,8 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
     spinner.succeed(`Retrieved ${cachedReports.length} cached + ${reportsToFetch.length} new report(s)`);
     process.stderr.write('\n');
 
-    // Deduplicate rows by (date, video_id) — YouTube may serve duplicate
-    // reports with slightly different values for the same day; keep last seen.
-    const seen = new Map<string, number>();
-    allData = allData.filter((row, i) => {
-      const key = `${row.date}|${row.video_id}`;
-      const prev = seen.get(key);
-      if (prev !== undefined) {
-        // Keep the later entry (overwrite)
-        return i === prev;
-      }
-      seen.set(key, i);
-      return true;
-    });
-    // Deduplicate: last-write-wins (Map preserves insertion order)
+    // Deduplicate by (date, video_id) — YouTube may serve duplicate
+    // reports for the same day; last-write-wins.
     const dedupMap = new Map<string, Record<string, string>>();
     for (const row of allData) {
       dedupMap.set(`${row.date}|${row.video_id}`, row);
@@ -526,7 +514,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
     }
 
     // Step 10: Warn about missing dates in the returned data
-    if (filteredData.length > 0) {
+    if (filteredData.length > 0 && !options.videoId) {
       const returnedDates = new Set(filteredData.map(row => row.date));
       // Generate expected date range
       const rangeStart = new Date(adjustedStart);
