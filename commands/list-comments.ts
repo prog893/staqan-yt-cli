@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { listVideoComments } from '../lib/youtube';
-import { formatDate, error, debug, parseVideoId, initCommand, withSpinner } from '../lib/utils';
+import { formatDate, error, parsePositiveInt, debug, parseVideoId, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ListCommentsOptions } from '../types';
@@ -26,7 +26,8 @@ async function listCommentsCommand(options: ListCommentsOptions): Promise<void> 
 
   // Determine sort order
   const sortOrder = options.sort === 'new' ? 'time' : 'relevance';
-  const limit = parseInt(options.limit || '20');
+  let limit: number;
+  try { limit = parsePositiveInt(options.limit, 20); } catch (e) { error((e as Error).message); process.exit(1); }
 
   debug(`Fetching comments for video: ${videoId}, limit: ${limit}, sort: ${sortOrder}`);
 

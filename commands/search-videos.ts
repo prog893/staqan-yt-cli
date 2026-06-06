@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { searchVideos } from '../lib/youtube';
-import { formatDate, error, debug, initCommand, withSpinner } from '../lib/utils';
+import { formatDate, error, parsePositiveInt, debug, initCommand, withSpinner } from '../lib/utils';
 import { getConfigValue, getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { SearchVideosOptions, QueryOption } from '../types';
@@ -64,8 +64,10 @@ async function searchVideosCommand(options: SearchVideosOptions & QueryOption): 
     ? `Searching YouTube for "${query}"...`
     : `Searching ${targetChannel} for "${query}"...`;
 
+  let limit: number;
+  try { limit = parsePositiveInt(options.limit, 25); } catch (e) { error((e as Error).message); process.exit(1); }
+
   await withSpinner(spinnerMessage, 'Search failed', async (spinner) => {
-    const limit = parseInt(options.limit || '25');
     debug(`Search mode: ${searchMode}, query: "${query}", limit: ${limit}`);
 
     const videos = await searchVideos(query, {

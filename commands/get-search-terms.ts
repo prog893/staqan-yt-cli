@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, debug, formatNumber, convertToCSV, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, error, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { SearchTermsOptions } from '../types';
@@ -15,6 +15,9 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
     error('Required: --video-id');
     process.exit(1);
   }
+
+  let limit: number;
+  try { limit = parsePositiveInt(options.limit, 50); } catch (e) { error((e as Error).message); process.exit(1); }
 
   await withSpinner('Fetching search terms...', 'Failed to fetch search terms', async (spinner) => {
     const parsedId = parseVideoId(videoId);
@@ -47,8 +50,6 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
     })();
 
     debug(`Date range: ${startDate} to ${endDate}`);
-
-    const limit = options.limit ? parseInt(options.limit, 10) : 50;
 
     // Fetch search terms data
     const analyticsResponse = await youtubeAnalytics.reports.query({
