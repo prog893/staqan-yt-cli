@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '../lib/auth';
-import { error, debug, success, warning, initCommand, withSpinner, formatTimestampWithTimezone } from '../lib/utils';
+import { error, debug, success, warning, initCommand, withSpinner, formatTimestampWithTimezone, parseDateOption } from '../lib/utils';
 import {
   isReportCached,
   saveReportToCache,
@@ -102,6 +102,17 @@ async function downloadReport(
  */
 async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> {
   initCommand(options);
+
+  let parsedStartDate: string | undefined;
+  let parsedEndDate: string | undefined;
+  try {
+    parsedStartDate = parseDateOption(options.startDate, '--start-date');
+    parsedEndDate = parseDateOption(options.endDate, '--end-date');
+  } catch (e) { error((e as Error).message); process.exit(1); }
+  if (parsedStartDate && parsedEndDate && parsedStartDate > parsedEndDate) {
+    error('--start-date must be before --end-date');
+    process.exit(1);
+  }
 
   await withSpinner('Initializing...', 'Failed to fetch reports', async (spinner) => {
     // Resolve channel handle → canonical channel ID for cache namespacing
@@ -242,11 +253,11 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
       }
 
       // Filter by date range if specified (compare date portions only)
-      if (options.startDate || options.endDate) {
+      if (parsedStartDate || parsedEndDate) {
         const allMinDate = reports[reports.length - 1].startTime!.split('T')[0]; // Oldest
         const allMaxDate = reports[0].endTime!.split('T')[0]; // Newest
-        const filteredStart = (options.startDate || allMinDate).split('T')[0];
-        const filteredEnd = (options.endDate || allMaxDate).split('T')[0];
+        const filteredStart = (parsedStartDate || allMinDate).split('T')[0];
+        const filteredEnd = (parsedEndDate || allMaxDate).split('T')[0];
 
         // Validate that start date is not after end date
         if (filteredStart > filteredEnd) {

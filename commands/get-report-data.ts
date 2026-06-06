@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '../lib/auth';
-import { error, warning, debug, initCommand, withSpinner, formatTimestampWithTimezone } from '../lib/utils';
+import { error, warning, debug, initCommand, withSpinner, formatTimestampWithTimezone, parseDateOption } from '../lib/utils';
 import { getOutputFormat, getConfigValue } from '../lib/config';
 import { formatJson, formatTable, formatCsv, formatText } from '../lib/formatters';
 import {
@@ -98,6 +98,17 @@ async function downloadReport(
  */
 async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
   initCommand(options);
+
+  let parsedStartDate: string | undefined;
+  let parsedEndDate: string | undefined;
+  try {
+    parsedStartDate = parseDateOption(options.startDate, '--start-date');
+    parsedEndDate = parseDateOption(options.endDate, '--end-date');
+  } catch (e) { error((e as Error).message); process.exit(1); }
+  if (parsedStartDate && parsedEndDate && parsedStartDate > parsedEndDate) {
+    error('--start-date must be before --end-date');
+    process.exit(1);
+  }
 
   await withSpinner('Checking for existing reporting job...', 'Failed to fetch report data', async (spinner) => {
     // Resolve channel handle → canonical channel ID for cache namespacing
@@ -206,8 +217,8 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
     const minDate = reports[reports.length - 1].startTime!.split('T')[0]; // Oldest
     const maxDate = reports[0].endTime!.split('T')[0]; // Newest
 
-    const requestedStart = options.startDate || minDate;
-    const requestedEnd = options.endDate || maxDate;
+    const requestedStart = parsedStartDate || minDate;
+    const requestedEnd = parsedEndDate || maxDate;
 
     // Check if requested range is available
     if (!minDate || !maxDate || !requestedStart || !requestedEnd) {

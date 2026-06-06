@@ -1,13 +1,24 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, debug, formatNumber, convertToCSV, chunkDateRange, retryWithBackoff, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, error, debug, formatNumber, convertToCSV, chunkDateRange, retryWithBackoff, initCommand, withSpinner, parseDateOption } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { AnalyticsOptions } from '../types';
 
 async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void> {
   initCommand(options);
+
+  let parsedStartDate: string | undefined;
+  let parsedEndDate: string | undefined;
+  try {
+    parsedStartDate = parseDateOption(options.startDate, '--start-date');
+    parsedEndDate = parseDateOption(options.endDate, '--end-date');
+  } catch (e) { error((e as Error).message); process.exit(1); }
+  if (parsedStartDate && parsedEndDate && parsedStartDate > parsedEndDate) {
+    error('--start-date must be before --end-date');
+    process.exit(1);
+  }
 
   // Extract video ID from options
   const videoId = options.videoId;
@@ -48,8 +59,8 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
 
     // Calculate date range
     // Default: full historical data from upload date to today
-    const endDate = options.endDate || new Date().toISOString().split('T')[0];
-    const startDate = options.startDate || publishedAt.split('T')[0];
+    const endDate = parsedEndDate || new Date().toISOString().split('T')[0];
+    const startDate = parsedStartDate || publishedAt.split('T')[0];
 
     debug(`Date range: ${startDate} to ${endDate}`);
 

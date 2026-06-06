@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseChannelHandle, error, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner } from '../lib/utils';
+import { parseChannelHandle, error, parsePositiveInt, parseDateOption, debug, formatNumber, convertToCSV, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ChannelSearchTermsOptions } from '../types';
@@ -34,6 +34,17 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
 
   let rawLimit: number;
   try { rawLimit = parsePositiveInt(options.limit, 25); } catch (e) { error((e as Error).message); process.exit(1); }
+
+  let parsedStartDate: string | undefined;
+  let parsedEndDate: string | undefined;
+  try {
+    parsedStartDate = parseDateOption(options.startDate, '--start-date');
+    parsedEndDate = parseDateOption(options.endDate, '--end-date');
+  } catch (e) { error((e as Error).message); process.exit(1); }
+  if (parsedStartDate && parsedEndDate && parsedStartDate > parsedEndDate) {
+    error('--start-date must be before --end-date');
+    process.exit(1);
+  }
 
   await withSpinner('Resolving channel...', 'Failed to fetch channel search terms', async (spinner) => {
     // Resolve channel from arg or config default
@@ -135,8 +146,8 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
       ? `${videoFilter};${sourceFilter};${contentTypeFilter}`
       : `${videoFilter};${sourceFilter}`;
 
-    const endDate = options.endDate || new Date().toISOString().split('T')[0];
-    const startDate = options.startDate || YOUTUBE_START_DATE;
+    const endDate = parsedEndDate || new Date().toISOString().split('T')[0];
+    const startDate = parsedStartDate || YOUTUBE_START_DATE;
     const isLifetime = startDate === YOUTUBE_START_DATE;
     // API enforces maxResults ≤ 25 for this report type
     const limit = Math.min(rawLimit, MAX_RESULTS_LIMIT);

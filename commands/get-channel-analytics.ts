@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseChannelHandle, error, debug, formatNumber, initCommand, withSpinner, createSpinner } from '../lib/utils';
+import { parseChannelHandle, error, debug, formatNumber, initCommand, withSpinner, createSpinner, parseDateOption } from '../lib/utils';
 import { requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ChannelAnalyticsOptions } from '../types';
@@ -32,6 +32,17 @@ const REPORT_TYPES: Record<string, { dimensions: string; metrics: string }> = {
 
 async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Promise<void> {
   initCommand(options);
+
+  let parsedStartDate: string | undefined;
+  let parsedEndDate: string | undefined;
+  try {
+    parsedStartDate = parseDateOption(options.startDate, '--start-date');
+    parsedEndDate = parseDateOption(options.endDate, '--end-date');
+  } catch (e) { error((e as Error).message); process.exit(1); }
+  if (parsedStartDate && parsedEndDate && parsedStartDate > parsedEndDate) {
+    error('--start-date must be before --end-date');
+    process.exit(1);
+  }
 
   await withSpinner('Fetching channel analytics...', 'Failed to fetch channel analytics', async (spinner) => {
     // Determine channel ID
@@ -88,8 +99,8 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
     spinner.succeed('Channel information retrieved');
 
     // Determine date range (default: last 30 days)
-    const endDate = options.endDate || new Date().toISOString().split('T')[0];
-    const startDate = options.startDate ||
+    const endDate = parsedEndDate || new Date().toISOString().split('T')[0];
+    const startDate = parsedStartDate ||
       new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     debug(`Date range: ${startDate} to ${endDate}`);

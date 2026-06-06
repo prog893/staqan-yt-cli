@@ -321,6 +321,14 @@ function parsePositiveInt(limitOpt: string | undefined, defaultValue: number): n
   return n;
 }
 
+function parseDateOption(opt: string | undefined, flag: string): string | undefined {
+  if (opt === undefined) return undefined;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(opt) || isNaN(Date.parse(opt))) {
+    throw new Error(`${flag} must be in YYYY-MM-DD format`);
+  }
+  return opt;
+}
+
 function validatePrivacyFilter(privacy: string[] | undefined): void {
   if (!privacy || privacy.length === 0) return;
   const valid = ['public', 'private', 'unlisted'];
@@ -536,5 +544,6 @@ export {
   sleep,
   retryWithBackoff,
   parsePositiveInt,
+  parseDateOption,
   validatePrivacyFilter,
 };
