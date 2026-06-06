@@ -29,13 +29,11 @@
   "author": "STAQAN",
   "license": "MIT",
   "dependencies": {
-    "@googleapis/youtube": "^17.0.0",
-    "@googleapis/youtubereporting": "^5.2.0",
     "@modelcontextprotocol/sdk": "^1.0.4",
     "chalk": "^4.1.2",
     "commander": "^12.0.0",
-    "google-auth-library": "^9.0.0",
-    "googleapis": "^134.0.0",
+    "google-auth-library": "10.5.0",
+    "googleapis": "^173.0.0",
     "open": "^8.4.2",
     "ora": "^5.4.1"
   },
