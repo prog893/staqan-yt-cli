@@ -3,15 +3,13 @@ import { getPlaylistsById } from '../lib/youtube';
 import { formatDate, formatNumber, debug, parsePlaylistId, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
-import { OutputOption, VerboseOption } from '../types';
-
-interface PlaylistIdsOption { playlistIds: string[]; }
+import { OutputOption, VerboseOption, PlaylistIdsOption } from '../types';
 
 async function getPlaylistsCommand(options: PlaylistIdsOption & OutputOption & VerboseOption): Promise<void> {
   initCommand(options);
 
   await withSpinner('Fetching playlist information...', 'Failed to fetch playlist information', async (spinner) => {
-    const playlistIds = options.playlistIds;
+    const playlistIds = options.playlistIds!;
     const parsedIds = playlistIds.map(parsePlaylistId);
     debug(`Parsing ${playlistIds.length} playlist ID(s)`, playlistIds);
     debug(`Parsed IDs:`, parsedIds);
