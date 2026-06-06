@@ -42,6 +42,9 @@
   "engines": {
     "bun": ">=1.0.0"
   },
+  "overrides": {
+    "uuid": ">=11.1.1"
+  },
   "devDependencies": {
     "@types/chalk": "^0.4.31",
     "@types/commander": "^2.12.0",
