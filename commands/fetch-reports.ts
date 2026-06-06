@@ -2,7 +2,7 @@ import { google } from 'googleapis';
 import { getAuthenticatedClient } from '../lib/auth';
 import { error, debug, success, warning, initCommand, withSpinner, formatTimestampWithTimezone } from '../lib/utils';
 import {
-  findCachedReports,
+  isReportCached,
   saveReportToCache,
   loadCacheIndex,
   loadReportMetadata,
@@ -220,13 +220,21 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
         continue;
       }
 
-      // Get reports for this job
-      const reportsResponse = await youtubeReporting.jobs.reports.list({
-        jobId,
-        onBehalfOfContentOwner: undefined,
-      });
-
-      let reports = reportsResponse.data.reports || [];
+      // Get reports for this job (with pagination)
+      const allFetchedReports: any[] = [];
+      let reportsPageToken: string | undefined;
+      do {
+        const reportsResponse = await youtubeReporting.jobs.reports.list({
+          jobId,
+          onBehalfOfContentOwner: undefined,
+          pageToken: reportsPageToken,
+        });
+        const pageReports = reportsResponse.data.reports || [];
+        allFetchedReports.push(...pageReports);
+        reportsPageToken = reportsResponse.data.nextPageToken || undefined;
+        debug(`Fetched ${pageReports.length} reports (total: ${allFetchedReports.length})`);
+      } while (reportsPageToken);
+      let reports = allFetchedReports;
 
       if (reports.length === 0) {
         debug(`No reports available for ${reportTypeId}`);
@@ -267,10 +275,10 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
         const startTime = report.startTime!;
         const endTime = report.endTime!;
 
-        // Check if already cached
-        const cached = await findCachedReports(channelId, reportTypeId, startTime, endTime);
+        // Check if already cached (by unique report ID, not date overlap)
+        const alreadyCached = await isReportCached(channelId, reportId);
 
-        if (cached.length > 0 && !options.force) {
+        if (alreadyCached && !options.force) {
           debug(`Skipping cached report: ${reportId} (${startTime} to ${endTime})`);
           typeSkipped++;
           continue;

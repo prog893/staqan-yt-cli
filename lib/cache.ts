@@ -111,6 +111,20 @@ export async function removeCacheEntry(channelId: string, reportId: string): Pro
 /**
  * Find cached reports for a type and date range (filtered by channelId)
  */
+/**
+ * Check if a specific report (by reportId) is already cached.
+ * Each YouTube Reporting API report has a unique ID — matching by ID
+ * avoids false-positive overlap when adjacent reports share a boundary
+ * date (e.g. 04-20→04-21 and 04-21→04-22 both contain "04-21").
+ */
+export async function isReportCached(
+  channelId: string,
+  reportId: string
+): Promise<boolean> {
+  const index = await loadCacheIndex(channelId);
+  return index.entries.some(entry => entry.reportId === reportId);
+}
+
 export async function findCachedReports(
   channelId: string,
   reportTypeId: string,
@@ -456,6 +470,41 @@ export function findDateGaps(
 }
 
 /**
+ * Convert YYYYMMDD string to YYYY-MM-DD for consistent date handling
+ */
+function normalizeDate(d: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  if (/^\d{4}\d{2}\d{2}$/.test(d)) return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+  // Handle ISO timestamps
+  return d.split('T')[0];
+}
+
+/**
+ * Get actual data dates for a cached report by reading its metadata file.
+ * The metadata file always stores startTimeActual/endTimeActual (parsed from CSV).
+ * We use these instead of the API report time windows for gap analysis,
+ * because API windows span 2 calendar days and overlap with adjacent reports.
+ */
+async function getActualDates(
+  entry: CacheIndexEntry,
+  channelId: string
+): Promise<{ start: string; end: string }> {
+  const metadata = await loadReportMetadata(channelId, entry.reportId, entry.reportTypeId);
+  if (metadata?.startTimeActual && metadata?.endTimeActual) {
+    return {
+      start: normalizeDate(metadata.startTimeActual),
+      end: normalizeDate(metadata.endTimeActual),
+    };
+  }
+
+  // Last resort: use API time windows (may have overlap issues)
+  return {
+    start: entry.startTime.split('T')[0],
+    end: entry.endTime.split('T')[0],
+  };
+}
+
+/**
  * Analyze cache coverage for requested date range
  */
 export async function analyzeCacheCoverage(
@@ -483,16 +532,20 @@ export async function analyzeCacheCoverage(
   const partiallyCovered: CacheCoverage['partiallyCovered'] = [];
   const notCovered: string[] = [];
 
-  const cachedRanges = cachedReports.map(r => ({
-    start: r.startTime.split('T')[0],
-    end: r.endTime.split('T')[0],
-  }));
+  // Resolve actual data dates for each cached report (reads metadata if needed)
+  const entriesWithDates = await Promise.all(
+    cachedReports.map(async (r) => ({
+      entry: r,
+      dates: await getActualDates(r, channelId),
+    }))
+  );
 
+  const cachedRanges = entriesWithDates.map(e => e.dates);
   const gaps = findDateGaps(cachedRanges, requestedStart, requestedEnd);
 
-  for (const cachedReport of cachedReports) {
-    const cachedStart = cachedReport.startTime.split('T')[0];
-    const cachedEnd = cachedReport.endTime.split('T')[0];
+  for (const { dates } of entriesWithDates) {
+    const cachedStart = dates.start;
+    const cachedEnd = dates.end;
 
     const overlap = computeDateRangeOverlap(
       cachedStart,
