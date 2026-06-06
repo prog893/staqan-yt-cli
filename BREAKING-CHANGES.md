@@ -248,7 +248,7 @@ staqan-yt get-video-analytics --video-id dQw4w9WgXcQ
 
 # Get/update tags
 staqan-yt get-video-tags --video-id dQw4w9WgXcQ
-staqan-yt update-video-tags --video-id dQw4w9WgXcQ --tags "tag1,tag2"
+staqan-yt update-video-tags --video-id dQw4w9WgXcQ --replace "tag1,tag2"
 
 # Get thumbnail
 staqan-yt get-thumbnail --video-id dQw4w9WgXcQ

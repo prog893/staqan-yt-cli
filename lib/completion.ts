@@ -131,7 +131,7 @@ export function getCommandOptions(command: string): string[] {
     'get-channel-search-terms': ['--channel', '--limit', '-l', '--content-type', '--start-date', '--end-date', ...outputOptions, ...verboseOption],
     'list-comments': ['--limit', '-l', '--sort', '-s', ...outputOptions, ...verboseOption],
     'get-video-tags': [...outputOptions, ...verboseOption],
-    'update-video-tags': ['--tags', '--add', '--remove', '--dry-run', '--yes', '-y', ...outputOptions, ...verboseOption],
+    'update-video-tags': ['--replace', '--add', '--remove', '--dry-run', '--yes', '-y', ...outputOptions, ...verboseOption],
     'get-thumbnail': ['--quality', ...outputOptions, ...verboseOption],
     'get-playlist': [...outputOptions, ...verboseOption],
     'get-playlists': [...outputOptions, ...verboseOption],
@@ -327,7 +327,7 @@ _staqa_nyt_completion() {
       COMPREPLY=( \$(compgen -W "--video-id --output --verbose" -- "\${cur}") )
       ;;
     update-video-tags)
-      COMPREPLY=( \$(compgen -W "--video-id --tags --add --remove --dry-run --yes --output --verbose" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--video-id --replace --add --remove --dry-run --yes --output --verbose" -- "\${cur}") )
       ;;
     get-thumbnail)
       COMPREPLY=( \$(compgen -W "--video-id --quality --output --verbose" -- "\${cur}") )
@@ -658,7 +658,7 @@ ${commandList}
       local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--video-id[Video ID]: :_staqan_yt_video_ids' \\
-        '--tags[Replace all tags]:tags:' \\
+        '--replace[Replace all tags]:tags:' \\
         '--add[Add tags]:tags:' \\
         '--remove[Remove tags]:tags:' \\
         '--dry-run[Preview changes]' \\
