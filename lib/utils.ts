@@ -323,10 +323,15 @@ function parsePositiveInt(limitOpt: string | undefined, defaultValue: number): n
 
 function parseDateOption(opt: string | undefined, flag: string): string | undefined {
   if (opt === undefined) return undefined;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(opt) || isNaN(Date.parse(opt))) {
+  const parts = opt.split('-');
+  if (parts.length !== 3 || !/^\d{4}$/.test(parts[0]) || !/^\d{1,2}$/.test(parts[1]) || !/^\d{1,2}$/.test(parts[2])) {
     throw new Error(`${flag} must be in YYYY-MM-DD format`);
   }
-  return opt;
+  const normalized = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+  if (isNaN(Date.parse(normalized))) {
+    throw new Error(`${flag} must be in YYYY-MM-DD format`);
+  }
+  return normalized;
 }
 
 function validatePrivacyFilter(privacy: string[] | undefined): void {
