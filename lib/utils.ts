@@ -316,12 +316,9 @@ function chunkDateRange(startDate: string, endDate: string): { start: string; en
  * until this function confirms them.
  */
 function parsePositiveInt(limitOpt: string | undefined, defaultValue: number): number {
-  const limit = limitOpt ? parseInt(limitOpt, 10) : defaultValue;
-  if (isNaN(limit) || limit < 1) {
-    error('--limit must be a positive integer');
-    process.exit(1);
-  }
-  return limit;
+  const n = limitOpt ? parseInt(limitOpt, 10) : defaultValue;
+  if (isNaN(n) || n < 1) throw new Error('--limit must be a positive integer');
+  return n;
 }
 
 function validatePrivacyFilter(privacy: string[] | undefined): void {

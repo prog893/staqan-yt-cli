@@ -32,7 +32,8 @@ const YOUTUBE_START_DATE = '2005-02-14';
 async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions): Promise<void> {
   initCommand(options);
 
-  const rawLimit = parsePositiveInt(options.limit, 25);
+  let rawLimit: number;
+  try { rawLimit = parsePositiveInt(options.limit, 25); } catch (e) { error((e as Error).message); process.exit(1); }
 
   await withSpinner('Resolving channel...', 'Failed to fetch channel search terms', async (spinner) => {
     // Resolve channel from arg or config default

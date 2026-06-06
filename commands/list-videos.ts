@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getChannelVideos } from '../lib/youtube';
-import { formatDate, parsePositiveInt, debug, initCommand, withSpinner, validatePrivacyFilter } from '../lib/utils';
+import { formatDate, error, parsePositiveInt, debug, initCommand, withSpinner, validatePrivacyFilter } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv, formatPrivacyStatus } from '../lib/formatters';
 import { ChannelOption, OutputOption, LimitOption, VerboseOption, TypeFilterOption, PrivacyFilterOption } from '../types';
@@ -9,7 +9,8 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
   initCommand(options);
   validatePrivacyFilter(options.privacy);
 
-  const limit = parsePositiveInt(options.limit, 50);
+  let limit: number;
+  try { limit = parsePositiveInt(options.limit, 50); } catch (e) { error((e as Error).message); process.exit(1); }
 
   await withSpinner('Fetching channel videos...', 'Failed to fetch videos', async (spinner) => {
     const channel = await requireChannel(options.channel);

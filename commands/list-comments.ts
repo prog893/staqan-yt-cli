@@ -26,7 +26,8 @@ async function listCommentsCommand(options: ListCommentsOptions): Promise<void> 
 
   // Determine sort order
   const sortOrder = options.sort === 'new' ? 'time' : 'relevance';
-  const limit = parsePositiveInt(options.limit, 20);
+  let limit: number;
+  try { limit = parsePositiveInt(options.limit, 20); } catch (e) { error((e as Error).message); process.exit(1); }
 
   debug(`Fetching comments for video: ${videoId}, limit: ${limit}, sort: ${sortOrder}`);
 
