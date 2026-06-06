@@ -19,8 +19,16 @@ async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void>
     debug(`Parsed video ID: ${parsedId}`);
 
     // Validate that at least one update is provided
-    if (!options.tags && !options.add && !options.remove) {
-      error('Please provide at least one of --tags, --add, or --remove');
+    if (!options.replace && !options.add && !options.remove) {
+      error('Please provide at least one of --replace, --add, or --remove');
+      process.exit(1);
+    }
+
+    // --replace is rewrite mode; --add/--remove is incremental mode — cannot mix
+    if (options.replace && (options.add || options.remove)) {
+      error('--replace cannot be combined with --add or --remove');
+      console.log(chalk.gray('  Rewrite mode:      --replace "foo,bar"'));
+      console.log(chalk.gray('  Incremental mode:  --add "foo" --remove "bar"'));
       process.exit(1);
     }
 
@@ -50,9 +58,9 @@ async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void>
     // Calculate new tags
     let newTags: string[] = [];
 
-    if (options.tags) {
+    if (options.replace) {
       // Replace all tags
-      newTags = options.tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+      newTags = options.replace.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0);
     } else {
       // Start with current tags
       newTags = [...currentTags];
@@ -152,7 +160,18 @@ async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void>
     success(`Video updated: https://youtube.com/watch?v=${parsedId}`);
   } catch (err) {
     console.log('');
-    error(`Failed to update tags: ${(err as Error).message}`);
+    const errorMessage = (err as Error).message;
+    if (errorMessage.includes('invalid video keywords')) {
+      error('Cannot update video tags');
+      console.log('');
+      console.log(chalk.gray('This usually means one of two things:'));
+      console.log(chalk.gray('  1. You don\'t have permission to modify this video (not your channel)'));
+      console.log(chalk.gray('  2. Tags contain invalid characters or exceed length limits'));
+      console.log('');
+      console.log(chalk.gray('Tip: Tags use comma-separated format: --add "tokyo bar,craft beer,nightlife"'));
+    } else {
+      error(`Failed to update tags: ${errorMessage}`);
+    }
     process.exit(1);
   }
 }

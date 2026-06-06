@@ -201,7 +201,7 @@ export interface RetentionOptions extends OutputOption, VerboseOption, VideoIdOp
 export interface GetTagsOptions extends OutputOption, VerboseOption, VideoIdOption {}
 
 export interface UpdateTagsOptions extends VerboseOption, VideoIdOption {
-  tags?: string;
+  replace?: string;
   add?: string;
   remove?: string;
   dryRun?: boolean;

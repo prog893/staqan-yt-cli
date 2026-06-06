@@ -338,7 +338,7 @@ program
   .command('update-video-tags')
   .description('Update video tags (replace, add, or remove)')
   .requiredOption('--video-id <id>', 'Video ID')
-  .option('--tags <tags>', 'Replace all tags with comma-separated list')
+  .option('--replace <tags>', 'Replace all tags with comma-separated list')
   .option('--add <tags>', 'Add comma-separated tags')
   .option('--remove <tags>', 'Remove comma-separated tags')
   .option('--dry-run', 'Preview changes without applying them')
