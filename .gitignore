@@ -51,3 +51,4 @@ temp/
 
 # Homebrew tap clone (used by release scripts)
 homebrew-tap/
+.claude/
