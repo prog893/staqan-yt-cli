@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { listChannelPlaylists } from '../lib/youtube';
-import { formatDate, formatNumber, debug, initCommand, withSpinner, validatePrivacyFilter } from '../lib/utils';
+import { formatDate, formatNumber, parsePositiveInt, debug, initCommand, withSpinner, validatePrivacyFilter } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv, formatPrivacyStatus } from '../lib/formatters';
 import { ChannelOption, OutputOption, LimitOption, VerboseOption, PrivacyFilterOption } from '../types';
@@ -9,11 +9,10 @@ async function listPlaylistsCommand(options: ChannelOption & OutputOption & Limi
   initCommand(options);
   validatePrivacyFilter(options.privacy);
 
+  const limit = parsePositiveInt(options.limit, 50);
+
   await withSpinner('Fetching channel playlists...', 'Failed to fetch playlists', async (spinner) => {
     const channel = await requireChannel(options.channel);
-    debug(`Using channel: ${channel}`);
-
-    const limit = parseInt(options.limit || '50');
     debug(`Channel handle: ${channel}, limit: ${limit}`);
 
     let playlists = await listChannelPlaylists(channel, limit);

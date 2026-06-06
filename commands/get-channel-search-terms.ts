@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseChannelHandle, error, debug, formatNumber, convertToCSV, initCommand, withSpinner } from '../lib/utils';
+import { parseChannelHandle, error, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ChannelSearchTermsOptions } from '../types';
@@ -31,6 +31,8 @@ const YOUTUBE_START_DATE = '2005-02-14';
 
 async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions): Promise<void> {
   initCommand(options);
+
+  const rawLimit = parsePositiveInt(options.limit, 25);
 
   await withSpinner('Resolving channel...', 'Failed to fetch channel search terms', async (spinner) => {
     // Resolve channel from arg or config default
@@ -136,7 +138,7 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
     const startDate = options.startDate || YOUTUBE_START_DATE;
     const isLifetime = startDate === YOUTUBE_START_DATE;
     // API enforces maxResults ≤ 25 for this report type
-    const limit = Math.min(options.limit ? parseInt(options.limit, 10) : 25, MAX_RESULTS_LIMIT);
+    const limit = Math.min(rawLimit, MAX_RESULTS_LIMIT);
 
     debug('Video count in filter:', videoIds.length);
     debug('Filters (truncated):', filters.substring(0, 120) + '...');

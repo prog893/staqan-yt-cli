@@ -315,6 +315,15 @@ function chunkDateRange(startDate: string, endDate: string): { start: string; en
  * type is PrivacyStatus[], but at runtime the values are unvalidated strings
  * until this function confirms them.
  */
+function parsePositiveInt(limitOpt: string | undefined, defaultValue: number): number {
+  const limit = limitOpt ? parseInt(limitOpt, 10) : defaultValue;
+  if (isNaN(limit) || limit < 1) {
+    error('--limit must be a positive integer');
+    process.exit(1);
+  }
+  return limit;
+}
+
 function validatePrivacyFilter(privacy: string[] | undefined): void {
   if (!privacy || privacy.length === 0) return;
   const valid = ['public', 'private', 'unlisted'];
@@ -529,5 +538,6 @@ export {
   chunkDateRange,
   sleep,
   retryWithBackoff,
+  parsePositiveInt,
   validatePrivacyFilter,
 };
