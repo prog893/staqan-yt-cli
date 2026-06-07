@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, debug, formatNumber, convertToCSV, chunkDateRange, retryWithBackoff, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, error, debug, formatNumber, convertToCSV, chunkDateRange, retryWithBackoff, initCommand, withSpinner, validateDateOption, validateDateRange } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { AnalyticsOptions } from '../types';
@@ -15,6 +15,10 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
     error('Required: --video-id');
     process.exit(1);
   }
+
+  try { if (options.startDate) validateDateOption('--start-date', options.startDate); } catch (e) { error((e as Error).message); process.exit(1); }
+  try { if (options.endDate) validateDateOption('--end-date', options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
+  try { if (options.startDate && options.endDate) validateDateRange(options.startDate, options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
 
   await withSpinner('Fetching video information...', 'Failed to fetch analytics', async (spinner) => {
     const parsedId = parseVideoId(videoId);
@@ -51,6 +55,7 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
     const endDate = options.endDate || new Date().toISOString().split('T')[0];
     const startDate = options.startDate || publishedAt.split('T')[0];
 
+    try { validateDateRange(startDate, endDate); } catch (e) { spinner.stop(); error((e as Error).message); process.exit(1); }
     debug(`Date range: ${startDate} to ${endDate}`);
 
     // Default metrics

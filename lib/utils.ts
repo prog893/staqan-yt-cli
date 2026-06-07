@@ -321,6 +321,25 @@ function parsePositiveInt(limitOpt: string | undefined, defaultValue: number): n
   return n;
 }
 
+function validateDateOption(flag: string, value: string): void {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error(`${flag} must be in YYYY-MM-DD format (got: ${value})`);
+  }
+  // Catch invalid calendar dates like 2024-02-30.
+  // User input is a local-timezone calendar date; validate purely as such.
+  // new Date(y, m, 0).getDate() = days in month m of year y (tz-independent).
+  const [y, m, d] = value.split('-').map(Number);
+  if (m < 1 || m > 12 || d < 1 || d > new Date(y, m, 0).getDate()) {
+    throw new Error(`${flag} is not a valid date: ${value}`);
+  }
+}
+
+function validateDateRange(startDate: string, endDate: string): void {
+  if (startDate > endDate) {
+    throw new Error(`--start-date must be on or before --end-date (${startDate} > ${endDate})`);
+  }
+}
+
 function validatePrivacyFilter(privacy: string[] | undefined): void {
   if (!privacy || privacy.length === 0) return;
   const valid = ['public', 'private', 'unlisted'];
@@ -536,5 +555,7 @@ export {
   sleep,
   retryWithBackoff,
   parsePositiveInt,
+  validateDateOption,
+  validateDateRange,
   validatePrivacyFilter,
 };

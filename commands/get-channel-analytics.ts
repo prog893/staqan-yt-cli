@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseChannelHandle, error, debug, formatNumber, initCommand, withSpinner, createSpinner } from '../lib/utils';
+import { parseChannelHandle, error, debug, formatNumber, initCommand, withSpinner, createSpinner, validateDateOption, validateDateRange } from '../lib/utils';
 import { requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ChannelAnalyticsOptions } from '../types';
@@ -32,6 +32,10 @@ const REPORT_TYPES: Record<string, { dimensions: string; metrics: string }> = {
 
 async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Promise<void> {
   initCommand(options);
+
+  try { if (options.startDate) validateDateOption('--start-date', options.startDate); } catch (e) { error((e as Error).message); process.exit(1); }
+  try { if (options.endDate) validateDateOption('--end-date', options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
+  try { if (options.startDate && options.endDate) validateDateRange(options.startDate, options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
 
   await withSpinner('Fetching channel analytics...', 'Failed to fetch channel analytics', async (spinner) => {
     // Determine channel ID
@@ -92,6 +96,7 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
     const startDate = options.startDate ||
       new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+    validateDateRange(startDate, endDate);
     debug(`Date range: ${startDate} to ${endDate}`);
 
     // Determine dimensions and metrics based on report type or custom
