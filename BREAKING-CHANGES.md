@@ -1,5 +1,23 @@
 # Breaking Changes
 
+## v2.1.0
+
+**`--tags` → `--replace`** in `update-video-tags`:
+
+| Before | After |
+|---|---|
+| `--tags "foo,bar"` | `--replace "foo,bar"` |
+
+**Why:** `--tags` was ambiguous — `--replace` makes it clear this replaces all tags.
+
+**Also:** Mixing modes now errors (was silently ignored before):
+```bash
+# ✗ --replace cannot be combined with --add or --remove
+staqan-yt update-video-tags --video-id ID --replace "foo" --add "bar"
+```
+
+---
+
 ## v2.0.0: Channel-isolated cache and data storage
 
 **Directory structure change** — all per-channel data now lives under a channel ID namespace:
@@ -230,7 +248,7 @@ staqan-yt get-video-analytics --video-id dQw4w9WgXcQ
 
 # Get/update tags
 staqan-yt get-video-tags --video-id dQw4w9WgXcQ
-staqan-yt update-video-tags --video-id dQw4w9WgXcQ --tags "tag1,tag2"
+staqan-yt update-video-tags --video-id dQw4w9WgXcQ --replace "tag1,tag2"
 
 # Get thumbnail
 staqan-yt get-thumbnail --video-id dQw4w9WgXcQ

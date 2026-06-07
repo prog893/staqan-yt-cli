@@ -66,7 +66,7 @@ staqan-yt update-video-tags --video-id <videoId>
 
 - `--video-id <id>` - YouTube video ID or video URL (required)
 
-- `--tags <tags>` - Replace all tags with comma-separated list
+- `--replace <tags>` - Replace all tags with comma-separated list
 - `--add <tags>` - Add comma-separated tags
 - `--remove <tags>` - Remove comma-separated tags
 - `--dry-run` - Preview changes without applying them
@@ -79,7 +79,7 @@ staqan-yt update-video-tags --video-id <videoId>
 ```bash
 # Replace all tags
 staqan-yt update-video-tags --video-id dQw4w9WgXcQ \
-  --tags "youtube,tutorial,how to,programming"
+  --replace "youtube,tutorial,how to,programming"
 
 # Add tags to existing
 staqan-yt update-video-tags --video-id dQw4w9WgXcQ \
@@ -102,17 +102,20 @@ staqan-yt update-video-tags --video-id dQw4w9WgXcQ \
 
 ### Operation Modes
 
-**Replace (`--tags`):**
+**Replace (`--replace`):**
 - Replaces ALL existing tags
 - Use this for complete tag overhaul
+- Cannot be combined with `--add` or `--remove`
 
 **Add (`--add`):**
 - Adds new tags to existing ones
 - Preserves all current tags
+- Can be combined with `--remove`
 
 **Remove (`--remove`):**
 - Removes specified tags if they exist
 - Keeps all other tags
+- Can be combined with `--add`
 
 ### Safety Features
 
