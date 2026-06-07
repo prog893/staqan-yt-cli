@@ -105,14 +105,17 @@ staqan-yt update-video-tags --video-id dQw4w9WgXcQ \
 **Replace (`--replace`):**
 - Replaces ALL existing tags
 - Use this for complete tag overhaul
+- Cannot be combined with `--add` or `--remove`
 
 **Add (`--add`):**
 - Adds new tags to existing ones
 - Preserves all current tags
+- Can be combined with `--remove`
 
 **Remove (`--remove`):**
 - Removes specified tags if they exist
 - Keeps all other tags
+- Can be combined with `--add`
 
 ### Safety Features
 
