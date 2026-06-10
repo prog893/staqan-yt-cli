@@ -321,6 +321,31 @@ function parsePositiveInt(limitOpt: string | undefined, defaultValue: number): n
   return n;
 }
 
+function toLocalYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function validateDateOption(flag: string, value: string): void {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error(`${flag} must be in YYYY-MM-DD format (got: ${value})`);
+  }
+  // Catch invalid calendar dates like 2024-02-30.
+  // Days-in-month check is tz-independent; UTC methods make that explicit.
+  const [y, m, d] = value.split('-').map(Number);
+  if (m < 1 || m > 12 || d < 1 || d > new Date(Date.UTC(y, m, 0)).getUTCDate()) {
+    throw new Error(`${flag} is not a valid date: ${value}`);
+  }
+}
+
+function validateDateRange(startDate: string, endDate: string): void {
+  if (startDate > endDate) {
+    throw new Error(`--start-date must be on or before --end-date (${startDate} > ${endDate})`);
+  }
+}
+
 function validatePrivacyFilter(privacy: string[] | undefined): void {
   if (!privacy || privacy.length === 0) return;
   const valid = ['public', 'private', 'unlisted'];
@@ -536,5 +561,8 @@ export {
   sleep,
   retryWithBackoff,
   parsePositiveInt,
+  toLocalYmd,
+  validateDateOption,
+  validateDateRange,
   validatePrivacyFilter,
 };

@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '../lib/auth';
-import { error, warning, debug, initCommand, withSpinner, formatTimestampWithTimezone } from '../lib/utils';
+import { error, warning, debug, initCommand, withSpinner, formatTimestampWithTimezone, validateDateOption, validateDateRange } from '../lib/utils';
 import { getOutputFormat, getConfigValue } from '../lib/config';
 import { formatJson, formatTable, formatCsv, formatText } from '../lib/formatters';
 import {
@@ -98,6 +98,9 @@ async function downloadReport(
  */
 async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
   initCommand(options);
+  try { if (options.startDate) validateDateOption('--start-date', options.startDate); } catch (e) { error((e as Error).message); process.exit(1); }
+  try { if (options.endDate) validateDateOption('--end-date', options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
+  try { if (options.startDate && options.endDate) validateDateRange(options.startDate, options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
 
   await withSpinner('Checking for existing reporting job...', 'Failed to fetch report data', async (spinner) => {
     // Resolve channel handle → canonical channel ID for cache namespacing
@@ -217,11 +220,12 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       process.exit(1);
     }
 
-    // Validate that start date is not after end date
-    if (requestedStart > requestedEnd) {
+    try {
+      validateDateRange(requestedStart, requestedEnd);
+    } catch (e) {
       spinner.fail('Invalid date range');
       console.log('');
-      error('start-date must be before or equal to end-date');
+      error((e as Error).message);
       console.log(chalk.gray('Provided:') + ` start-date=${requestedStart}, end-date=${requestedEnd}`);
       console.log('');
       process.exit(1);

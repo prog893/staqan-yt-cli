@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseChannelHandle, error, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner } from '../lib/utils';
+import { parseChannelHandle, error, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, validateDateOption, validateDateRange } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ChannelSearchTermsOptions } from '../types';
@@ -34,6 +34,9 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
 
   let rawLimit: number;
   try { rawLimit = parsePositiveInt(options.limit, 25); } catch (e) { error((e as Error).message); process.exit(1); }
+  try { if (options.startDate) validateDateOption('--start-date', options.startDate); } catch (e) { error((e as Error).message); process.exit(1); }
+  try { if (options.endDate) validateDateOption('--end-date', options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
+  try { if (options.startDate && options.endDate) validateDateRange(options.startDate, options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
 
   await withSpinner('Resolving channel...', 'Failed to fetch channel search terms', async (spinner) => {
     // Resolve channel from arg or config default
@@ -135,9 +138,10 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
       ? `${videoFilter};${sourceFilter};${contentTypeFilter}`
       : `${videoFilter};${sourceFilter}`;
 
-    const endDate = options.endDate || new Date().toISOString().split('T')[0];
+    const endDate = options.endDate || toLocalYmd(new Date());
     const startDate = options.startDate || YOUTUBE_START_DATE;
     const isLifetime = startDate === YOUTUBE_START_DATE;
+    try { validateDateRange(startDate, endDate); } catch (e) { spinner.stop(); error((e as Error).message); process.exit(1); }
     // API enforces maxResults ≤ 25 for this report type
     const limit = Math.min(rawLimit, MAX_RESULTS_LIMIT);
 

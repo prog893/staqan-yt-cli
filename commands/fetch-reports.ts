@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '../lib/auth';
-import { error, debug, success, warning, initCommand, withSpinner, formatTimestampWithTimezone } from '../lib/utils';
+import { error, debug, success, warning, initCommand, withSpinner, formatTimestampWithTimezone, validateDateOption, validateDateRange } from '../lib/utils';
 import {
   isReportCached,
   saveReportToCache,
@@ -102,6 +102,9 @@ async function downloadReport(
  */
 async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> {
   initCommand(options);
+  try { if (options.startDate) validateDateOption('--start-date', options.startDate); } catch (e) { error((e as Error).message); process.exit(1); }
+  try { if (options.endDate) validateDateOption('--end-date', options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
+  try { if (options.startDate && options.endDate) validateDateRange(options.startDate, options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
 
   await withSpinner('Initializing...', 'Failed to fetch reports', async (spinner) => {
     // Resolve channel handle → canonical channel ID for cache namespacing
@@ -248,9 +251,10 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
         const filteredStart = (options.startDate || allMinDate).split('T')[0];
         const filteredEnd = (options.endDate || allMaxDate).split('T')[0];
 
-        // Validate that start date is not after end date
-        if (filteredStart > filteredEnd) {
-          error('start-date must be before or equal to end-date');
+        try {
+          validateDateRange(filteredStart, filteredEnd);
+        } catch (e) {
+          error((e as Error).message);
           console.log(chalk.gray('Provided:') + ` start-date=${filteredStart}, end-date=${filteredEnd}`);
           console.log('');
           process.exit(1);

@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, debug, convertToCSV, chunkDateRange, retryWithBackoff, parseDuration, formatTimestamp, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, error, debug, convertToCSV, chunkDateRange, retryWithBackoff, parseDuration, formatTimestamp, initCommand, withSpinner, toLocalYmd } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { RetentionOptions } from '../types';
@@ -48,7 +48,7 @@ async function getRetentionCommand(options: RetentionOptions): Promise<void> {
     }
 
     // Calculate date range (default: full historical data)
-    const endDate = new Date().toISOString().split('T')[0];
+    const endDate = toLocalYmd(new Date());
     const startDate = publishedAt.split('T')[0];
 
     debug(`Date range: ${startDate} to ${endDate}`);
