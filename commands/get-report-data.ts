@@ -220,11 +220,12 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       process.exit(1);
     }
 
-    // Validate that start date is not after end date
-    if (requestedStart > requestedEnd) {
+    try {
+      validateDateRange(requestedStart, requestedEnd);
+    } catch (e) {
       spinner.fail('Invalid date range');
       console.log('');
-      error('start-date must be before or equal to end-date');
+      error((e as Error).message);
       console.log(chalk.gray('Provided:') + ` start-date=${requestedStart}, end-date=${requestedEnd}`);
       console.log('');
       process.exit(1);

@@ -251,9 +251,10 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
         const filteredStart = (options.startDate || allMinDate).split('T')[0];
         const filteredEnd = (options.endDate || allMaxDate).split('T')[0];
 
-        // Validate that start date is not after end date
-        if (filteredStart > filteredEnd) {
-          error('start-date must be before or equal to end-date');
+        try {
+          validateDateRange(filteredStart, filteredEnd);
+        } catch (e) {
+          error((e as Error).message);
           console.log(chalk.gray('Provided:') + ` start-date=${filteredStart}, end-date=${filteredEnd}`);
           console.log('');
           process.exit(1);
