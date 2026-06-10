@@ -341,15 +341,32 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
     }
 
     // Calculate date range. month dimension requires both dates on month
-    // boundaries — default to the previous complete calendar month in that case.
+    // boundaries (1st of month) — default to the previous complete calendar
+    // month, or validate user-supplied dates if provided.
     let startDate: string;
     let endDate: string;
-    if (!options.startDate && !options.endDate && effectiveDimensions.includes('month')) {
-      const today = new Date();
-      const firstOfThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      const firstOfPrevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      startDate = toLocalYmd(firstOfPrevMonth);
-      endDate   = toLocalYmd(firstOfThisMonth);
+    if (effectiveDimensions.includes('month')) {
+      if (!options.startDate && !options.endDate) {
+        const today = new Date();
+        const firstOfThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const firstOfPrevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        startDate = toLocalYmd(firstOfPrevMonth);
+        endDate   = toLocalYmd(firstOfThisMonth);
+      } else {
+        startDate = options.startDate || publishedAt.split('T')[0];
+        endDate   = options.endDate   || toLocalYmd(new Date());
+        const isFirstOfMonth = (d: string) => d.endsWith('-01');
+        if (!isFirstOfMonth(startDate)) {
+          spinner.stop();
+          error(`--start-date must be the 1st of a month when using the "month" dimension (got: ${startDate})`);
+          process.exit(1);
+        }
+        if (!isFirstOfMonth(endDate)) {
+          spinner.stop();
+          error(`--end-date must be the 1st of a month when using the "month" dimension (got: ${endDate})`);
+          process.exit(1);
+        }
+      }
     } else {
       endDate   = options.endDate   || toLocalYmd(new Date());
       startDate = options.startDate || publishedAt.split('T')[0];
