@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, debug, formatNumber, convertToCSV, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, error, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { TrafficSourcesOptions } from '../types';
@@ -39,11 +39,11 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
     const title = videoResponse.data.items[0].snippet?.title || 'Untitled';
 
     // Date range: last 30 days
-    const endDate = new Date().toISOString().split('T')[0];
+    const endDate = toLocalYmd(new Date());
     const startDate = (() => {
       const date = new Date();
       date.setDate(date.getDate() - 30);
-      return date.toISOString().split('T')[0];
+      return toLocalYmd(date);
     })();
 
     debug(`Date range: ${startDate} to ${endDate}`);

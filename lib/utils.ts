@@ -321,6 +321,13 @@ function parsePositiveInt(limitOpt: string | undefined, defaultValue: number): n
   return n;
 }
 
+function toLocalYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function validateDateOption(flag: string, value: string): void {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     throw new Error(`${flag} must be in YYYY-MM-DD format (got: ${value})`);
@@ -555,6 +562,7 @@ export {
   sleep,
   retryWithBackoff,
   parsePositiveInt,
+  toLocalYmd,
   validateDateOption,
   validateDateRange,
   validatePrivacyFilter,

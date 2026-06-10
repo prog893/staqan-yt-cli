@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, debug, formatNumber, convertToCSV, chunkDateRange, retryWithBackoff, initCommand, withSpinner, validateDateOption, validateDateRange } from '../lib/utils';
+import { parseVideoId, error, debug, formatNumber, convertToCSV, chunkDateRange, retryWithBackoff, initCommand, withSpinner, toLocalYmd, validateDateOption, validateDateRange } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { AnalyticsOptions } from '../types';
@@ -52,7 +52,7 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
 
     // Calculate date range
     // Default: full historical data from upload date to today
-    const endDate = options.endDate || new Date().toISOString().split('T')[0];
+    const endDate = options.endDate || toLocalYmd(new Date());
     const startDate = options.startDate || publishedAt.split('T')[0];
 
     try { validateDateRange(startDate, endDate); } catch (e) { spinner.stop(); error((e as Error).message); process.exit(1); }

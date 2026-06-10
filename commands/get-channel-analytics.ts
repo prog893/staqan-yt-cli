@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseChannelHandle, error, debug, formatNumber, initCommand, withSpinner, createSpinner, validateDateOption, validateDateRange } from '../lib/utils';
+import { parseChannelHandle, error, debug, formatNumber, initCommand, withSpinner, createSpinner, toLocalYmd, validateDateOption, validateDateRange } from '../lib/utils';
 import { requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ChannelAnalyticsOptions } from '../types';
@@ -92,9 +92,9 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
     spinner.succeed('Channel information retrieved');
 
     // Determine date range (default: last 30 days)
-    const endDate = options.endDate || new Date().toISOString().split('T')[0];
+    const endDate = options.endDate || toLocalYmd(new Date());
     const startDate = options.startDate ||
-      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      toLocalYmd(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
 
     try {
       validateDateRange(startDate, endDate);

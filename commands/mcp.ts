@@ -17,7 +17,7 @@ import {
 } from '../lib/youtube';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, chunkDateRange, retryWithBackoff, initCommand } from '../lib/utils';
+import { parseVideoId, chunkDateRange, retryWithBackoff, initCommand, toLocalYmd } from '../lib/utils';
 import { requireChannel } from '../lib/config';
 
 // Tool definitions
@@ -665,9 +665,9 @@ async function handleToolCall(name: string, args: any) {
       }
 
       // Determine date range (default: last 30 days)
-      const endDate = args.endDate || new Date().toISOString().split('T')[0];
+      const endDate = args.endDate || toLocalYmd(new Date());
       const startDate = args.startDate ||
-        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        toLocalYmd(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
 
       // Determine dimensions and metrics
       let dimensions: string;
@@ -755,7 +755,7 @@ async function handleToolCall(name: string, args: any) {
       }
 
       // Calculate date range
-      const endDate = args.endDate || new Date().toISOString().split('T')[0];
+      const endDate = args.endDate || toLocalYmd(new Date());
       const startDate = args.startDate || publishedAt.split('T')[0];
 
       // Default metrics
@@ -810,7 +810,7 @@ async function handleToolCall(name: string, args: any) {
       const analyticsResponse = await youtubeAnalytics.reports.query({
         ids: 'channel==MINE',
         startDate: '2000-01-01',
-        endDate: new Date().toISOString().split('T')[0],
+        endDate: toLocalYmd(new Date()),
         metrics: 'views',
         dimensions: 'insightTrafficSourceDetail',
         filters: `video==${parsedId};insightTrafficSourceType==YT_SEARCH`,
@@ -873,7 +873,7 @@ async function handleToolCall(name: string, args: any) {
         throw new Error('No videos found for this channel.');
       }
 
-      const endDate = args.endDate || new Date().toISOString().split('T')[0];
+      const endDate = args.endDate || toLocalYmd(new Date());
       const startDate = args.startDate || '2005-02-14';
       const limit = Math.min(args.limit || 25, 25);
       const CONTENT_TYPE_FILTERS: Record<string, string> = {
@@ -922,7 +922,7 @@ async function handleToolCall(name: string, args: any) {
       const analyticsResponse = await youtubeAnalytics.reports.query({
         ids: 'channel==MINE',
         startDate: '2000-01-01',
-        endDate: new Date().toISOString().split('T')[0],
+        endDate: toLocalYmd(new Date()),
         metrics: 'views',
         dimensions: 'insightTrafficSourceType',
         filters: `video==${parsedId}`,
@@ -945,7 +945,7 @@ async function handleToolCall(name: string, args: any) {
       const analyticsResponse = await youtubeAnalytics.reports.query({
         ids: 'channel==MINE',
         startDate: '2000-01-01',
-        endDate: new Date().toISOString().split('T')[0],
+        endDate: toLocalYmd(new Date()),
         metrics: 'audienceWatchRatio,relativeRetentionPerformance',
         dimensions: 'elapsedVideoTimeRatio',
         filters: `video==${parsedId}`,

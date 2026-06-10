@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseChannelHandle, error, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, validateDateOption, validateDateRange } from '../lib/utils';
+import { parseChannelHandle, error, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, validateDateOption, validateDateRange } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ChannelSearchTermsOptions } from '../types';
@@ -138,7 +138,7 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
       ? `${videoFilter};${sourceFilter};${contentTypeFilter}`
       : `${videoFilter};${sourceFilter}`;
 
-    const endDate = options.endDate || new Date().toISOString().split('T')[0];
+    const endDate = options.endDate || toLocalYmd(new Date());
     const startDate = options.startDate || YOUTUBE_START_DATE;
     const isLifetime = startDate === YOUTUBE_START_DATE;
     validateDateRange(startDate, endDate);
