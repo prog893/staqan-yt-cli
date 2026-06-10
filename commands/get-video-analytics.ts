@@ -310,10 +310,20 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
       process.exit(1);
     }
 
-    // Calculate date range
-    // Default: full historical data from upload date to today
-    const endDate = options.endDate || toLocalYmd(new Date());
-    const startDate = options.startDate || publishedAt.split('T')[0];
+    // Calculate date range. month dimension requires both dates on month
+    // boundaries — default to the previous complete calendar month in that case.
+    let startDate: string;
+    let endDate: string;
+    if (!options.startDate && !options.endDate && effectiveDimensions.includes('month')) {
+      const today = new Date();
+      const firstOfThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const firstOfPrevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      startDate = toLocalYmd(firstOfPrevMonth);
+      endDate   = toLocalYmd(firstOfThisMonth);
+    } else {
+      endDate   = options.endDate   || toLocalYmd(new Date());
+      startDate = options.startDate || publishedAt.split('T')[0];
+    }
 
     try { validateDateRange(startDate, endDate); } catch (e) { spinner.stop(); error((e as Error).message); process.exit(1); }
     debug(`Date range: ${startDate} to ${endDate}`);
