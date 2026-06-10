@@ -284,6 +284,36 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
       process.stderr.write(chalk.yellow(`   The API will reject them if incompatible. See https://github.com/prog893/staqan-yt-cli/blob/main/docs/dimension-compatibility.md for details.\n\n`));
     }
 
+    // Fail fast on known-incompatible dimension pairs (live-tested 2026-06-10).
+    // These all return "The query is not supported" from the API.
+    const INCOMPATIBLE_PAIRS: [string, string][] = [
+      ['day',   'month'],
+      ['country', 'day'],
+      ['country', 'deviceType'],
+      ['country', 'operatingSystem'],
+      ['country', 'insightTrafficSourceType'],
+      ['country', 'insightPlaybackLocationType'],
+      ['deviceType', 'insightTrafficSourceType'],
+      ['deviceType', 'insightPlaybackLocationType'],
+      ['operatingSystem', 'insightTrafficSourceType'],
+      ['operatingSystem', 'insightPlaybackLocationType'],
+      ['insightTrafficSourceType', 'insightPlaybackLocationType'],
+      ['insightTrafficSourceType', 'youtubeProduct'],
+      ['insightPlaybackLocationType', 'youtubeProduct'],
+      ['month', 'deviceType'],
+      ['month', 'operatingSystem'],
+      ['month', 'insightTrafficSourceType'],
+      ['month', 'insightPlaybackLocationType'],
+    ];
+    const dimSet = new Set(effectiveDimensions);
+    for (const [a, b] of INCOMPATIBLE_PAIRS) {
+      if (dimSet.has(a) && dimSet.has(b)) {
+        spinner.stop();
+        error(`Dimensions "${a}" and "${b}" cannot be used together.`);
+        process.exit(1);
+      }
+    }
+
     const auth = await getAuthenticatedClient();
     const youtube = google.youtube({ version: 'v3', auth });
     const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
