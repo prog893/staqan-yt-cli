@@ -96,7 +96,12 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
     const startDate = options.startDate ||
       new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    validateDateRange(startDate, endDate);
+    try {
+      validateDateRange(startDate, endDate);
+    } catch (e) {
+      error((e as Error).message);
+      process.exit(1);
+    }
     debug(`Date range: ${startDate} to ${endDate}`);
 
     // Determine dimensions and metrics based on report type or custom
