@@ -17,7 +17,7 @@ import {
 } from '../lib/youtube';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, chunkDateRange, retryWithBackoff, initCommand, toLocalYmd } from '../lib/utils';
+import { parseVideoId, chunkDateRange, retryWithBackoff, initCommand, toLocalYmd, validateDateOption, validateDateRange } from '../lib/utils';
 import { requireChannel } from '../lib/config';
 
 // Tool definitions
@@ -664,10 +664,14 @@ async function handleToolCall(name: string, args: any) {
         }
       }
 
+      if (args.startDate) validateDateOption('startDate', args.startDate);
+      if (args.endDate) validateDateOption('endDate', args.endDate);
+
       // Determine date range (default: last 30 days)
       const endDate = args.endDate || toLocalYmd(new Date());
       const startDate = args.startDate ||
         toLocalYmd(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+      validateDateRange(startDate, endDate);
 
       // Determine dimensions and metrics
       let dimensions: string;
@@ -754,9 +758,13 @@ async function handleToolCall(name: string, args: any) {
         throw new Error('Video publish date is missing');
       }
 
+      if (args.startDate) validateDateOption('startDate', args.startDate);
+      if (args.endDate) validateDateOption('endDate', args.endDate);
+
       // Calculate date range
       const endDate = args.endDate || toLocalYmd(new Date());
       const startDate = args.startDate || publishedAt.split('T')[0];
+      validateDateRange(startDate, endDate);
 
       // Default metrics
       const metrics = args.metrics || 'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares';
@@ -873,8 +881,12 @@ async function handleToolCall(name: string, args: any) {
         throw new Error('No videos found for this channel.');
       }
 
+      if (args.startDate) validateDateOption('startDate', args.startDate);
+      if (args.endDate) validateDateOption('endDate', args.endDate);
+
       const endDate = args.endDate || toLocalYmd(new Date());
       const startDate = args.startDate || '2005-02-14';
+      validateDateRange(startDate, endDate);
       const limit = Math.min(args.limit || 25, 25);
       const CONTENT_TYPE_FILTERS: Record<string, string> = {
         video: 'creatorContentType==LONG_FORM_CONTENT',

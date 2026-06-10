@@ -141,7 +141,7 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
     const endDate = options.endDate || toLocalYmd(new Date());
     const startDate = options.startDate || YOUTUBE_START_DATE;
     const isLifetime = startDate === YOUTUBE_START_DATE;
-    validateDateRange(startDate, endDate);
+    try { validateDateRange(startDate, endDate); } catch (e) { spinner.stop(); error((e as Error).message); process.exit(1); }
     // API enforces maxResults ≤ 25 for this report type
     const limit = Math.min(rawLimit, MAX_RESULTS_LIMIT);
 
