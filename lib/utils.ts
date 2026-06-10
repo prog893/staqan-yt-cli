@@ -333,10 +333,9 @@ function validateDateOption(flag: string, value: string): void {
     throw new Error(`${flag} must be in YYYY-MM-DD format (got: ${value})`);
   }
   // Catch invalid calendar dates like 2024-02-30.
-  // Intentionally uses the local system timezone — dates are treated as wall-clock
-  // calendar values. Future config support may allow a timezone override here.
+  // Days-in-month check is tz-independent; UTC methods make that explicit.
   const [y, m, d] = value.split('-').map(Number);
-  if (m < 1 || m > 12 || d < 1 || d > new Date(y, m, 0).getDate()) {
+  if (m < 1 || m > 12 || d < 1 || d > new Date(Date.UTC(y, m, 0)).getUTCDate()) {
     throw new Error(`${flag} is not a valid date: ${value}`);
   }
 }
