@@ -917,7 +917,7 @@ async function downloadCaption(captionId: string, format: CaptionFormat = 'json'
   // The download endpoint returns the caption content
   const response = await youtube.captions.download({
     id: captionId,
-  });
+  }, { responseType: 'text' });
 
   // The response is the actual caption content
   const content = response.data as string;
