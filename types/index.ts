@@ -283,7 +283,7 @@ export interface ChannelInfo {
 // Caption-related types
 export type CaptionTrackKind = 'standard' | 'ASR' | 'forced';
 
-export type CaptionFormat = 'srt' | 'vtt' | 'sbv' | 'srv2' | 'ttml' | 'json';
+export type CaptionFormat = 'srt' | 'vtt' | 'sbv' | 'scc' | 'ttml' | 'json';
 
 export interface CaptionInfo {
   id: string;

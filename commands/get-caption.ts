@@ -13,6 +13,12 @@ async function getCaptionCommand(options: GetCaptionOptions): Promise<void> {
     process.exit(1);
   }
 
+  const validFormats = ['srt', 'vtt', 'sbv', 'scc', 'ttml', 'json'];
+  if (options.format && !validFormats.includes(options.format)) {
+    error(`Invalid format '${options.format}'. Valid: ${validFormats.join(', ')}`);
+    process.exit(1);
+  }
+
   // Note: For caption metadata, use list-captions --video-id <videoId>
   // This command focuses on downloading caption content
   const format = options.format || 'json';

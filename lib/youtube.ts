@@ -906,7 +906,7 @@ async function listCaptions(videoId: string): Promise<CaptionInfo[]> {
 /**
  * Download caption content
  * @param captionId - Caption track ID
- * @param format - Output format (srt, vtt, sbv, srv2, ttml, or json for raw)
+ * @param format - Output format (srt, vtt, sbv, scc, ttml, or json for raw)
  * @returns Caption content as string
  */
 async function downloadCaption(captionId: string, format: CaptionFormat = 'json'): Promise<string> {
