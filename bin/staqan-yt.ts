@@ -428,7 +428,7 @@ program
   .command('get-caption')
   .description('Download caption content to stdout (get caption ID from list-captions)')
   .requiredOption('--caption-id <id>', 'Caption ID')
-  .option('--format <format>', 'Caption format: srt, vtt, sbv, srv2, ttml, json (default: json)', 'json')
+  .option('--format <format>', 'Caption format: srt, vtt, sbv, scc, ttml, json (default: json)', 'json')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('get-caption', getCaptionCommand));
 

@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { downloadCaption } from '../lib/youtube';
 import { error, debug, initCommand, createSpinner } from '../lib/utils';
-import { GetCaptionOptions } from '../types';
+import { GetCaptionOptions, CAPTION_FORMATS } from '../types';
 
 async function getCaptionCommand(options: GetCaptionOptions): Promise<void> {
   initCommand(options);
@@ -13,9 +13,8 @@ async function getCaptionCommand(options: GetCaptionOptions): Promise<void> {
     process.exit(1);
   }
 
-  const validFormats = ['srt', 'vtt', 'sbv', 'scc', 'ttml', 'json'];
-  if (options.format && !validFormats.includes(options.format)) {
-    error(`Invalid format '${options.format}'. Valid: ${validFormats.join(', ')}`);
+  if (options.format && !(CAPTION_FORMATS as readonly string[]).includes(options.format)) {
+    error(`Invalid format '${options.format}'. Valid: ${CAPTION_FORMATS.join(', ')}`);
     process.exit(1);
   }
 

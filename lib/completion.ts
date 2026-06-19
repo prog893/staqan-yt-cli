@@ -297,7 +297,7 @@ _staqa_nyt_completion() {
     --sort|-s)
       COMPREPLY=( \$(compgen -W "top new" -- "\${cur}") ); return ;;
     --format)
-      COMPREPLY=( \$(compgen -W "srt vtt sbv srv2 ttml json" -- "\${cur}") ); return ;;
+      COMPREPLY=( \$(compgen -W "srt vtt sbv scc ttml json" -- "\${cur}") ); return ;;
     staqan-yt)
       COMPREPLY=( \$(compgen -W "${commands}" -- "\${cur}") )
       return
@@ -777,7 +777,7 @@ ${commandList}
       local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--caption-id[Caption ID]:id:( )' \\
-        '--format[Caption format]:format:(srt vtt sbv srv2 ttml json)' \\
+        '--format[Caption format]:format:(srt vtt sbv scc ttml json)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-channel)

@@ -139,7 +139,7 @@ staqan-yt get-caption --caption-id <captionId>
 
 - `--caption-id <id>` - Caption track ID (get from `list-captions`) (required)
 
-- `--format <format>` - Caption format: srt, vtt, sbv, srv2, ttml, json (default: json)
+- `--format <format>` - Caption format: srt, vtt, sbv, scc, ttml, json (default: json)
 - `-v, --verbose` - Enable verbose output with debug information
 - `-h, --help` - Show help
 
@@ -166,7 +166,7 @@ staqan-yt get-caption --caption-id en.dQw4w9WgXcQ --format json | jq -r '.[].tex
 
 **Text formats:**
 - `json` - Structured JSON with timing (default)
-- `srv2` - YouTube's internal format
+- `scc` - Scenarist Closed Caption format
 
 **Subtitle formats:**
 - `srt` - SubRip format (most players)

@@ -209,7 +209,7 @@ staqan-yt list-report-jobs --type <Tab>  # Report type IDs
 # Static value completion
 staqan-yt get-video --output <Tab>   # json  table  text  pretty  csv
 staqan-yt list-comments --sort <Tab> # top  new
-staqan-yt get-caption --format <Tab> # srt  vtt  sbv  srv2  ttml  json
+staqan-yt get-caption --format <Tab> # srt  vtt  sbv  scc  ttml  json
 ```
 
 Dynamic completion caches results locally for 5 minutes (report types: 1 hour), so it stays fast on repeated presses.
