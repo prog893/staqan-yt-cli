@@ -193,12 +193,14 @@ Use `staqan-yt list-captions --video-id <your-video-id>` to get the exact captio
 ### Working with Captions
 
 **Extract plain text:**
+
 ```bash
 staqan-yt get-caption --caption-id <caption-id> --format json | \
   jq -r '.[].text' > transcript.txt
 ```
 
 **Create word cloud:**
+
 ```bash
 staqan-yt get-caption --caption-id <caption-id> --format json | \
   jq -r '.[].text' | \
@@ -209,6 +211,7 @@ staqan-yt get-caption --caption-id <caption-id> --format json | \
 ```
 
 **Find mentions:**
+
 ```bash
 staqan-yt get-caption --caption-id <caption-id> --format json | \
   jq -r '.[].text' | \
