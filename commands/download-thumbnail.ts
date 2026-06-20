@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import https from 'https';
 import http from 'http';
 import { createWriteStream } from 'fs';
-import { unlink } from 'fs/promises';
+import { rename, unlink } from 'fs/promises';
 import path from 'path';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
@@ -17,32 +17,39 @@ const VALID_QUALITIES = new Set<string>(QUALITY_ORDER);
 async function downloadFile(url: string, destPath: string): Promise<void> {
   const parsedUrl = new URL(url);
   const transport = parsedUrl.protocol === 'https:' ? https : http;
+  const tempPath = `${destPath}.${process.pid}.${Date.now()}.tmp`;
 
-  await new Promise<void>((resolve, reject) => {
-    transport.get(url, (response) => {
-      if (response.statusCode !== 200) {
-        unlink(destPath).catch(() => {});
-        reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
-        return;
-      }
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const req = transport.get(url, (response) => {
+        if (response.statusCode !== 200) {
+          response.resume();
+          reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
+          return;
+        }
 
-      const file = createWriteStream(destPath);
-      response.pipe(file);
+        const file = createWriteStream(tempPath);
+        response.pipe(file);
 
-      file.on('finish', () => {
-        file.close();
-        resolve();
+        file.on('finish', () => {
+          file.close();
+          resolve();
+        });
+
+        file.on('error', reject);
       });
 
-      file.on('error', (err) => {
-        unlink(destPath).catch(() => {});
-        reject(err);
+      req.setTimeout(30_000, () => {
+        req.destroy(new Error('Thumbnail download timed out'));
       });
-    }).on('error', (err) => {
-      unlink(destPath).catch(() => {});
-      reject(err);
+      req.on('error', reject);
     });
-  });
+
+    await rename(tempPath, destPath);
+  } catch (err) {
+    await unlink(tempPath).catch(() => {});
+    throw err;
+  }
 }
 
 async function downloadThumbnailCommand(options: DownloadThumbnailOptions): Promise<void> {

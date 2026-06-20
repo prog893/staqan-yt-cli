@@ -2,8 +2,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import https from 'https';
 import http from 'http';
-import { createWriteStream } from 'fs';
-import { unlink } from 'fs/promises';
+import { rename, unlink, writeFile } from 'fs/promises';
 import path from 'path';
 import {
   CallToolRequestSchema,
@@ -1147,7 +1146,11 @@ async function handleToolCall(name: string, args: any) {
       type ThumbQuality = typeof QUALITY_ORDER[number];
 
       const parsedId = parseVideoId(args.videoId);
-      const requestedQuality: ThumbQuality = (args.quality as ThumbQuality) || 'maxres';
+      const requestedQualityInput = args.quality ?? 'maxres';
+      if (!(QUALITY_ORDER as readonly string[]).includes(requestedQualityInput)) {
+        throw new Error(`Invalid quality "${requestedQualityInput}". Valid values: ${QUALITY_ORDER.join(', ')}`);
+      }
+      const requestedQuality = requestedQualityInput as ThumbQuality;
 
       const thumbResponse = await youtube.videos.list({
         part: ['snippet'],
@@ -1188,8 +1191,9 @@ async function handleToolCall(name: string, args: any) {
       const imageBytes = await new Promise<Buffer>((resolve, reject) => {
         const parsedUrl = new URL(thumbnailUrl!);
         const transport = parsedUrl.protocol === 'https:' ? https : http;
-        transport.get(thumbnailUrl!, (res) => {
+        const req = transport.get(thumbnailUrl!, (res) => {
           if (res.statusCode !== 200) {
+            res.resume();
             reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`));
             return;
           }
@@ -1197,19 +1201,23 @@ async function handleToolCall(name: string, args: any) {
           res.on('data', (chunk: Buffer) => chunks.push(chunk));
           res.on('end', () => resolve(Buffer.concat(chunks)));
           res.on('error', reject);
-        }).on('error', reject);
+        });
+        req.setTimeout(30_000, () => {
+          req.destroy(new Error('Thumbnail download timed out'));
+        });
+        req.on('error', reject);
       });
 
       if (args.filePath) {
         const dest = path.resolve(args.filePath);
-        await new Promise<void>((resolve, reject) => {
-          const file = createWriteStream(dest);
-          file.write(imageBytes, (err) => {
-            if (err) { unlink(dest).catch(() => {}); reject(err); return; }
-            file.end(() => resolve());
-          });
-          file.on('error', (err) => { unlink(dest).catch(() => {}); reject(err); });
-        });
+        const tempDest = `${dest}.${process.pid}.${Date.now()}.tmp`;
+        try {
+          await writeFile(tempDest, imageBytes);
+          await rename(tempDest, dest);
+        } catch (err) {
+          await unlink(tempDest).catch(() => {});
+          throw err;
+        }
         const note = resolvedQuality !== requestedQuality
           ? ` (requested "${requestedQuality}", used "${resolvedQuality}")`
           : '';
