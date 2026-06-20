@@ -22,6 +22,7 @@ import getVideoRetention = require('../commands/get-video-retention');
 import getVideoTags = require('../commands/get-video-tags');
 import updateVideoTags = require('../commands/update-video-tags');
 import getThumbnail = require('../commands/get-thumbnail');
+import downloadThumbnail = require('../commands/download-thumbnail');
 import mcpCommand = require('../commands/mcp');
 import getPlaylistCommand = require('../commands/get-playlist');
 import getPlaylistsCommand = require('../commands/get-playlists');
@@ -355,6 +356,15 @@ program
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('get-thumbnail', getThumbnail));
+
+program
+  .command('download-thumbnail')
+  .description('Download a video thumbnail image to disk')
+  .requiredOption('--video-id <id>', 'Video ID')
+  .option('--quality <quality>', 'Thumbnail quality: default, medium, high, standard, maxres (default: maxres)')
+  .option('--path <dir>', 'Output directory (default: current working directory)')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(withHelpWrapper('download-thumbnail', downloadThumbnail));
 
 // MCP server command
 program

@@ -217,6 +217,11 @@ export interface UpdateThumbnailOptions extends VerboseOption {
   yes?: boolean;
 }
 
+export interface DownloadThumbnailOptions extends VerboseOption, VideoIdOption {
+  quality?: string;
+  path?: string;
+}
+
 // Comments command options
 export interface ListCommentsOptions extends OutputOption, VerboseOption, LimitOption, VideoIdOption {
   sort?: 'top' | 'new';
