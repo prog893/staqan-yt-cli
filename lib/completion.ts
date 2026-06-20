@@ -132,7 +132,7 @@ export function getCommandOptions(command: string): string[] {
     'list-comments': ['--limit', '-l', '--sort', '-s', ...outputOptions, ...verboseOption],
     'get-video-tags': [...outputOptions, ...verboseOption],
     'update-video-tags': ['--replace', '--add', '--remove', '--dry-run', '--yes', '-y', ...outputOptions, ...verboseOption],
-    'get-thumbnail': ['--quality', ...outputOptions, ...verboseOption],
+    'get-thumbnail': [...outputOptions, ...verboseOption],
     'get-playlist': [...outputOptions, ...verboseOption],
     'get-playlists': [...outputOptions, ...verboseOption],
     'list-playlists': ['--channel', '--limit', '-l', '--privacy', ...outputOptions, ...verboseOption],
@@ -292,8 +292,6 @@ _staqa_nyt_completion() {
       ;;
     --privacy)
       COMPREPLY=( \$(compgen -W "public private unlisted" -- "\${cur}") ); return ;;
-    --quality)
-      COMPREPLY=( \$(compgen -W "maxres standard high medium default" -- "\${cur}") ); return ;;
     --sort|-s)
       COMPREPLY=( \$(compgen -W "top new" -- "\${cur}") ); return ;;
     --format)
@@ -330,7 +328,7 @@ _staqa_nyt_completion() {
       COMPREPLY=( \$(compgen -W "--video-id --replace --add --remove --dry-run --yes --output --verbose" -- "\${cur}") )
       ;;
     get-thumbnail)
-      COMPREPLY=( \$(compgen -W "--video-id --quality --output --verbose" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--video-id --output --verbose" -- "\${cur}") )
       ;;
     get-playlist)
       COMPREPLY=( \$(compgen -W "--playlist-id --output --verbose" -- "\${cur}") )
@@ -671,7 +669,6 @@ ${commandList}
       local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--video-id[Video ID]: :_staqan_yt_video_ids' \\
-        '--quality[Thumbnail quality]:quality:(maxres standard high medium default)' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;

@@ -155,26 +155,21 @@ staqan-yt get-thumbnail --video-id <videoId>
 ### Options
 
 - `--video-id <id>` - YouTube video ID or video URL (required)
-
-- `--quality <quality>` - Specific quality (default, medium, high, standard, maxres)
-- `--output <format>` - Output format: json, table, text, pretty (default: pretty)
+- `--output <format>` - Output format: json, table, text, pretty, csv (default: pretty)
 - `-v, --verbose` - Enable verbose output with debug information
 - `-h, --help` - Show help
 
 ### Examples
 
 ```bash
-# Get all thumbnail qualities
+# List all thumbnail qualities
 staqan-yt get-thumbnail --video-id dQw4w9WgXcQ
-
-# Get specific quality
-staqan-yt get-thumbnail --video-id dQw4w9WgXcQ --quality maxres
 
 # Export to JSON
 staqan-yt get-thumbnail --video-id dQw4w9WgXcQ --output json
 
-# Get URL only (text format)
-staqan-yt get-thumbnail --video-id dQw4w9WgXcQ --quality maxres --output text
+# Tab-separated URLs (for scripting)
+staqan-yt get-thumbnail --video-id dQw4w9WgXcQ --output text
 ```
 
 ### Thumbnail Qualities
@@ -187,35 +182,38 @@ staqan-yt get-thumbnail --video-id dQw4w9WgXcQ --quality maxres --output text
 | `standard` | 640x480 | High quality |
 | `maxres` | 1280x720 | Best quality |
 
-### Output Structure
+### Output Structure (JSON)
 
 ```json
 {
-  "default": "https://i.ytimg.com/vi/dQw4w9WgXcQ/default.jpg",
-  "medium": "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
-  "high": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
-  "standard": "https://i.ytimg.com/vi/dQw4w9WgXcQ/sddefault.jpg",
-  "maxres": "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"
+  "videoId": "dQw4w9WgXcQ",
+  "title": "Never Gonna Give You Up",
+  "thumbnails": [
+    { "quality": "default", "url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/default.jpg", "width": 120, "height": 90 },
+    { "quality": "maxres", "url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg", "width": 1280, "height": 720 }
+  ]
 }
 ```
 
 ### Use Cases
 
-- **Download thumbnails** - Save images for analysis
+- **Browse available URLs** - Pick the right quality for your use case
 - **A/B testing** - Compare thumbnail performance
 - **Social media** - Use thumbnails for promotion
-- **Archive** - Backup all thumbnail versions
+- **Scripting** - Feed URLs into curl/wget for download
 
-### Download Thumbnails
+### Download a Thumbnail
+
+To download the maxres thumbnail:
 
 ```bash
-# Get URL and download
-url=$(staqan-yt get-thumbnail --video-id VIDEO_ID --quality maxres --output text)
+# Get the maxres URL and download
+url=$(staqan-yt get-thumbnail --video-id VIDEO_ID --output text | grep maxres | cut -f2)
 curl -o thumbnail.jpg "$url"
 
 # Download all qualities
 staqan-yt get-thumbnail --video-id VIDEO_ID --output json | \
-  jq -r '.[]' | \
+  jq -r '.thumbnails[] | .url' | \
   while read url; do
     filename=$(basename "$url")
     curl -o "$filename" "$url"
@@ -353,7 +351,7 @@ done
 staqan-yt list-videos @yourchannel --output json | \
   jq -r '.[].id' | \
   while read id; do
-    url=$(staqan-yt get-thumbnail --video-id "$id" --quality maxres --output text)
+    url=$(staqan-yt get-thumbnail --video-id "$id" --output text | grep maxres | cut -f2)
     curl -o "${id}.jpg" "$url"
   done
 ```

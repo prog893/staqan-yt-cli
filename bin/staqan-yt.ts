@@ -352,7 +352,6 @@ program
   .command('get-thumbnail')
   .description('Get video thumbnail URLs')
   .requiredOption('--video-id <id>', 'Video ID')
-  .option('--quality <quality>', 'Specific quality (default, medium, high, standard, maxres)')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('get-thumbnail', getThumbnail));
