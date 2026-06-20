@@ -151,7 +151,7 @@ staqan-yt list-report-jobs --type <Tab>  # Report type IDs
 staqan-yt get-video --<Tab>          # --output, --verbose
 staqan-yt get-video --output <Tab>   # json  table  text  pretty  csv
 staqan-yt list-comments --sort <Tab> # top  new
-staqan-yt get-caption --format <Tab> # srt  vtt  sbv  srv2  ttml  json
+staqan-yt get-caption --format <Tab> # srt  vtt  sbv  scc  ttml  json
 ```
 
 Dynamic ID completion (video IDs, playlist IDs, report types) fetches live data from YouTube and caches results for 5 minutes. It requires a default channel to be configured.
