@@ -6,10 +6,11 @@ import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { GetThumbnailOptions } from '../types';
 
+const THUMBNAIL_SIZES = ['default', 'medium', 'high', 'standard', 'maxres'] as const;
+
 async function getThumbnailCommand(options: GetThumbnailOptions): Promise<void> {
   initCommand(options);
 
-  // Extract video ID from options
   const videoId = options.videoId;
   if (!videoId) {
     error('Required: --video-id');
@@ -43,11 +44,9 @@ async function getThumbnailCommand(options: GetThumbnailOptions): Promise<void> 
 
     const outputFormat = await getOutputFormat(options.output);
 
-    // Prepare flattened thumbnail data for structured formats
     const thumbnailData: Array<{ quality: string; url: string; width?: number; height?: number }> = [];
     if (thumbnails) {
-      const sizes = ['default', 'medium', 'high', 'standard', 'maxres'] as const;
-      sizes.forEach(size => {
+      THUMBNAIL_SIZES.forEach(size => {
         const thumbnail = thumbnails[size];
         if (thumbnail && thumbnail.url) {
           thumbnailData.push({
@@ -62,7 +61,7 @@ async function getThumbnailCommand(options: GetThumbnailOptions): Promise<void> 
 
     switch (outputFormat) {
       case 'json':
-        console.log(formatJson({ videoId: parsedId, title, thumbnails }));
+        console.log(formatJson({ videoId: parsedId, title, thumbnails: thumbnailData }));
         break;
 
       case 'table':
@@ -99,18 +98,6 @@ async function getThumbnailCommand(options: GetThumbnailOptions): Promise<void> 
             }
             console.log('');
           });
-
-          // If quality option specified, show only that one
-          if (options.quality) {
-            const quality = options.quality.toLowerCase();
-            const selectedThumb = thumbnailData.find(t => t.quality === quality);
-            if (selectedThumb) {
-              console.log(chalk.bold(`Selected Quality (${quality}):`));
-              console.log(chalk.blue(selectedThumb.url));
-            } else {
-              console.log(chalk.yellow(`No thumbnail found for quality: ${options.quality}`));
-            }
-          }
         }
         console.log('');
         break;

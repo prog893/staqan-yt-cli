@@ -209,9 +209,7 @@ export interface UpdateTagsOptions extends VerboseOption, VideoIdOption {
 }
 
 // Thumbnail command options
-export interface GetThumbnailOptions extends OutputOption, VerboseOption, VideoIdOption {
-  quality?: string;
-}
+export interface GetThumbnailOptions extends OutputOption, VerboseOption, VideoIdOption {}
 
 export interface UpdateThumbnailOptions extends VerboseOption {
   file: string;
