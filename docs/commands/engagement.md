@@ -143,23 +143,25 @@ staqan-yt get-caption --caption-id <captionId>
 - `-v, --verbose` - Enable verbose output with debug information
 - `-h, --help` - Show help
 
+> **Ownership requirement:** The YouTube API only allows downloading captions from videos on your own authenticated channel. `list-captions` works for any video, but `get-caption` will return a permissions error for videos you don't own.
+
 ### Examples
 
 ```bash
-# Get caption ID first
-staqan-yt list-captions --video-id dQw4w9WgXcQ
+# List captions on one of your own videos to get the caption ID
+staqan-yt list-captions --video-id <your-video-id>
 
 # Download captions (JSON format by default)
-staqan-yt get-caption --caption-id en.dQw4w9WgXcQ
+staqan-yt get-caption --caption-id <caption-id>
 
 # Download as SRT (subtitle file format)
-staqan-yt get-caption --caption-id en.dQw4w9WgXcQ --format srt > captions.srt
+staqan-yt get-caption --caption-id <caption-id> --format srt > captions.srt
 
 # Download as VTT
-staqan-yt get-caption --caption-id en.dQw4w9WgXcQ --format vtt > captions.vtt
+staqan-yt get-caption --caption-id <caption-id> --format vtt > captions.vtt
 
 # Download as text
-staqan-yt get-caption --caption-id en.dQw4w9WgXcQ --format json | jq -r '.[].text'
+staqan-yt get-caption --caption-id <caption-id> --format json | jq -r '.[].text'
 ```
 
 ### Caption Formats
@@ -182,21 +184,23 @@ Caption IDs typically follow the format:
 ```
 
 Examples:
-- `en.dQw4w9WgXcQ` - English captions
-- `ja.dQw4w9WgXcQ` - Japanese captions
-- `en.dQw4w9WgXcQ.3` - Multiple English tracks
+- `en.<video-id>` - English captions
+- `ja.<video-id>` - Japanese captions
+- `en.<video-id>.3` - Multiple English tracks
+
+Use `staqan-yt list-captions --video-id <your-video-id>` to get the exact caption ID for your videos.
 
 ### Working with Captions
 
 **Extract plain text:**
 ```bash
-staqan-yt get-caption en.dQw4w9WgXcQ --format json | \
+staqan-yt get-caption --caption-id <caption-id> --format json | \
   jq -r '.[].text' > transcript.txt
 ```
 
 **Create word cloud:**
 ```bash
-staqan-yt get-caption en.dQw4w9WgXcQ --format json | \
+staqan-yt get-caption --caption-id <caption-id> --format json | \
   jq -r '.[].text' | \
   tr '[:upper:]' '[:lower:]' | \
   tr -d '[:punct:]' | \
@@ -206,7 +210,7 @@ staqan-yt get-caption en.dQw4w9WgXcQ --format json | \
 
 **Find mentions:**
 ```bash
-staqan-yt get-caption en.dQw4w9WgXcQ --format json | \
+staqan-yt get-caption --caption-id <caption-id> --format json | \
   jq -r '.[].text' | \
   grep -i '@\|twitter\|instagram'
 ```

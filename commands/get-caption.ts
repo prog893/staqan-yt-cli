@@ -38,16 +38,14 @@ async function getCaptionCommand(options: GetCaptionOptions): Promise<void> {
 
     // Provide helpful context for common API limitations
     if (errMessage.includes('permissions') || errMessage.includes('not sufficient')) {
-      error('Caption download not available');
+      error('Caption download not available — you can only download captions from your own videos');
       console.log('');
       console.log(chalk.yellow('YouTube API Limitation:'));
-      console.log(chalk.gray('Caption downloads are restricted by YouTube and may not be available for all videos.'));
+      console.log(chalk.gray('The captions.download API only works for videos on your authenticated channel.'));
+      console.log(chalk.gray('Downloading captions from other channels\' videos is not permitted.'));
       console.log('');
-      console.log(chalk.gray('Downloads typically work for:'));
-      console.log('  • Captions manually uploaded by the content owner');
-      console.log('  • Captions with third-party contributions enabled');
-      console.log('');
-      console.log(chalk.gray('Auto-generated captions usually cannot be downloaded via the API.'));
+      console.log(chalk.gray('To get the transcript of a video you don\'t own, use a third-party tool or'));
+      console.log(chalk.gray('the YouTube website\'s subtitle/transcript feature instead.'));
     } else {
       error(errMessage);
     }
