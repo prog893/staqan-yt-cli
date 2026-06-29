@@ -25,6 +25,11 @@ async function listCommentsCommand(options: ListCommentsOptions): Promise<void> 
   }
 
   // Determine sort order
+  const validSorts = ['new', 'relevance'];
+  if (options.sort !== undefined && !validSorts.includes(options.sort)) {
+    error(`Invalid --sort "${options.sort}". Valid values: new, relevance`);
+    process.exit(1);
+  }
   const sortOrder = options.sort === 'new' ? 'time' : 'relevance';
   let limit: number;
   try { limit = parsePositiveInt(options.limit, 20); } catch (e) { error((e as Error).message); process.exit(1); }

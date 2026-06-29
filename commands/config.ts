@@ -97,6 +97,17 @@ async function configCommand(
         process.exit(1);
       }
 
+      const validKeys: ConfigKey[] = ['default.channel', 'default.output', 'lock.timeout'];
+      if (!validKeys.includes(key as ConfigKey)) {
+        error(`Invalid config key: ${key}`);
+        console.log('');
+        console.log('Available keys:');
+        console.log('  default.channel  - Default channel handle or ID (e.g., @staqan)');
+        console.log('  default.output   - Default output format (json|table|text|pretty|csv)');
+        console.log('  lock.timeout     - Lock acquisition timeout in ms (default: 60000)');
+        process.exit(1);
+      }
+
       const currentValue = await getConfigValue(key as ConfigKey);
 
       if (currentValue !== undefined) {
