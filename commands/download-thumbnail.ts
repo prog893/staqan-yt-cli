@@ -3,10 +3,13 @@ import https from 'https';
 import http from 'http';
 import { createWriteStream } from 'fs';
 import { rename, unlink } from 'fs/promises';
+import { randomUUID } from 'crypto';
 import path from 'path';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
 import { parseVideoId, error, debug, initCommand, withSpinner } from '../lib/utils';
+import { getOutputFormat } from '../lib/config';
+import { formatJson } from '../lib/formatters';
 import { DownloadThumbnailOptions } from '../types';
 
 const QUALITY_ORDER = ['maxres', 'standard', 'high', 'medium', 'default'] as const;
@@ -17,7 +20,7 @@ const VALID_QUALITIES = new Set<string>(QUALITY_ORDER);
 async function downloadFile(url: string, destPath: string): Promise<void> {
   const parsedUrl = new URL(url);
   const transport = parsedUrl.protocol === 'https:' ? https : http;
-  const tempPath = `${destPath}.${process.pid}.${Date.now()}.tmp`;
+  const tempPath = `${destPath}.${randomUUID()}.tmp`;
 
   try {
     await new Promise<void>((resolve, reject) => {
@@ -71,6 +74,7 @@ async function downloadThumbnailCommand(options: DownloadThumbnailOptions): Prom
   }
 
   const outputDir = options.path ? path.resolve(options.path) : process.cwd();
+  const outputFormat = await getOutputFormat(options.output);
 
   await withSpinner('Fetching thumbnail URL...', 'Failed to download thumbnail', async (spinner) => {
     const parsedId = parseVideoId(options.videoId!);
@@ -136,13 +140,28 @@ async function downloadThumbnailCommand(options: DownloadThumbnailOptions): Prom
     await downloadFile(thumbnailUrl, destPath);
 
     spinner.succeed('Thumbnail downloaded');
-    console.log('');
 
-    if (resolvedQuality !== quality) {
-      console.log(chalk.yellow(`Note: "${quality}" quality not available; used "${resolvedQuality}" instead.`));
+    const result = { videoId: parsedId, quality: resolvedQuality, path: destPath };
+
+    switch (outputFormat) {
+      case 'json':
+        console.log(formatJson(result));
+        break;
+
+      case 'text':
+        console.log(destPath);
+        break;
+
+      case 'pretty':
+      default:
+        console.log('');
+        if (resolvedQuality !== quality) {
+          console.log(chalk.yellow(`Note: "${quality}" quality not available; used "${resolvedQuality}" instead.`));
+        }
+        console.log(chalk.gray('Saved: ') + chalk.green(destPath));
+        console.log('');
+        break;
     }
-    console.log(chalk.gray('Saved: ') + chalk.green(destPath));
-    console.log('');
   });
 }
 

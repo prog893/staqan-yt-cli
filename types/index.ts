@@ -217,7 +217,7 @@ export interface UpdateThumbnailOptions extends VerboseOption {
   yes?: boolean;
 }
 
-export interface DownloadThumbnailOptions extends VerboseOption, VideoIdOption {
+export interface DownloadThumbnailOptions extends OutputOption, VerboseOption, VideoIdOption {
   quality?: string;
   path?: string;
 }

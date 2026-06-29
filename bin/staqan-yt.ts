@@ -363,6 +363,7 @@ program
   .requiredOption('--video-id <id>', 'Video ID')
   .option('--quality <quality>', 'Thumbnail quality: default, medium, high, standard, maxres (default: maxres)')
   .option('--path <dir>', 'Output directory (default: current working directory)')
+  .option('--output <format>', 'Output format: json, text, pretty (default: pretty)')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('download-thumbnail', downloadThumbnail));
 
