@@ -49,6 +49,7 @@ const COMMAND_GROUPS: Record<string, string[]> = {
     'get-playlist',
     'get-playlists',
     'get-thumbnail',
+    'download-thumbnail',
     'get-video-tags',
     'update-video-tags',
   ],

@@ -1,5 +1,10 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import https from 'https';
+import http from 'http';
+import { rename, unlink, writeFile } from 'fs/promises';
+import { randomUUID } from 'crypto';
+import path from 'path';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -396,6 +401,29 @@ const TOOLS: Tool[] = [
           type: 'string',
           description: 'Specific quality to return (optional): default, medium, high, standard, or maxres',
           enum: ['default', 'medium', 'high', 'standard', 'maxres'],
+        },
+      },
+      required: ['videoId'],
+    },
+  },
+  {
+    name: 'youtube_download_thumbnail',
+    description: 'Download a video thumbnail as a JPEG image. Without filePath, returns the image inline; with filePath, saves to disk and returns the path.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        videoId: {
+          type: 'string',
+          description: 'YouTube video ID (11 characters)',
+        },
+        quality: {
+          type: 'string',
+          description: 'Thumbnail size quality (default: maxres). Falls back to the next available quality if the requested one is not present.',
+          enum: ['default', 'medium', 'high', 'standard', 'maxres'],
+        },
+        filePath: {
+          type: 'string',
+          description: 'Absolute path or path relative to cwd to save the JPEG to. Omit to receive the image inline.',
         },
       },
       required: ['videoId'],
@@ -1110,6 +1138,102 @@ async function handleToolCall(name: string, args: any) {
             type: 'text',
             text: JSON.stringify({ videoId: parsedId, title, thumbnails }, null, 2),
           },
+        ],
+      };
+    }
+
+    case 'youtube_download_thumbnail': {
+      const QUALITY_ORDER = ['maxres', 'standard', 'high', 'medium', 'default'] as const;
+      type ThumbQuality = typeof QUALITY_ORDER[number];
+
+      const parsedId = parseVideoId(args.videoId);
+      const requestedQualityInput = args.quality ?? 'maxres';
+      if (!(QUALITY_ORDER as readonly string[]).includes(requestedQualityInput)) {
+        throw new Error(`Invalid quality "${requestedQualityInput}". Valid values: ${QUALITY_ORDER.join(', ')}`);
+      }
+      const requestedQuality = requestedQualityInput as ThumbQuality;
+
+      const thumbResponse = await youtube.videos.list({
+        part: ['snippet'],
+        id: [parsedId],
+      });
+
+      if (!thumbResponse.data.items || thumbResponse.data.items.length === 0) {
+        throw new Error(`Video not found: ${parsedId}`);
+      }
+
+      const thumbnails = thumbResponse.data.items[0].snippet?.thumbnails;
+      if (!thumbnails) {
+        throw new Error(`No thumbnail data for video: ${parsedId}`);
+      }
+
+      let resolvedQuality: ThumbQuality | null = null;
+      let thumbnailUrl: string | null = null;
+
+      if (thumbnails[requestedQuality]?.url) {
+        resolvedQuality = requestedQuality;
+        thumbnailUrl = thumbnails[requestedQuality]!.url!;
+      } else {
+        const startIdx = QUALITY_ORDER.indexOf(requestedQuality);
+        for (let i = startIdx + 1; i < QUALITY_ORDER.length; i++) {
+          const q = QUALITY_ORDER[i];
+          if (thumbnails[q]?.url) {
+            resolvedQuality = q;
+            thumbnailUrl = thumbnails[q]!.url!;
+            break;
+          }
+        }
+      }
+
+      if (!resolvedQuality || !thumbnailUrl) {
+        throw new Error(`No thumbnail available for video: ${parsedId}`);
+      }
+
+      const imageBytes = await new Promise<Buffer>((resolve, reject) => {
+        const parsedUrl = new URL(thumbnailUrl!);
+        const transport = parsedUrl.protocol === 'https:' ? https : http;
+        const req = transport.get(thumbnailUrl!, (res) => {
+          if (res.statusCode !== 200) {
+            res.resume();
+            reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`));
+            return;
+          }
+          const chunks: Buffer[] = [];
+          res.on('data', (chunk: Buffer) => chunks.push(chunk));
+          res.on('end', () => resolve(Buffer.concat(chunks)));
+          res.on('error', reject);
+        });
+        req.setTimeout(30_000, () => {
+          req.destroy(new Error('Thumbnail download timed out'));
+        });
+        req.on('error', reject);
+      });
+
+      if (args.filePath) {
+        const dest = path.resolve(args.filePath);
+        const tempDest = `${dest}.${randomUUID()}.tmp`;
+        try {
+          await writeFile(tempDest, imageBytes);
+          await rename(tempDest, dest);
+        } catch (err) {
+          await unlink(tempDest).catch(() => {});
+          throw err;
+        }
+        const note = resolvedQuality !== requestedQuality
+          ? ` (requested "${requestedQuality}", used "${resolvedQuality}")`
+          : '';
+        return {
+          content: [{ type: 'text', text: `Saved thumbnail to ${dest}${note}.` }],
+        };
+      }
+
+      const note = resolvedQuality !== requestedQuality
+        ? ` (requested "${requestedQuality}", used "${resolvedQuality}")`
+        : '';
+      return {
+        content: [
+          { type: 'text', text: `Thumbnail for ${parsedId} — quality: ${resolvedQuality}${note}` },
+          { type: 'image', data: imageBytes.toString('base64'), mimeType: 'image/jpeg' },
         ],
       };
     }
