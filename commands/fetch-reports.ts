@@ -162,6 +162,13 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
           error('--types cannot be empty. Provide comma-separated type IDs or omit the flag.');
           process.exit(1);
         }
+        const availableIds = new Set(reportTypes.map(t => t.id).filter((id): id is string => Boolean(id)));
+        const invalidIds = requestedIds.filter(id => !availableIds.has(id));
+        if (invalidIds.length > 0) {
+          spinner.fail('Invalid --types');
+          error(`Unknown report type ID(s): ${invalidIds.join(', ')}`);
+          process.exit(1);
+        }
         reportTypes = reportTypes.filter(t => requestedIds.includes(t.id!));
         debug(`Filtering by multiple types: ${requestedIds.join(', ')}`);
       }

@@ -109,7 +109,10 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
     let metrics: string;
     let reportName = '';
 
-    if (options.report && (options.dimensions || options.metrics)) {
+    if (
+      options.report !== undefined &&
+      (options.dimensions !== undefined || options.metrics !== undefined)
+    ) {
       spinner.fail('Conflicting options');
       error('Cannot combine --report with --dimensions or --metrics. Use one or the other.');
       process.exit(1);

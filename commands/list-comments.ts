@@ -25,9 +25,9 @@ async function listCommentsCommand(options: ListCommentsOptions): Promise<void> 
   }
 
   // Determine sort order
-  const validSorts = ['new', 'relevance'];
+  const validSorts = ['new', 'top'];
   if (options.sort !== undefined && !validSorts.includes(options.sort)) {
-    error(`Invalid --sort "${options.sort}". Valid values: new, relevance`);
+    error(`Invalid --sort "${options.sort}". Valid values: new, top`);
     process.exit(1);
   }
   const sortOrder = options.sort === 'new' ? 'time' : 'relevance';
