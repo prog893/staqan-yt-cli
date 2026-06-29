@@ -350,6 +350,16 @@ export interface Config {
 
 export type ConfigKey = 'default.channel' | 'default.output' | 'lock.timeout';
 
+// Canonical list of all config keys for validation
+export const CONFIG_KEYS: ConfigKey[] = ['default.channel', 'default.output', 'lock.timeout'];
+
+// Help text for each config key
+export const CONFIG_KEY_HELP: Record<ConfigKey, string> = {
+	'default.channel': 'Default channel handle or ID (e.g., @staqan)',
+	'default.output': 'Default output format (json|table|text|pretty|csv)',
+	'lock.timeout': 'Lock acquisition timeout in ms (default: 60000)',
+};
+
 // Completion types
 export type CompletionType = 'video-id' | 'playlist-id' | 'report-type';
 
