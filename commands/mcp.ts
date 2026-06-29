@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import https from 'https';
 import http from 'http';
 import { rename, unlink, writeFile } from 'fs/promises';
+import { randomUUID } from 'crypto';
 import path from 'path';
 import {
   CallToolRequestSchema,
@@ -1210,7 +1211,7 @@ async function handleToolCall(name: string, args: any) {
 
       if (args.filePath) {
         const dest = path.resolve(args.filePath);
-        const tempDest = `${dest}.${process.pid}.${Date.now()}.tmp`;
+        const tempDest = `${dest}.${randomUUID()}.tmp`;
         try {
           await writeFile(tempDest, imageBytes);
           await rename(tempDest, dest);

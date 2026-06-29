@@ -31,10 +31,8 @@ async function downloadFile(url: string, destPath: string): Promise<void> {
         const file = createWriteStream(tempPath);
         response.pipe(file);
 
-        file.on('finish', () => {
-          file.close();
-          resolve();
-        });
+        file.on('finish', () => file.close());
+        file.on('close', resolve);
 
         file.on('error', reject);
       });
