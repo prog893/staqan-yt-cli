@@ -3,8 +3,15 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { getConfig, getConfigValue, setConfigValue, DEFAULT_LOCK_TIMEOUT_MS } from '../lib/config';
 import { success, error, info, CACHE_DIR } from '../lib/utils';
-import { ConfigKey } from '../types';
+import { ConfigKey, CONFIG_KEYS, CONFIG_KEY_HELP } from '../types';
 import { installCompletion, detectShell } from '../lib/completion';
+
+function printAvailableConfigKeys(): void {
+  console.log('Available keys:');
+  CONFIG_KEYS.forEach(k => {
+    console.log(`  ${k.padEnd(18)} - ${CONFIG_KEY_HELP[k]}`);
+  });
+}
 
 async function invalidateChannelCache(): Promise<void> {
   // Per-channel completion caches (video-id, playlist-id) are channel-specific.
@@ -62,22 +69,15 @@ async function configCommand(
       if (!key || !value) {
         error('Usage: staqan-yt config set <key> <value>');
         console.log('');
-        console.log('Available keys:');
-        console.log('  default.channel  - Default channel handle or ID (e.g., @staqan)');
-        console.log('  default.output   - Default output format (json|table|text|pretty|csv)');
-        console.log('  lock.timeout     - Lock acquisition timeout in ms (default: 60000)');
+        printAvailableConfigKeys();
         process.exit(1);
       }
 
       // Validate key
-      const validKeys: ConfigKey[] = ['default.channel', 'default.output', 'lock.timeout'];
-      if (!validKeys.includes(key as ConfigKey)) {
+      if (!CONFIG_KEYS.includes(key as ConfigKey)) {
         error(`Invalid config key: ${key}`);
         console.log('');
-        console.log('Available keys:');
-        console.log('  default.channel  - Default channel handle or ID (e.g., @staqan)');
-        console.log('  default.output   - Default output format (json|table|text|pretty|csv)');
-        console.log('  lock.timeout     - Lock acquisition timeout in ms (default: 60000)');
+        printAvailableConfigKeys();
         process.exit(1);
       }
 
@@ -97,14 +97,10 @@ async function configCommand(
         process.exit(1);
       }
 
-      const validKeys: ConfigKey[] = ['default.channel', 'default.output', 'lock.timeout'];
-      if (!validKeys.includes(key as ConfigKey)) {
+      if (!CONFIG_KEYS.includes(key as ConfigKey)) {
         error(`Invalid config key: ${key}`);
         console.log('');
-        console.log('Available keys:');
-        console.log('  default.channel  - Default channel handle or ID (e.g., @staqan)');
-        console.log('  default.output   - Default output format (json|table|text|pretty|csv)');
-        console.log('  lock.timeout     - Lock acquisition timeout in ms (default: 60000)');
+        printAvailableConfigKeys();
         process.exit(1);
       }
 
