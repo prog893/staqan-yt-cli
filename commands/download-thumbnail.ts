@@ -29,12 +29,18 @@ async function downloadFile(url: string, destPath: string): Promise<void> {
         }
 
         const file = createWriteStream(tempPath);
+        const fail = (err: Error) => {
+          reject(err);
+          response.destroy();
+          file.destroy();
+        };
+
+        response.once('error', fail);
         response.pipe(file);
 
         file.on('finish', () => file.close());
         file.on('close', resolve);
-
-        file.on('error', reject);
+        file.once('error', fail);
       });
 
       req.setTimeout(30_000, () => {
