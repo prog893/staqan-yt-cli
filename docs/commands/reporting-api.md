@@ -486,7 +486,22 @@ Reporting API quota usage:
 - **list-report-types**: 1 unit
 - **list-report-jobs**: 1 unit
 - **get-report-data**: 1 unit (cached: 0 units)
-- **fetch-reports**: 1 unit per report downloaded
+- **fetch-reports**: 1 unit per report downloaded, plus:
+  - 1 unit for `reportTypes.list`
+  - 1 unit for `jobs.list` (called once per run, not once per type)
+  - 1 unit per `jobs.reports.list` page per type
+  - 1 unit per `jobs.create` for new types
+
+### Rate-limit handling
+
+`fetch-reports` automatically retries on `HTTP 429 / Free requests per minute`
+errors with exponential backoff (5s → 10s → 20s → 40s → 80s, capped at 90s) and
+honors the server's `Retry-After` header. Daily quota exhaustion
+(`Free requests per day`) aborts the run immediately with a clear message —
+no amount of waiting will recover within the same window.
+
+Downloads themselves also retry on 429 and on transient network errors
+(`ECONNRESET` / `ETIMEDOUT` / `EAI_AGAIN`).
 
 ## Notes
 

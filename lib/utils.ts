@@ -455,6 +455,51 @@ async function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Classify a Google API error by quota type.
+ *
+ * Returns:
+ *   'rpm'   — YouTube Reporting/Data API "Free requests per minute" limit hit.
+ *             Retriable after the per-minute window resets (≈60s).
+ *   'daily' — Daily quota exhausted. Not retriable; abort the run.
+ *   null    — Some other error; let the caller decide what to do.
+ *
+ * YouTube's error message format (per API docs and observed in cron logs):
+ *   "Quota exceeded for quota metric 'Free requests' and limit 'Free requests per minute'"
+ *   "Quota exceeded for quota metric 'Free requests' and limit 'Free requests per day'"
+ *
+ * Both arrive as HTTP 429 with reason `rateLimitExceeded`, so status code alone
+ * can't tell them apart — we have to inspect the message text.
+ *
+ * The googleapis library surfaces the API's `errors[].message` either in
+ * `err.message` or nested in `err.response.data.error.errors[]`. We check both.
+ */
+function isRateLimitError(err: unknown): 'rpm' | 'daily' | null {
+  if (!err || typeof err !== 'object') return null;
+
+  const messages: string[] = [];
+
+  // googleapis / GaxiosError: the API message is usually on err.message
+  const topMessage = (err as { message?: unknown }).message;
+  if (typeof topMessage === 'string') messages.push(topMessage);
+
+  // Some errors nest the YouTube message under response.data.error.errors[].message
+  const nested = (err as { response?: { data?: { error?: { errors?: Array<{ message?: unknown }>; message?: unknown } } } }).response?.data?.error;
+  if (nested?.message && typeof nested.message === 'string') messages.push(nested.message);
+  if (Array.isArray(nested?.errors)) {
+    for (const e of nested.errors) {
+      if (e && typeof e.message === 'string') messages.push(e.message);
+    }
+  }
+
+  for (const msg of messages) {
+    const lower = msg.toLowerCase();
+    if (lower.includes('per day')) return 'daily';
+    if (lower.includes('per minute') || lower.includes('per minute ')) return 'rpm';
+  }
+  return null;
+}
+
+/**
  * Retry a function with exponential backoff
  */
 async function retryWithBackoff<T>(
@@ -484,6 +529,60 @@ async function retryWithBackoff<T>(
   }
 
   throw lastError || new Error('Max retries exceeded');
+}
+
+/**
+ * Retry a YouTube API call that may hit the per-minute (RPM) quota limit.
+ *
+ * On "Free requests per minute": backs off exponentially — 5s → 10s → 20s →
+ * 40s → 80s, capped at `maxDelayMs` (default 90s) — and retries, up to
+ * `maxRetries` times. Each retry emits a `progress()` line so the user (or
+ * cron log) can see what's happening. Honors the server's Retry-After header
+ * if present and larger than the exponential wait.
+ *
+ * On "Free requests per day" (or any longer-window quota — week / month):
+ * throws immediately with a clear message — no amount of waiting will
+ * recover within the same window, so retrying wastes time and hides the
+ * real problem from the operator.
+ *
+ * On any other error: re-throws as-is.
+ */
+async function withRateLimitRetry<T>(
+  fn: () => Promise<T>,
+  opts: { maxRetries?: number; baseDelayMs?: number; maxDelayMs?: number; label?: string } = {}
+): Promise<T> {
+  const maxRetries = opts.maxRetries ?? 5;
+  const baseDelayMs = opts.baseDelayMs ?? 5_000;
+  const maxDelayMs = opts.maxDelayMs ?? 90_000;
+  const label = opts.label ?? 'API call';
+
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      const kind = isRateLimitError(err);
+      if (kind === 'daily') {
+        throw new Error(
+          `Daily YouTube API quota exhausted while running ${label}. ` +
+          `Aborting — wait until 00:00 PT (quota reset) or request a quota increase. ` +
+          `Original error: ${(err as Error).message}`
+        );
+      }
+      if (kind === 'rpm' && attempt < maxRetries) {
+        const expMs = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs);
+        const waitSec = Math.round(expMs / 1000);
+        progress(`RPM quota hit on ${label} (attempt ${attempt}/${maxRetries}), backing off ${waitSec}s before retry...`);
+        await sleep(expMs);
+        continue;
+      }
+      // Not a retriable rate-limit error (or out of attempts) — bubble up.
+      throw err;
+    }
+  }
+  // Should be unreachable, but keep typescript happy.
+  throw lastError instanceof Error ? lastError : new Error(`Max RPM retries exceeded for ${label}`);
 }
 
 /**
@@ -560,6 +659,8 @@ export {
   chunkDateRange,
   sleep,
   retryWithBackoff,
+  isRateLimitError,
+  withRateLimitRetry,
   parsePositiveInt,
   toLocalYmd,
   validateDateOption,
