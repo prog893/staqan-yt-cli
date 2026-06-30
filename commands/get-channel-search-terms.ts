@@ -38,6 +38,16 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
   try { if (options.endDate) validateDateOption('--end-date', options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
   try { if (options.startDate && options.endDate) validateDateRange(options.startDate, options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
 
+  // Validate --content-type against the allowlist. The type is already
+  // narrowed to 'all' | 'video' | 'shorts' in types/index.ts, but commander.js
+  // passes arbitrary strings through at runtime, so an unknown value would
+  // silently fall through to the 'all' branch via CONTENT_TYPE_FILTERS lookup.
+  const validContentTypes = Object.keys(CONTENT_TYPE_FILTERS).concat('all');
+  if (options.contentType !== undefined && !validContentTypes.includes(options.contentType)) {
+    error(`Invalid --content-type "${options.contentType}". Valid values: ${validContentTypes.join(', ')}`);
+    process.exit(1);
+  }
+
   await withSpinner('Resolving channel...', 'Failed to fetch channel search terms', async (spinner) => {
     // Resolve channel from arg or config default
     const channelArg = await requireChannel(options.channel);
