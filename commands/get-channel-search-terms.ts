@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseChannelHandle, error, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, validateDateOption, validateDateRange, parseDuration } from '../lib/utils';
+import { parseChannelHandle, error, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, validateDateOption, validateDateRange, parseDuration, runOrExit } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ChannelSearchTermsOptions } from '../types';
@@ -34,11 +34,10 @@ const VIDEOS_LIST_CHUNK_SIZE = 50;
 async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions): Promise<void> {
   initCommand(options);
 
-  let rawLimit: number;
-  try { rawLimit = parsePositiveInt(options.limit, 25); } catch (e) { error((e as Error).message); process.exit(1); }
-  try { if (options.startDate) validateDateOption('--start-date', options.startDate); } catch (e) { error((e as Error).message); process.exit(1); }
-  try { if (options.endDate) validateDateOption('--end-date', options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
-  try { if (options.startDate && options.endDate) validateDateRange(options.startDate, options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
+  const rawLimit = runOrExit(() => parsePositiveInt('--limit', options.limit, 25));
+  runOrExit(() => { if (options.startDate) validateDateOption('--start-date', options.startDate); });
+  runOrExit(() => { if (options.endDate) validateDateOption('--end-date', options.endDate); });
+  runOrExit(() => { if (options.startDate && options.endDate) validateDateRange(options.startDate, options.endDate); });
 
   // Validate --content-type against the allowlist. The type is already
   // narrowed to 'all' | 'video' | 'shorts' in types/index.ts, but commander.js
@@ -195,7 +194,9 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
     const endDate = options.endDate || toLocalYmd(new Date());
     const startDate = options.startDate || YOUTUBE_START_DATE;
     const isLifetime = startDate === YOUTUBE_START_DATE;
-    try { validateDateRange(startDate, endDate); } catch (e) { spinner.stop(); error((e as Error).message); process.exit(1); }
+    // validateDateRange throws on bad ranges; withSpinner's catch handles it
+    // (fail + error + exit) — no manual try/catch needed here.
+    validateDateRange(startDate, endDate);
     // API enforces maxResults ≤ 25 for this report type
     const limit = Math.min(rawLimit, MAX_RESULTS_LIMIT);
 

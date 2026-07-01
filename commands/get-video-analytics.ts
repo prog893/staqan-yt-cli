@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, debug, formatNumber, convertToCSV, chunkDateRange, retryWithBackoff, initCommand, withSpinner, toLocalYmd, validateDateOption, validateDateRange } from '../lib/utils';
+import { parseVideoId, error, debug, formatNumber, convertToCSV, chunkDateRange, retryWithBackoff, initCommand, withSpinner, toLocalYmd, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { AnalyticsOptions } from '../types';
@@ -16,9 +16,9 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
     process.exit(1);
   }
 
-  try { if (options.startDate) validateDateOption('--start-date', options.startDate); } catch (e) { error((e as Error).message); process.exit(1); }
-  try { if (options.endDate) validateDateOption('--end-date', options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
-  try { if (options.startDate && options.endDate) validateDateRange(options.startDate, options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
+  runOrExit(() => { if (options.startDate) validateDateOption('--start-date', options.startDate); });
+  runOrExit(() => { if (options.endDate) validateDateOption('--end-date', options.endDate); });
+  runOrExit(() => { if (options.startDate && options.endDate) validateDateRange(options.startDate, options.endDate); });
 
   await withSpinner('Fetching video information...', 'Failed to fetch analytics', async (spinner) => {
     const parsedId = parseVideoId(videoId);
@@ -55,7 +55,8 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
     const endDate = options.endDate || toLocalYmd(new Date());
     const startDate = options.startDate || publishedAt.split('T')[0];
 
-    try { validateDateRange(startDate, endDate); } catch (e) { spinner.stop(); error((e as Error).message); process.exit(1); }
+    // validateDateRange throws on bad ranges; withSpinner's catch handles it.
+    validateDateRange(startDate, endDate);
     debug(`Date range: ${startDate} to ${endDate}`);
 
     // Default metrics

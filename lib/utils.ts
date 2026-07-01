@@ -315,9 +315,9 @@ function chunkDateRange(startDate: string, endDate: string): { start: string; en
  * type is PrivacyStatus[], but at runtime the values are unvalidated strings
  * until this function confirms them.
  */
-function parsePositiveInt(limitOpt: string | undefined, defaultValue: number): number {
-  const n = limitOpt ? parseInt(limitOpt, 10) : defaultValue;
-  if (isNaN(n) || n < 1) throw new Error('--limit must be a positive integer');
+function parsePositiveInt(flag: string, opt: string | undefined, defaultValue: number): number {
+  const n = opt ? parseInt(opt, 10) : defaultValue;
+  if (isNaN(n) || n < 1) throw new Error(`${flag} must be a positive integer`);
   return n;
 }
 
@@ -351,7 +351,27 @@ function validatePrivacyFilter(privacy: string[] | undefined): void {
   const valid = ['public', 'private', 'unlisted'];
   const invalid = privacy.filter(s => !valid.includes(s));
   if (invalid.length > 0) {
-    error(`Invalid privacy value(s): ${invalid.join(', ')}. Valid values: public, private, unlisted`);
+    throw new Error(`Invalid privacy value(s): ${invalid.join(', ')}. Valid values: public, private, unlisted`);
+  }
+}
+
+/**
+ * Run a throwing validator (or any void/value function) and catch-and-die on
+ * failure: print the error message via `error()` and exit(1). This is the
+ * caller side of the project's throw-and-catch helper contract — validators
+ * throw, the command decides to exit via this wrapper. Keeps every command's
+ * `try { validate() } catch (e) { error(...); process.exit(1); }` boilerplate
+ * in one place.
+ *
+ * For async work wrapped in a spinner, prefer `withSpinner` (it owns its own
+ * catch-and-die). Use `runOrExit` for the synchronous validation calls that
+ * run at the top of a command before any spinner starts.
+ */
+function runOrExit<T>(fn: () => T): T {
+  try {
+    return fn();
+  } catch (e) {
+    error((e as Error).message);
     process.exit(1);
   }
 }
@@ -706,4 +726,5 @@ export {
   validateDateOption,
   validateDateRange,
   validatePrivacyFilter,
+  runOrExit,
 };

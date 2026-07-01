@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '../lib/auth';
-import { error, warning, debug, initCommand, withSpinner, formatTimestampWithTimezone, validateDateOption, validateDateRange } from '../lib/utils';
+import { error, warning, debug, initCommand, withSpinner, formatTimestampWithTimezone, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
 import { getOutputFormat, getConfigValue } from '../lib/config';
 import { formatJson, formatTable, formatCsv, formatText } from '../lib/formatters';
 import {
@@ -98,9 +98,9 @@ async function downloadReport(
  */
 async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
   initCommand(options);
-  try { if (options.startDate) validateDateOption('--start-date', options.startDate); } catch (e) { error((e as Error).message); process.exit(1); }
-  try { if (options.endDate) validateDateOption('--end-date', options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
-  try { if (options.startDate && options.endDate) validateDateRange(options.startDate, options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
+  runOrExit(() => { if (options.startDate) validateDateOption('--start-date', options.startDate); });
+  runOrExit(() => { if (options.endDate) validateDateOption('--end-date', options.endDate); });
+  runOrExit(() => { if (options.startDate && options.endDate) validateDateRange(options.startDate, options.endDate); });
 
   await withSpinner('Checking for existing reporting job...', 'Failed to fetch report data', async (spinner) => {
     // Resolve channel handle → canonical channel ID for cache namespacing

@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd } from '../lib/utils';
+import { parseVideoId, error, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, runOrExit } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { SearchTermsOptions } from '../types';
@@ -16,8 +16,7 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
     process.exit(1);
   }
 
-  let limit: number;
-  try { limit = parsePositiveInt(options.limit, 50); } catch (e) { error((e as Error).message); process.exit(1); }
+  const limit = runOrExit(() => parsePositiveInt('--limit', options.limit, 50));
 
   await withSpinner('Fetching search terms...', 'Failed to fetch search terms', async (spinner) => {
     const parsedId = parseVideoId(videoId);
