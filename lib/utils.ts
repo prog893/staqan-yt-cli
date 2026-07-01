@@ -356,6 +356,27 @@ function validatePrivacyFilter(privacy: string[] | undefined): void {
 }
 
 /**
+ * Run a throwing validator (or any void/value function) and catch-and-die on
+ * failure: print the error message via `error()` and exit(1). This is the
+ * caller side of the project's throw-and-catch helper contract — validators
+ * throw, the command decides to exit via this wrapper. Keeps every command's
+ * `try { validate() } catch (e) { error(...); process.exit(1); }` boilerplate
+ * in one place.
+ *
+ * For async work wrapped in a spinner, prefer `withSpinner` (it owns its own
+ * catch-and-die). Use `runOrExit` for the synchronous validation calls that
+ * run at the top of a command before any spinner starts.
+ */
+function runOrExit<T>(fn: () => T): T {
+  try {
+    return fn();
+  } catch (e) {
+    error((e as Error).message);
+    process.exit(1);
+  }
+}
+
+/**
  * Initialize a command: enable verbose mode if requested.
  * Call at the top of every command before any async work.
  */
@@ -705,4 +726,5 @@ export {
   validateDateOption,
   validateDateRange,
   validatePrivacyFilter,
+  runOrExit,
 };
