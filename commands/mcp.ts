@@ -923,7 +923,11 @@ async function handleToolCall(name: string, args: any) {
       // `Invalid value (...) given in field parameters.filters`, even for the
       // correct enum values. So we pre-trim the `video==` list to Shorts
       // (<60s) or long-form (>=60s). See #88.
+      const validContentTypes = ['all', 'video', 'shorts'];
       const contentType = args.contentType ?? 'all';
+      if (!validContentTypes.includes(contentType)) {
+        throw new Error(`Invalid contentType "${contentType}". Valid values: ${validContentTypes.join(', ')}`);
+      }
       if (contentType !== 'all') {
         const wantShorts = contentType === 'shorts';
         const durationById = new Map<string, number>();
