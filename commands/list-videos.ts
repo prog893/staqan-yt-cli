@@ -7,10 +7,10 @@ import { ChannelOption, OutputOption, LimitOption, VerboseOption, TypeFilterOpti
 
 async function channelVideosCommand(options: ChannelOption & OutputOption & LimitOption & VerboseOption & TypeFilterOption & PrivacyFilterOption): Promise<void> {
   initCommand(options);
-  validatePrivacyFilter(options.privacy);
+  try { validatePrivacyFilter(options.privacy); } catch (e) { error((e as Error).message); process.exit(1); }
 
   let limit: number;
-  try { limit = parsePositiveInt(options.limit, 50); } catch (e) { error((e as Error).message); process.exit(1); }
+  try { limit = parsePositiveInt('--limit', options.limit, 50); } catch (e) { error((e as Error).message); process.exit(1); }
 
   await withSpinner('Fetching channel videos...', 'Failed to fetch videos', async (spinner) => {
     const channel = await requireChannel(options.channel);

@@ -35,7 +35,7 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
   initCommand(options);
 
   let rawLimit: number;
-  try { rawLimit = parsePositiveInt(options.limit, 25); } catch (e) { error((e as Error).message); process.exit(1); }
+  try { rawLimit = parsePositiveInt('--limit', options.limit, 25); } catch (e) { error((e as Error).message); process.exit(1); }
   try { if (options.startDate) validateDateOption('--start-date', options.startDate); } catch (e) { error((e as Error).message); process.exit(1); }
   try { if (options.endDate) validateDateOption('--end-date', options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }
   try { if (options.startDate && options.endDate) validateDateRange(options.startDate, options.endDate); } catch (e) { error((e as Error).message); process.exit(1); }

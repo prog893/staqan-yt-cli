@@ -17,7 +17,7 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
   }
 
   let limit: number;
-  try { limit = parsePositiveInt(options.limit, 50); } catch (e) { error((e as Error).message); process.exit(1); }
+  try { limit = parsePositiveInt('--limit', options.limit, 50); } catch (e) { error((e as Error).message); process.exit(1); }
 
   await withSpinner('Fetching search terms...', 'Failed to fetch search terms', async (spinner) => {
     const parsedId = parseVideoId(videoId);

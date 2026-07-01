@@ -9,7 +9,6 @@ import {
   CREDENTIALS_PATH,
   TOKEN_PATH,
   ensureConfigDir,
-  error,
   info,
 } from './utils';
 import { OAuth2Credentials, OAuth2Token } from '../types';
@@ -80,6 +79,34 @@ async function createOAuth2Client(): Promise<OAuth2Client> {
 }
 
 /**
+ * Error thrown when the OAuth2 credentials file is missing.
+ * Carries the setup-instruction message so the caller's catch block can
+ * decide whether (and how) to print it before exiting.
+ */
+class CredentialsMissingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CredentialsMissingError';
+  }
+}
+
+/**
+ * Print the multi-line setup instructions for obtaining OAuth2 credentials.
+ * Used by `authenticate()` (via a thrown CredentialsMissingError) and by the
+ * `auth` command's catch block to surface the same UX in one place.
+ */
+function printCredentialsSetupInstructions(): void {
+  info('To set up authentication:');
+  console.log('1. Go to: ' + chalk.cyan('https://console.cloud.google.com/apis/credentials'));
+  console.log('2. Create OAuth 2.0 Client ID (Desktop application)');
+  console.log('3. Download the credentials JSON file');
+  console.log('4. Save it as: ' + chalk.cyan(CREDENTIALS_PATH));
+  console.log('');
+  info('Required OAuth scopes:');
+  SCOPES.forEach(scope => console.log('  - ' + scope));
+}
+
+/**
  * Get authenticated OAuth2 client
  */
 async function getAuthenticatedClient(): Promise<OAuth2Client> {
@@ -113,17 +140,11 @@ async function authenticate(): Promise<OAuth2Client> {
   const credentials = await loadCredentials();
 
   if (!credentials) {
-    error('Credentials file not found!');
-    console.log('');
-    info('To set up authentication:');
-    console.log('1. Go to: ' + chalk.cyan('https://console.cloud.google.com/apis/credentials'));
-    console.log('2. Create OAuth 2.0 Client ID (Desktop application)');
-    console.log('3. Download the credentials JSON file');
-    console.log('4. Save it as: ' + chalk.cyan(CREDENTIALS_PATH));
-    console.log('');
-    info('Required OAuth scopes:');
-    SCOPES.forEach(scope => console.log('  - ' + scope));
-    process.exit(1);
+    // Throw instead of exiting — the caller (commands/auth.ts) decides how
+    // to surface the message and exit. The setup instructions live in a
+    // shared helper so the caller's catch block can print them in the same
+    // shape as the old direct-exit path.
+    throw new CredentialsMissingError('Credentials file not found!');
   }
 
   const oauth2Client = await createOAuth2Client();
@@ -194,4 +215,6 @@ export {
   loadCredentials,
   loadToken,
   saveToken,
+  CredentialsMissingError,
+  printCredentialsSetupInstructions,
 };

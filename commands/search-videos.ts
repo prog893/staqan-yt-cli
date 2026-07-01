@@ -65,7 +65,7 @@ async function searchVideosCommand(options: SearchVideosOptions & QueryOption): 
     : `Searching ${targetChannel} for "${query}"...`;
 
   let limit: number;
-  try { limit = parsePositiveInt(options.limit, 25); } catch (e) { error((e as Error).message); process.exit(1); }
+  try { limit = parsePositiveInt('--limit', options.limit, 25); } catch (e) { error((e as Error).message); process.exit(1); }
 
   await withSpinner(spinnerMessage, 'Search failed', async (spinner) => {
     debug(`Search mode: ${searchMode}, query: "${query}", limit: ${limit}`);
