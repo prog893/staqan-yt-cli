@@ -77,7 +77,7 @@ function handler(videoId: string): void {
 
 ### "Cannot compile" Errors
 
-**Symptom**: `npm run build` fails with compilation errors
+**Symptom**: `bun run build` fails with compilation errors
 
 **Solution**:
 
@@ -86,10 +86,10 @@ function handler(videoId: string): void {
 rm -rf dist/
 
 # Check TypeScript errors
-npm run type-check
+bun run type-check
 
 # Fix errors and rebuild
-npm run build
+bun run build
 ```
 
 ### "Module not found" Errors
@@ -100,13 +100,13 @@ npm run build
 
 ```bash
 # Check if module is installed
-npm ls xxx
+bun pm ls xxx
 
 # Install missing module
-npm install xxx
+bun add xxx
 
 # Rebuild
-npm run build
+bun run build
 ```
 
 ### TSC Errors
@@ -116,12 +116,9 @@ npm run build
 **Solution**: TypeScript is installed as a dev dependency:
 
 ```bash
-# Use npm scripts instead
-npm run type-check
-npm run build
-
-# Or install globally
-npm install -g typescript
+# Use the bun scripts instead
+bun run type-check
+bun run build
 ```
 
 ## ESLint Errors
@@ -130,7 +127,7 @@ npm install -g typescript
 
 ```bash
 # See all errors
-npm run lint
+bun run lint
 ```
 
 ### Unused Imports
@@ -221,22 +218,22 @@ staqan-yt get-video dQw4w9WgXcQ  # ✅ Correct
 staqan-yt get-video abc          # ❌ Too short
 ```
 
-## NPM Errors
+## Bun Errors
 
-### "EACCES" Permission Errors
+### Permission Errors on Install
 
-**Error**: `EACCES: permission denied`
+**Error**: `EACCES: permission denied` (or similar) during `bun install`
 
-**Solution**: Fix npm permissions or use sudo (not recommended):
+**Solution**: Bun manages its own cache and should not need sudo. If you hit
+permission issues, check that `~/.bun` and the project `node_modules/` are
+owned by your user:
 
 ```bash
-# Fix npm permissions (recommended)
-mkdir -p ~/.npm-global
-npm config set prefix '~/.npm-global'
-export PATH=~/.npm-global/bin:$PATH
+# Fix ownership (recommended)
+sudo chown -R "$USER" ~/.bun node_modules
 
-# Or use sudo (not recommended)
-sudo npm install -g .
+# Then re-install
+bun install
 ```
 
 ### "EBUSY" File Lock Errors
@@ -248,7 +245,7 @@ sudo npm install -g .
 ```bash
 # On Windows: Check open files
 # On macOS/Linux: Use lsof
-lsof | grep node
+lsof | grep bun
 
 # Kill process if needed
 kill -9 <PID>
@@ -278,14 +275,11 @@ console.log('Loading config from:', configPath);
 ### Verify Environment
 
 ```bash
-# Check Node version
-node --version  # Should be v18 or higher
-
-# Check npm version
-npm --version
+# Check Bun version
+bun --version  # Should be >=1.0.0 (see package.json `engines.bun`)
 
 # Check environment variables
-env | grep NODE
+env | grep BUN
 ```
 
 ## Getting Help

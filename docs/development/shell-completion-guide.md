@@ -286,15 +286,15 @@ plain spec without `*` in `_arguments`.
 ### Step 5: Build and verify
 
 ```bash
-npm run type-check
-npm run build
+bun run type-check
+bun run build
 
 # Inspect generated bash completion for your command
-node -e "const {getCompletionScript} = require('./dist/lib/completion'); \
+bun -e "const {getCompletionScript} = require('./dist/lib/completion'); \
   console.log(getCompletionScript('bash'))" | grep -A 3 "my-command)"
 
 # Inspect generated zsh completion
-node -e "const {getCompletionScript} = require('./dist/lib/completion'); \
+bun -e "const {getCompletionScript} = require('./dist/lib/completion'); \
   console.log(getCompletionScript('zsh'))" | grep -A 15 "my-command)"
 
 # Reinstall and test live

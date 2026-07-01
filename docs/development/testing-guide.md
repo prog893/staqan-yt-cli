@@ -81,36 +81,36 @@ staqan-yt update-video dQw4w9WgXcQ --title "New Title" --yes
 ### Install Dependencies
 
 ```bash
-npm install
+bun install
 ```
 
-### Link for Global Testing
+### Test the Local Build
+
+> **Do not use `npm link` (or `bun link`)** — it shadows the
+> Homebrew-installed `staqan-yt` with a symlink to your working tree, which
+> can break other scripts that depend on the released binary. Run the
+> compiled output directly instead:
 
 ```bash
-npm link
-```
-
-Now you can test commands globally:
-
-```bash
-staqan-yt --help
-staqan-yt get-video dQw4w9WgXcQ
+bun run build
+bun dist/bin/staqan-yt.js --help
+bun dist/bin/staqan-yt.js get-video dQw4w9WgXcQ
 ```
 
 ### Build Commands
 
 ```bash
 # Type check without emitting
-npm run type-check
+bun run type-check
 
 # Run linter
-npm run lint
+bun run lint
 
 # Build the project
-npm run build
+bun run build
 
-# Development mode with tsx
-npm run dev
+# Development mode (runs TypeScript directly via bun)
+bun run dev
 ```
 
 ## Test Patterns
@@ -171,9 +171,9 @@ staqan-yt update-video VIDEO_ID --description "New description" --dry-run
 
 Before committing changes:
 
-- [ ] Type check passes: `npm run type-check`
-- [ ] Linting passes: `npm run lint`
-- [ ] Build succeeds: `npm run build`
+- [ ] Type check passes: `bun run type-check`
+- [ ] Linting passes: `bun run lint`
+- [ ] Build succeeds: `bun run build`
 - [ ] All non-destructive commands tested
 - [ ] All output formats work correctly
 - [ ] Error handling tested (invalid inputs, auth failures)

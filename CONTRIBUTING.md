@@ -35,20 +35,20 @@ bun run dev
 
 # Or build and run
 bun run build
-node dist/bin/staqan-yt.js --help
+bun dist/bin/staqan-yt.js --help
 ```
 
 ### Code Quality Checks
 
 ```bash
 # Type checking
-npm run type-check
+bun run type-check
 
 # Linting
-npm run lint
+bun run lint
 
 # Build
-npm run build
+bun run build
 ```
 
 ## Code Conventions
@@ -104,7 +104,7 @@ function handle(input: unknown): string {
 interface RawApiItem { id?: string; snippet?: { title?: string } }
 ```
 
-If `npm run lint` reports `any` warnings, fix them before submitting.
+If `bun run lint` reports `any` warnings, fix them before submitting.
 
 **1. Use strict types:**
 ```typescript
@@ -484,7 +484,7 @@ if (!channelId) {
 ```bash
 # Clean build and try again
 rm -rf dist/
-npm run build
+bun run build
 ```
 
 ### YouTube API Quota Management

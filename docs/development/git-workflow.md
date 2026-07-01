@@ -153,7 +153,7 @@ git push && git push --tags
 ```bash
 # 1. Edit package.json version manually
 # 2. Sync version to other files
-npm run sync-version
+bun run sync-version
 
 # 3. Commit changes
 git add -A

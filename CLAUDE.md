@@ -55,14 +55,7 @@ git checkout -b feature/your-feature-name
 
 ## Quick Reference
 
-### Install & Test Globally
-
-```bash
-npm link              # Test globally (development)
-staqan-yt --help      # Verify installation
-```
-
-### Homebrew Install (production)
+### Install (Homebrew — production + development)
 
 ```bash
 # First time
@@ -71,7 +64,17 @@ brew install staqan-yt
 
 # After a release
 brew upgrade staqan-yt
+
+# Verify
+staqan-yt --help
 ```
+
+> **Never use `npm link` (or `bun link`) for this CLI.** It shadows the
+> Homebrew binary with a symlink to the local working tree, so other scripts
+> (and your shell) silently start running an unpublished, potentially unstable
+> build. If you need to exercise a local change, run the compiled output
+> directly from the repo: `bun run build && bun dist/bin/staqan-yt.js <args>`.
+> See `docs/development/testing-guide.md`.
 
 ### Common Commands
 
@@ -324,7 +327,7 @@ staqan-yt-cli/
 2. **Create command file**: `commands/your-command.ts` with proper types
 3. **Register in bin/staqan-yt.ts**: Add command with description
 4. **Add types** (if needed): Update `types/index.ts`
-5. **Build and test**: `npm run type-check && npm run lint && npm run build`
+5. **Build and test**: `bun run type-check && bun run lint && bun run build`
 6. **Update documentation**:
    - Add to `docs/commands/<category>.md`
    - Update `lib/customHelp.ts` help grouping
