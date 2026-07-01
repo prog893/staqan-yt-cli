@@ -1,16 +1,10 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseChannelHandle, error, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, validateDateOption, validateDateRange } from '../lib/utils';
+import { parseChannelHandle, error, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, validateDateOption, validateDateRange, parseDuration } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ChannelSearchTermsOptions } from '../types';
-
-// Content type filter values for YouTube Analytics API
-const CONTENT_TYPE_FILTERS: Record<string, string> = {
-  video: 'creatorContentType==LONG_FORM_CONTENT',
-  shorts: 'creatorContentType==SHORT_FORM_CONTENT',
-};
 
 // Metrics for insightTrafficSourceDetail with insightTrafficSourceType==YT_SEARCH.
 // videoThumbnailImpressions/CTR are only valid for discovery-type sources and
@@ -29,6 +23,14 @@ const MAX_VIDEO_IDS = 500;
 // YouTube founding date — used as the effective "lifetime" start
 const YOUTUBE_START_DATE = '2005-02-14';
 
+// YouTube's documented Shorts threshold. Note: Shorts can be up to 60s of
+// vertical video; videos at exactly 60s are accepted as Shorts, but we use
+// `>= 60s` for the long-form bucket to match YouTube Studio's own bucketing.
+const SHORTS_DURATION_LIMIT_SECONDS = 60;
+
+// videos.list accepts at most 50 IDs per call
+const VIDEOS_LIST_CHUNK_SIZE = 50;
+
 async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions): Promise<void> {
   initCommand(options);
 
@@ -41,8 +43,8 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
   // Validate --content-type against the allowlist. The type is already
   // narrowed to 'all' | 'video' | 'shorts' in types/index.ts, but commander.js
   // passes arbitrary strings through at runtime, so an unknown value would
-  // silently fall through to the 'all' branch via CONTENT_TYPE_FILTERS lookup.
-  const validContentTypes = Object.keys(CONTENT_TYPE_FILTERS).concat('all');
+  // silently fall through to the 'all' branch below.
+  const validContentTypes = ['all', 'video', 'shorts'];
   if (options.contentType !== undefined && !validContentTypes.includes(options.contentType)) {
     error(`Invalid --content-type "${options.contentType}". Valid values: ${validContentTypes.join(', ')}`);
     process.exit(1);
@@ -137,16 +139,58 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
       process.exit(1);
     }
 
-    // Build filter: video IDs + traffic source + optional content type
-    const contentTypeFilter = options.contentType && options.contentType !== 'all'
-      ? CONTENT_TYPE_FILTERS[options.contentType]
-      : undefined;
+    // --content-type filtering is done CLIENT-SIDE by duration, because the
+    // YouTube Analytics API does not accept `creatorContentType` as a filter
+    // for the `insightTrafficSourceDetail` + `YT_SEARCH` report. We verified
+    // live that it returns `Invalid value (...) given in field parameters.filters`
+    // even with the correct enum values (VIDEO_ON_DEMAND / SHORTS). The only
+    // way to scope search traffic by content type for this report is to
+    // pre-filter the `video==` list to just Shorts (duration < 60s) or just
+    // long-form videos (duration >= 60s). See #88.
+    const contentType = options.contentType ?? 'all';
+    if (contentType !== 'all') {
+      const wantShorts = contentType === 'shorts';
+      spinner.text = `Fetching video durations (${wantShorts ? 'Shorts' : 'long-form'} filter)...`;
+
+      const durationById = new Map<string, number>();
+      for (let i = 0; i < videoIds.length; i += VIDEOS_LIST_CHUNK_SIZE) {
+        const chunk = videoIds.slice(i, i + VIDEOS_LIST_CHUNK_SIZE);
+        const videosResponse = await youtube.videos.list({
+          part: ['contentDetails'],
+          id: chunk,
+        });
+        for (const item of videosResponse.data.items || []) {
+          if (item.id && item.contentDetails?.duration) {
+            durationById.set(item.id, parseDuration(item.contentDetails.duration));
+          }
+        }
+      }
+
+      const filtered = videoIds.filter((id) => {
+        const secs = durationById.get(id);
+        if (secs === undefined) return false; // unknown duration → exclude
+        return wantShorts ? secs < SHORTS_DURATION_LIMIT_SECONDS : secs >= SHORTS_DURATION_LIMIT_SECONDS;
+      });
+
+      debug(`Content-type filter (${contentType}): ${videoIds.length} → ${filtered.length} videos`);
+
+      if (filtered.length === 0) {
+        spinner.fail(`No ${wantShorts ? 'Shorts' : 'long-form videos'} found`);
+        error(
+          `No ${wantShorts ? 'Shorts' : 'long-form videos'} found for this channel. ` +
+          `Try a different --content-type value or omit the flag for all videos.`
+        );
+        process.exit(1);
+      }
+
+      // Mutate in place: subsequent filter assembly uses the trimmed list.
+      videoIds.length = 0;
+      videoIds.push(...filtered);
+    }
 
     const videoFilter = `video==${videoIds.join(',')}`;
     const sourceFilter = 'insightTrafficSourceType==YT_SEARCH';
-    const filters = contentTypeFilter
-      ? `${videoFilter};${sourceFilter};${contentTypeFilter}`
-      : `${videoFilter};${sourceFilter}`;
+    const filters = `${videoFilter};${sourceFilter}`;
 
     const endDate = options.endDate || toLocalYmd(new Date());
     const startDate = options.startDate || YOUTUBE_START_DATE;
