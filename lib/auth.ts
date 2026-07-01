@@ -1,7 +1,6 @@
 import { google } from 'googleapis';
 import { promises as fs } from 'fs';
 import http from 'http';
-import url from 'url';
 import open from 'open';
 import chalk from 'chalk';
 import { OAuth2Client } from 'google-auth-library';
@@ -55,8 +54,12 @@ async function saveToken(token: OAuth2Token): Promise<void> {
 
 /**
  * Create OAuth2 client
+ *
+ * `redirectUri` is the redirect URI registered with / accepted by Google. It is
+ * only used when generating auth URLs and exchanging the authorization code, so
+ * for token-refresh paths it is irrelevant — callers there pass a placeholder.
  */
-async function createOAuth2Client(): Promise<OAuth2Client> {
+async function createOAuth2Client(redirectUri: string): Promise<OAuth2Client> {
   const credentials = await loadCredentials();
 
   if (!credentials) {
@@ -75,7 +78,7 @@ async function createOAuth2Client(): Promise<OAuth2Client> {
   return new google.auth.OAuth2(
     client_id,
     client_secret,
-    'http://localhost:3000'
+    redirectUri
   );
 }
 
@@ -83,7 +86,8 @@ async function createOAuth2Client(): Promise<OAuth2Client> {
  * Get authenticated OAuth2 client
  */
 async function getAuthenticatedClient(): Promise<OAuth2Client> {
-  const oauth2Client = await createOAuth2Client();
+  // redirect_uri is unused on the token-refresh path; a placeholder is fine.
+  const oauth2Client = await createOAuth2Client('http://localhost');
   const token = await loadToken();
 
   if (!token) {
@@ -107,7 +111,59 @@ async function getAuthenticatedClient(): Promise<OAuth2Client> {
 }
 
 /**
+ * Pick the loopback host for the OAuth redirect URI.
+ *
+ * Desktop ("installed") OAuth clients register a loopback redirect URI such as
+ * `http://localhost:3000`. Per RFC 8252 §7.3, the authorization server MUST
+ * accept any port for loopback redirects, so we bind an OS-assigned free port at
+ * runtime rather than a fixed one (which crashes with EADDRINUSE when port 3000
+ * is already taken). We keep the SAME host the user registered so the redirect
+ * still matches Google's expectations — defaulting to `localhost`.
+ */
+function getRedirectHost(credentials: OAuth2Credentials | null): string {
+  const uris = credentials?.installed?.redirect_uris
+    ?? credentials?.web?.redirect_uris
+    ?? [];
+
+  for (const uri of uris) {
+    try {
+      const { hostname } = new URL(uri);
+      if (hostname === '127.0.0.1' || hostname === 'localhost') {
+        return hostname;
+      }
+    } catch {
+      // Ignore malformed redirect URI entries.
+    }
+  }
+  return 'localhost';
+}
+
+/**
+ * Escape a string for safe interpolation into an HTML response body.
+ * Used when reflecting the OAuth `error` query param back to the browser.
+ */
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (c) => {
+    switch (c) {
+      case '&': return '&amp;';
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '"': return '&quot;';
+      case "'": return '&#39;';
+      default: return c;
+    }
+  });
+}
+
+/**
  * Authenticate user via OAuth2 flow
+ *
+ * Spins up a throwaway local HTTP server on an OS-assigned free port to receive
+ * the OAuth callback. Binding to port 0 makes the kernel atomically pick a free
+ * port, so we never collide with another process (the original hardcoded 3000
+ * crashed with EADDRINUSE whenever 3000 was occupied). The same host registered
+ * in credentials is reused; only the port varies, which RFC 8252 guarantees
+ * Google will accept for loopback redirects.
  */
 async function authenticate(): Promise<OAuth2Client> {
   const credentials = await loadCredentials();
@@ -126,37 +182,82 @@ async function authenticate(): Promise<OAuth2Client> {
     process.exit(1);
   }
 
-  const oauth2Client = await createOAuth2Client();
+  const authConfig = credentials.installed || credentials.web;
+  if (!authConfig) {
+    throw new Error('Invalid credentials format. Expected "installed" or "web" properties.');
+  }
+  const { client_id, client_secret } = authConfig;
+  const redirectHost = getRedirectHost(credentials);
 
-  return new Promise((resolve, reject) => {
-    // Create local server to receive callback
+  return new Promise<OAuth2Client>((resolve, reject) => {
+    // oauth2Client is created inside the listen callback once the assigned port
+    // is known. It is referenced by the request handler, which only fires after
+    // the browser is redirected back — by then this is already assigned.
+    let oauth2Client: OAuth2Client;
+
+    // Create local server to receive the OAuth callback
     const server = http.createServer((req, res) => {
       (async () => {
-      try {
-        const queryParams = url.parse(req.url!, true).query;
+        try {
+          // WHATWG URL API — avoids the deprecated url.parse() (DEP0169).
+          // req.url looks like "/?code=...&scope=..." or "/?error=access_denied".
+          const callbackUrl = new URL(req.url ?? '/', 'http://localhost');
+          const code = callbackUrl.searchParams.get('code');
+          const oauthError = callbackUrl.searchParams.get('error');
 
-        if (queryParams.code) {
+          if (oauthError) {
+            // User denied consent or Google reported an error (e.g. access_denied).
+            res.writeHead(400, { 'Content-Type': 'text/html', 'Connection': 'close' });
+            res.end(
+              '<h1>Authentication failed</h1>' +
+              `<p>Google reported: ${escapeHtml(oauthError)}</p>` +
+              '<p>You can close this window and retry in your terminal.</p>'
+            );
+            server.closeAllConnections();
+            server.close();
+            reject(new Error(`Google reported an authentication error: ${oauthError}`));
+            return;
+          }
+
+          if (!code) {
+            // Not the OAuth callback (e.g. a favicon request). Ignore it so the
+            // server stays up for the real callback.
+            res.writeHead(404, { 'Content-Type': 'text/plain', 'Connection': 'close' });
+            res.end('Not found');
+            return;
+          }
+
           res.writeHead(200, { 'Content-Type': 'text/html', 'Connection': 'close' });
           res.end('<h1>Authentication successful!</h1><p>You can close this window and return to the terminal.</p>');
 
-          const { tokens } = await oauth2Client.getToken(queryParams.code as string);
+          // Exchange the code using the same client (and thus the same
+          // redirect_uri) that generated the auth URL.
+          const { tokens } = await oauth2Client.getToken(code);
           await saveToken(tokens as OAuth2Token);
 
           // Close all connections and server
           server.closeAllConnections();
           server.close((err) => {
-            if (err) {
-              // Ignore close errors
-            }
+            void err; // Ignore close errors
             resolve(oauth2Client);
           });
+        } catch (err) {
+          server.closeAllConnections();
+          server.close();
+          reject(err);
         }
-      } catch (err) {
-        server.closeAllConnections();
-        server.close();
-        reject(err);
-      }
       })();
+    });
+
+    // Surface server errors as a friendly rejection instead of letting the
+    // unhandled 'error' event crash the process with a raw stack trace.
+    server.on('error', (err) => {
+      const e = err as NodeJS.ErrnoException;
+      if (e.code === 'EADDRINUSE') {
+        reject(new Error('Could not bind a free local port for the authentication callback. Please close other processes or retry.'));
+      } else {
+        reject(new Error(`Failed to start the local authentication server: ${e.message}`));
+      }
     });
 
     // Configure server to prevent hanging
@@ -167,7 +268,17 @@ async function authenticate(): Promise<OAuth2Client> {
       server.close();
     });
 
-    server.listen(3000, () => {
+    // Port 0 → the kernel atomically assigns a free port, guaranteeing no
+    // EADDRINUSE collision even when a fixed port (e.g. 3000) is in use.
+    server.listen(0, () => {
+      const address = server.address();
+      const port = address && typeof address === 'object' ? address.port : 0;
+      const redirectUri = `http://${redirectHost}:${port}`;
+
+      // Build the client with the exact redirect URI we are listening on; the
+      // same instance is reused for getToken() so the code exchange matches.
+      oauth2Client = new google.auth.OAuth2(client_id, client_secret, redirectUri);
+
       const authUrl = oauth2Client.generateAuthUrl({
         access_type: 'offline',
         scope: SCOPES,
