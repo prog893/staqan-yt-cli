@@ -22,7 +22,7 @@ import {
 } from '../lib/youtube';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, chunkDateRange, retryWithBackoff, initCommand, toLocalYmd, validateDateOption, validateDateRange } from '../lib/utils';
+import { parseVideoId, chunkDateRange, retryWithBackoff, initCommand, toLocalYmd, validateDateOption, validateDateRange, parseDuration } from '../lib/utils';
 import { requireChannel } from '../lib/config';
 
 // Tool definitions
@@ -916,19 +916,46 @@ async function handleToolCall(name: string, args: any) {
       const startDate = args.startDate || '2005-02-14';
       validateDateRange(startDate, endDate);
       const limit = Math.min(args.limit || 25, 25);
-      const CONTENT_TYPE_FILTERS: Record<string, string> = {
-        video: 'creatorContentType==LONG_FORM_CONTENT',
-        shorts: 'creatorContentType==SHORT_FORM_CONTENT',
-      };
-      const contentTypeFilter = args.contentType && args.contentType !== 'all'
-        ? CONTENT_TYPE_FILTERS[args.contentType]
-        : undefined;
+
+      // --content-type is filtered CLIENT-SIDE by duration. The YouTube
+      // Analytics API rejects `creatorContentType` as a filter for the
+      // `insightTrafficSourceDetail` + `YT_SEARCH` report with
+      // `Invalid value (...) given in field parameters.filters`, even for the
+      // correct enum values. So we pre-trim the `video==` list to Shorts
+      // (<60s) or long-form (>=60s). See #88.
+      const contentType = args.contentType ?? 'all';
+      if (contentType !== 'all') {
+        const wantShorts = contentType === 'shorts';
+        const durationById = new Map<string, number>();
+        for (let i = 0; i < videoIds.length; i += 50) {
+          const chunk = videoIds.slice(i, i + 50);
+          const videosResponse = await youtube.videos.list({
+            part: ['contentDetails'],
+            id: chunk,
+          });
+          for (const item of videosResponse.data.items || []) {
+            if (item.id && item.contentDetails?.duration) {
+              durationById.set(item.id, parseDuration(item.contentDetails.duration));
+            }
+          }
+        }
+        const filtered = videoIds.filter((id) => {
+          const secs = durationById.get(id);
+          if (secs === undefined) return false;
+          return wantShorts ? secs < 60 : secs >= 60;
+        });
+        if (filtered.length === 0) {
+          throw new Error(
+            `No ${wantShorts ? 'Shorts' : 'long-form videos'} found for this channel.`
+          );
+        }
+        videoIds.length = 0;
+        videoIds.push(...filtered);
+      }
 
       const videoFilter = `video==${videoIds.join(',')}`;
       const sourceFilter = 'insightTrafficSourceType==YT_SEARCH';
-      const filters = contentTypeFilter
-        ? `${videoFilter};${sourceFilter};${contentTypeFilter}`
-        : `${videoFilter};${sourceFilter}`;
+      const filters = `${videoFilter};${sourceFilter}`;
 
       const analyticsResponse = await youtubeAnalytics.reports.query({
         ids: 'channel==MINE',
