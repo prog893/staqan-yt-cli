@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import http from 'http';
 import open from 'open';
@@ -199,6 +200,10 @@ async function authenticate(): Promise<OAuth2Client> {
     // the browser is redirected back — by then this is already assigned.
     let oauth2Client: OAuth2Client;
 
+    // OAuth `state` nonce: binds the authorization code to this auth attempt so
+    // a forged callback (CSRF) can't inject an attacker's code. Google echoes
+    // this value on the redirect; we compare it before using the code.
+    const expectedState = randomUUID();
     // Create local server to receive the OAuth callback
     const server = http.createServer((req, res) => {
       (async () => {
@@ -228,6 +233,18 @@ async function authenticate(): Promise<OAuth2Client> {
             // server stays up for the real callback.
             res.writeHead(404, { 'Content-Type': 'text/plain', 'Connection': 'close' });
             res.end('Not found');
+            return;
+          }
+
+          // CSRF protection: bind the returned code to this auth attempt via the
+          // OAuth `state` nonce. Reject any callback whose state doesn't match.
+          const state = callbackUrl.searchParams.get('state');
+          if (state !== expectedState) {
+            res.writeHead(400, { 'Content-Type': 'text/plain', 'Connection': 'close' });
+            res.end('Invalid OAuth state');
+            server.closeAllConnections();
+            server.close();
+            reject(new Error('OAuth state mismatch: authentication callback rejected.'));
             return;
           }
 
@@ -297,6 +314,7 @@ async function authenticate(): Promise<OAuth2Client> {
       const authUrl = oauth2Client.generateAuthUrl({
         access_type: 'offline',
         scope: SCOPES,
+        state: expectedState,
       });
 
       console.log('');
