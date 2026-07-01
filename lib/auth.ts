@@ -121,9 +121,7 @@ async function getAuthenticatedClient(): Promise<OAuth2Client> {
  * still matches Google's expectations — defaulting to `localhost`.
  */
 function getRedirectHost(credentials: OAuth2Credentials | null): string {
-  const uris = credentials?.installed?.redirect_uris
-    ?? credentials?.web?.redirect_uris
-    ?? [];
+  const uris = credentials?.installed?.redirect_uris ?? [];
 
   for (const uri of uris) {
     try {
@@ -182,11 +180,17 @@ async function authenticate(): Promise<OAuth2Client> {
     process.exit(1);
   }
 
-  const authConfig = credentials.installed || credentials.web;
-  if (!authConfig) {
-    throw new Error('Invalid credentials format. Expected "installed" or "web" properties.');
+  // The loopback OAuth flow requires a Desktop ("installed") client. Web-type
+  // clients use exact-match redirect URIs and cannot accept the runtime-assigned
+  // loopback port, so reject them up front with a clear message.
+  if (!credentials.installed) {
+    throw new Error(
+      'Desktop ("installed") OAuth credentials are required. ' +
+      'Create an OAuth 2.0 Client ID of type "Desktop application" in Google Cloud Console ' +
+      'and save it to ' + CREDENTIALS_PATH + '.'
+    );
   }
-  const { client_id, client_secret } = authConfig;
+  const { client_id, client_secret } = credentials.installed;
   const redirectHost = getRedirectHost(credentials);
 
   return new Promise<OAuth2Client>((resolve, reject) => {
@@ -227,13 +231,18 @@ async function authenticate(): Promise<OAuth2Client> {
             return;
           }
 
+          // Exchange the code using the same client (and thus the same
+          // redirect_uri) that generated the auth URL. Apply the resulting
+          // tokens so the resolved client is authenticated — getToken() does
+          // not set credentials itself in google-auth-library 10.x.
+          const { tokens } = await oauth2Client.getToken(code);
+          oauth2Client.setCredentials(tokens);
+          await saveToken(tokens as OAuth2Token);
+
+          // Only signal success to the browser once the exchange and persistence
+          // have actually succeeded, so the browser and terminal can't disagree.
           res.writeHead(200, { 'Content-Type': 'text/html', 'Connection': 'close' });
           res.end('<h1>Authentication successful!</h1><p>You can close this window and return to the terminal.</p>');
-
-          // Exchange the code using the same client (and thus the same
-          // redirect_uri) that generated the auth URL.
-          const { tokens } = await oauth2Client.getToken(code);
-          await saveToken(tokens as OAuth2Token);
 
           // Close all connections and server
           server.closeAllConnections();
@@ -242,6 +251,12 @@ async function authenticate(): Promise<OAuth2Client> {
             resolve(oauth2Client);
           });
         } catch (err) {
+          // If the exchange/persistence failed before we responded, tell the
+          // browser instead of leaving it hanging on a stale connection.
+          if (!res.headersSent) {
+            res.writeHead(500, { 'Content-Type': 'text/html', 'Connection': 'close' });
+            res.end('<h1>Authentication failed</h1><p>The token exchange failed. Please return to the terminal and retry.</p>');
+          }
           server.closeAllConnections();
           server.close();
           reject(err);
