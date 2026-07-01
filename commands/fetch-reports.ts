@@ -15,6 +15,7 @@ import { acquireLock, getLockPath } from '../lib/lock';
 import https from 'https';
 import { createWriteStream, unlinkSync } from 'fs';
 import { promises as fs } from 'fs';
+import { pipeline } from 'stream/promises';
 import { unlink } from 'fs/promises';
 import path from 'path';
 import chalk from 'chalk';
@@ -28,6 +29,18 @@ interface FetchReportsOptions {
   force?: boolean;
   verify?: boolean;
   verbose?: boolean;
+}
+
+/**
+ * Build a filesystem-safe temp path for a report download.
+ *
+ * `report.id` comes from an external API response and is interpolated into a
+ * temp filename. Strip anything outside [A-Za-z0-9._-] so a malicious or
+ * malformed ID (e.g. "../foo" or "id/with/slashes") can't escape /tmp.
+ */
+function safeTmpReportPath(reportId: string | null | undefined): string {
+  const safeId = String(reportId ?? 'report').replace(/[^A-Za-z0-9._-]/g, '_');
+  return path.join('/tmp', `${safeId}.csv`);
 }
 
 /**
@@ -80,15 +93,17 @@ function downloadOnce(
         }
 
         const file = createWriteStream(dest);
-        response.pipe(file);
-        file.on('finish', () => {
-          file.close();
-          resolve({ statusCode: 200, retryAfterSec: 0 });
-        });
-        file.on('error', (err) => {
-          unlink(dest).catch(() => {});
-          reject(err);
-        });
+        // Use pipeline (not .pipe) so a read-side error mid-stream rejects
+        // cleanly and tears down both ends — otherwise a partial file can
+        // survive and skip the retry path. See nodejs stream docs:
+        //   https://nodejs.org/api/stream.html#streamstreampipelinesource-transforms-destination-options
+        pipeline(response, file).then(
+          () => resolve({ statusCode: 200, retryAfterSec: 0 }),
+          (err) => {
+            unlink(dest).catch(() => {});
+            reject(err);
+          }
+        );
       })
       .on('error', (err) => {
         unlink(dest).catch(() => {});
@@ -114,7 +129,7 @@ async function downloadReport(
   report: { id?: string | null; downloadUrl?: string | null; startTime?: string | null; endTime?: string | null; createTime?: string | null },
   auth: { getAccessToken(): Promise<{ token?: string | null }> }
 ): Promise<{ csvData: string; headers: string[]; data: Record<string, string>[]; minDate: string; maxDate: string }> {
-  const tmpPath = path.join('/tmp', `${report.id}.csv`);
+  const tmpPath = safeTmpReportPath(report.id);
   const credentials = await auth.getAccessToken();
   const accessToken = credentials.token || '';
 
@@ -131,6 +146,17 @@ async function downloadReport(
         break;
       }
       // 429 from download host — exponential backoff, honoring Retry-After.
+      //
+      // Daily-quota exhaustion manifests as a 429 with a multi-thousand-second
+      // Retry-After (often ~86400s). Sleeping and retrying just hides the real
+      // problem, so abort immediately when the header says the wait is more
+      // than 30 minutes — that's clearly not an RPM hiccup.
+      if (result.retryAfterSec >= 30 * 60) {
+        throw new Error(
+          `YouTube Reporting download quota appears exhausted for ${report.id}. ` +
+          `Server Retry-After is ${result.retryAfterSec}s; aborting instead of retrying.`
+        );
+      }
       const expSec = Math.min(baseDelaySec * 2 ** (attempt - 1), maxDelaySec);
       const waitSec = result.retryAfterSec > 0
         ? Math.min(Math.max(result.retryAfterSec, expSec), maxDelaySec)

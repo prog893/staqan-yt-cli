@@ -500,6 +500,38 @@ function isRateLimitError(err: unknown): 'rpm' | 'daily' | null {
 }
 
 /**
+ * Extract the server's `Retry-After` value (in seconds) from a thrown API
+ * error, if any. Supports both gaxios's Headers-like object (with `.get`)
+ * and plain Node IncomingHttpHeaders (lowercase keys).
+ *
+ * YouTube may send this on 429 responses to suggest a longer wait than our
+ * default exponential backoff. Per the HTTP spec it can be either a delta in
+ * seconds or an HTTP-date; we only honor the numeric form.
+ */
+function getRetryAfterMs(err: unknown): number | undefined {
+  if (!err || typeof err !== 'object') return undefined;
+  const response = (err as { response?: { headers?: unknown } }).response;
+  const headers = response?.headers as unknown;
+  if (!headers) return undefined;
+
+  // gaxios Headers — has .get(name)
+  if (typeof (headers as { get?: unknown }).get === 'function') {
+    const v = (headers as { get: (n: string) => string | null }).get('retry-after');
+    if (v) {
+      const n = Number(v);
+      return Number.isFinite(n) && n >= 0 ? n * 1000 : undefined;
+    }
+  }
+  // Plain IncomingHttpHeaders — lowercase keys
+  const raw = (headers as Record<string, unknown>)['retry-after'];
+  if (typeof raw === 'string' || typeof raw === 'number') {
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n * 1000 : undefined;
+  }
+  return undefined;
+}
+
+/**
  * Retry a function with exponential backoff
  */
 async function retryWithBackoff<T>(
@@ -538,7 +570,8 @@ async function retryWithBackoff<T>(
  * 40s → 80s, capped at `maxDelayMs` (default 90s) — and retries, up to
  * `maxRetries` times. Each retry emits a `progress()` line so the user (or
  * cron log) can see what's happening. Honors the server's Retry-After header
- * if present and larger than the exponential wait.
+ * (via getRetryAfterMs) and waits the larger of (Retry-After, exponential),
+ * but still capped by `maxDelayMs`.
  *
  * On "Free requests per day" (or any longer-window quota — week / month):
  * throws immediately with a clear message — no amount of waiting will
@@ -572,9 +605,15 @@ async function withRateLimitRetry<T>(
       }
       if (kind === 'rpm' && attempt < maxRetries) {
         const expMs = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs);
-        const waitSec = Math.round(expMs / 1000);
-        progress(`RPM quota hit on ${label} (attempt ${attempt}/${maxRetries}), backing off ${waitSec}s before retry...`);
-        await sleep(expMs);
+        // Honor server's Retry-After when it's larger than our exponential wait.
+        const serverMs = getRetryAfterMs(err);
+        const waitMs = serverMs !== undefined
+          ? Math.min(Math.max(serverMs, expMs), maxDelayMs)
+          : expMs;
+        const waitSec = Math.round(waitMs / 1000);
+        const source = serverMs !== undefined && serverMs > expMs ? ' (server Retry-After)' : '';
+        progress(`RPM quota hit on ${label} (attempt ${attempt}/${maxRetries}), backing off ${waitSec}s${source} before retry...`);
+        await sleep(waitMs);
         continue;
       }
       // Not a retriable rate-limit error (or out of attempts) — bubble up.
@@ -660,6 +699,7 @@ export {
   sleep,
   retryWithBackoff,
   isRateLimitError,
+  getRetryAfterMs,
   withRateLimitRetry,
   parsePositiveInt,
   toLocalYmd,
