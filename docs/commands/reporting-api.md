@@ -260,8 +260,8 @@ staqan-yt fetch-reports
 - `-c, --channel <handle>` - Channel handle or ID (overrides config default)
 - `-t, --type <id>` - Fetch specific report type
 - `-T, --types <ids>` - Fetch multiple report types (comma-separated)
-- `--start-date <date>` - Filter by start date (YYYY-MM-DD)
-- `--end-date <date>` - Filter by end date (YYYY-MM-DD)
+- `--start-date <date>` - Filter by start date (YYYY-MM-DD). Reports whose window **overlaps** the range are included — see [Date range filtering](#date-range-filtering).
+- `--end-date <date>` - Filter by end date (YYYY-MM-DD). Reports whose window **overlaps** the range are included.
 - `-f, --force` - Re-download even if cached
 - `--verify` - Verify cached file completeness
 - `-v, --verbose` - Enable verbose output
@@ -285,12 +285,40 @@ staqan-yt fetch-reports \
   --start-date=2026-01-01 \
   --end-date=2026-01-31
 
+# Force re-download only a missing window (e.g. recovering from bug #52)
+# Re-downloads only reports that overlap that range; other cached reports
+# are left alone.
+staqan-yt fetch-reports --type=channel_reach_basic_a1 \
+  --force --start-date=2026-04-07 --end-date=2026-04-10
+
 # Verify cached files
 staqan-yt fetch-reports --verify
 
 # Force re-download (overwrite cache)
 staqan-yt fetch-reports --force
 ```
+
+### Date range filtering
+
+`--start-date` and `--end-date` use **overlap** semantics: a report is
+included if any day in its `[startTime, endTime]` window falls inside
+`[--start-date, --end-date]`. This matters because YouTube reports can span
+multiple days (weekly, monthly, etc.) — a weekly report covering
+`2026-01-05`–`2026-01-11` should be included when the user asks for
+`--start-date=2026-01-01 --end-date=2026-01-31`, because some of its data
+falls inside January.
+
+If you provide only one of the two flags, the other is left open:
+
+- `--start-date 2026-01-01` (no `--end-date`) → include every report that
+  ends on or after `2026-01-01` (i.e. data exists from Jan 1 onward).
+- `--end-date 2026-01-31` (no `--start-date`) → include every report that
+  starts on or before `2026-01-31` (i.e. data exists up to Jan 31).
+
+This is what makes `fetch-reports --force --start-date ... --end-date ...`
+useful for targeted recovery: the date filter narrows the *candidates for
+re-download*, and `--force` makes the run actually re-download them, while
+cached reports outside the range are left untouched.
 
 ### Why Archive Reports?
 

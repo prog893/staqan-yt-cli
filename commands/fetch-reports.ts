@@ -376,7 +376,18 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
         continue;
       }
 
-      // Filter by date range if specified (compare date portions only)
+      // Filter by date range if specified (compare date portions only).
+      //
+      // Use *overlap* semantics, not full-containment: a report counts as
+      // matching if any day in its [startTime, endTime] window falls inside
+      // the requested [filteredStart, filteredEnd] range. The previous
+      // implementation required the report window to be fully contained,
+      // which silently dropped weekly/monthly reports that started before
+      // --start-date or ended after --end-date — exactly the reports users
+      // hit when trying to recover from bug #52 (overlap on the recovery
+      // window) with `fetch-reports --force --start-date ... --end-date ...`.
+      //
+      // Overlap formula: reportStart <= filteredEnd && reportEnd >= filteredStart
       if (options.startDate || options.endDate) {
         const allMinDate = reports[reports.length - 1].startTime!.split('T')[0]; // Oldest
         const allMaxDate = reports[0].endTime!.split('T')[0]; // Newest
@@ -395,10 +406,14 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
         reports = reports.filter((report: typeof reports[0]) => {
           const reportStart = report.startTime!.split('T')[0];
           const reportEnd = report.endTime!.split('T')[0];
-          return reportStart >= filteredStart && reportEnd <= filteredEnd;
+          // Overlap: any day in [reportStart, reportEnd] is also in
+          // [filteredStart, filteredEnd]. With only one bound provided the
+          // other side of the inequality is always true, so a missing flag
+          // doesn't tighten the filter.
+          return reportStart <= filteredEnd && reportEnd >= filteredStart;
         });
 
-        debug(`Filtered to ${reports.length} report(s) for date range`);
+        debug(`Filtered to ${reports.length} report(s) overlapping date range`);
       }
 
       // Process each report
