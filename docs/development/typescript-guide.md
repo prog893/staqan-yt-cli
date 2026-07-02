@@ -15,10 +15,10 @@ This project uses TypeScript with strict type checking enabled. Key configuratio
 ### Build Process
 
 ```bash
-npm run build         # Compile TypeScript to dist/
-npm run type-check    # Type checking without emit
-npm run lint          # Run ESLint
-npm run dev           # Development mode with tsx
+bun run build         # Compile TypeScript to dist/
+bun run type-check    # Type checking without emit
+bun run lint          # Run ESLint
+bun run dev           # Development mode (tsx runs the TypeScript source)
 ```
 
 ## Type Safety Guidelines
@@ -106,7 +106,7 @@ ESLint is configured with TypeScript support (flat config format):
 ### Running Linter
 
 ```bash
-npm run lint          # Check all files
+bun run lint          # Check all files
 ```
 
 ## Common TypeScript Patterns for CLI
@@ -219,7 +219,7 @@ if (!channelId) {
 ### ESLint Errors
 
 ```bash
-npm run lint          # See all errors
+bun run lint          # See all errors
 # Fix common issues:
 # - Unused imports: Remove them
 # - Unused variables: Prefix with _ if intentional
@@ -231,10 +231,10 @@ npm run lint          # See all errors
 ```bash
 # Clean build and try again
 rm -rf dist/
-npm run build
+bun run build
 
 # Check for syntax errors in .ts files
-npm run type-check
+bun run type-check
 ```
 
 ## Related Guides

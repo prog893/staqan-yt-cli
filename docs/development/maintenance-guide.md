@@ -7,34 +7,34 @@ This guide covers dependency updates, breaking changes, and Dependabot vulnerabi
 ### Check for Updates
 
 ```bash
-npm outdated
+bun outdated
 ```
 
 ### Update Dependencies
 
 ```bash
 # Update specific package
-npm update <package-name>
+bun update <package-name>
 
 # Update all (use with caution)
-npm update
+bun update
 
 # Update to latest versions (may include breaking changes)
-npx npm-check-updates -u
-npm install
+bunx npm-check-updates -u
+bun install
 ```
 
 ### After Updating
 
 ```bash
 # Build the project
-npm run build
+bun run build
 
 # Run type checking
-npm run type-check
+bun run type-check
 
 # Run linter
-npm run lint
+bun run lint
 
 # Test all non-destructive commands:
 # - Video operations: get-video, get-videos, get-thumbnail, get-video-tags
@@ -93,24 +93,24 @@ remote: To find out more about visit: https://github.com/prog893/staqan-yt-cli/s
 gh api '/repos/prog893/staqan-yt-cli/dependabot-alerts?state=open' | jq .
 
 # Check dependency chain
-npm ls <vulnerable-package>
+bun why <vulnerable-package>
 ```
 
 #### 2. Update Dependencies
 
 ```bash
 # Update specific package
-npm update <package-name>
+bun update <package-name>
 
 # Or update all (use with caution)
-npm update
+bun update
 ```
 
 #### 3. Test Thoroughly
 
 ```bash
 # Build the project
-npm run build
+bun run build
 
 # Test all non-destructive commands:
 # - Video operations: get-video, get-videos, get-thumbnail, get-video-tags
@@ -126,7 +126,7 @@ npm run build
 
 ```bash
 # Commit the fix
-git add package-lock.json
+git add bun.lock
 git commit -m "Fix: Update <package> to address security vulnerabilities
 
 - Updated <package> from X.Y.Z to A.B.C
@@ -139,7 +139,7 @@ git commit -m "Fix: Update <package> to address security vulnerabilities
 Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
 
 # Bump patch version
-npm version patch
+bun pm version patch
 
 # Push to GitHub
 git push && git push --tags
@@ -172,7 +172,7 @@ Based on security best practices:
 
 **Root cause analysis:**
 ```bash
-npm ls hono
+bun why hono
 # staqan-yt-cli
 # └── @modelcontextprotocol/sdk@1.25.2
 #     └── @hono/node-server@1.19.8
@@ -181,7 +181,7 @@ npm ls hono
 
 **Solution**: Update the direct dependency
 ```bash
-npm update @modelcontextprotocol/sdk
+bun update @modelcontextprotocol/sdk
 # This automatically updates hono to 4.11.8 (patched version)
 ```
 
@@ -199,7 +199,7 @@ npm update @modelcontextprotocol/sdk
 ### Check Dependency Chains
 
 - Transitive dependencies often bring vulnerabilities
-- Use `npm ls <package>` to trace chains
+- Use `bun why <package>` to trace chains
 - Update direct dependencies to fix transitive issues
 
 ### Test After Updates

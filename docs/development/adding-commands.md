@@ -98,10 +98,12 @@ export interface YourNewType {
 ## Step 5: Build and Test
 
 ```bash
-npm run type-check    # Ensure no type errors
-npm run lint          # Ensure no linting errors
-npm run build         # Compile to dist/
-npm link              # Test globally
+bun run type-check    # Ensure no type errors
+bun run lint          # Ensure no linting errors
+bun run build         # Compile to dist/
+# Run the local build directly — do NOT use `npm link` (or `bun link`),
+# which would shadow the Homebrew binary:
+bun dist/bin/staqan-yt.js help
 ```
 
 ## Step 6: Update Documentation

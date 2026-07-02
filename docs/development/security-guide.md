@@ -191,8 +191,8 @@ if (!title) {
 ### Keep Dependencies Updated
 
 ```bash
-npm update
-npm audit fix
+bun update
+bun audit
 ```
 
 ### Monitor Dependabot Alerts

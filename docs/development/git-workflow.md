@@ -136,13 +136,13 @@ git branch --show-current
 
 ### Release Workflow
 
-**Option 1: Using npm version (recommended):**
+**Option 1: Using bun pm version (recommended):**
 
 ```bash
 # Automatically bumps version, syncs all files, creates commit & tag
-npm version patch   # For bug fixes and minor changes (X.Y.Z -> X.Y.Z+1)
-npm version minor   # For new features (X.Y.Z -> X.Y+1.0)
-npm version major   # For breaking changes (X.Y.Z -> X+1.0.0) - rarely used
+bun pm version patch   # For bug fixes and minor changes (X.Y.Z -> X.Y.Z+1)
+bun pm version minor   # For new features (X.Y.Z -> X.Y+1.0)
+bun pm version major   # For breaking changes (X.Y.Z -> X+1.0.0) - rarely used
 
 # Push to GitHub
 git push && git push --tags
@@ -153,7 +153,7 @@ git push && git push --tags
 ```bash
 # 1. Edit package.json version manually
 # 2. Sync version to other files
-npm run sync-version
+bun run sync-version
 
 # 3. Commit changes
 git add -A
