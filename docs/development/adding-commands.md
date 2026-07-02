@@ -103,7 +103,7 @@ bun run lint          # Ensure no linting errors
 bun run build         # Compile to dist/
 # Run the local build directly — do NOT use `npm link` (or `bun link`),
 # which would shadow the Homebrew binary:
-bun dist/bin/staqan-yt.js --help
+bun dist/bin/staqan-yt.js help
 ```
 
 ## Step 6: Update Documentation

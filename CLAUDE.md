@@ -66,7 +66,7 @@ brew install staqan-yt
 brew upgrade staqan-yt
 
 # Verify
-staqan-yt --help
+staqan-yt help
 ```
 
 > **Never use `npm link` (or `bun link`) for this CLI.** It shadows the

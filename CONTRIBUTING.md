@@ -30,12 +30,12 @@ cd staqan-yt-cli
 # Install dependencies
 bun install
 
-# Run in development mode
+# Run in development mode (runs TypeScript source via tsx)
 bun run dev
 
 # Or build and run
 bun run build
-bun dist/bin/staqan-yt.js --help
+bun dist/bin/staqan-yt.js help
 ```
 
 ### Code Quality Checks

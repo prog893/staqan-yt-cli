@@ -76,7 +76,7 @@ sudo mv staqan-yt /usr/local/bin/
 
 ```bash
 staqan-yt --version
-staqan-yt --help
+staqan-yt help
 ```
 
 ## Shell Completions

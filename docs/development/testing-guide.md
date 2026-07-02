@@ -99,7 +99,7 @@ bun install
 
 ```bash
 bun run build
-bun dist/bin/staqan-yt.js --help
+bun dist/bin/staqan-yt.js help
 bun dist/bin/staqan-yt.js get-video dQw4w9WgXcQ
 ```
 
@@ -115,7 +115,7 @@ bun run lint
 # Build the project
 bun run build
 
-# Development mode (runs TypeScript directly via bun)
+# Development mode (tsx runs the TypeScript source)
 bun run dev
 ```
 

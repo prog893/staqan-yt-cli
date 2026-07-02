@@ -18,7 +18,7 @@ This project uses TypeScript with strict type checking enabled. Key configuratio
 bun run build         # Compile TypeScript to dist/
 bun run type-check    # Type checking without emit
 bun run lint          # Run ESLint
-bun run dev           # Development mode (bun runs TypeScript directly)
+bun run dev           # Development mode (tsx runs the TypeScript source)
 ```
 
 ## Type Safety Guidelines
