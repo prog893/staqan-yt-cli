@@ -4,7 +4,7 @@ import { program, Command } from 'commander';
 import chalk from 'chalk';
 import * as path from 'path';
 import { GroupedHelp } from '../lib/customHelp';
-import { setQuiet, setVerbose } from '../lib/utils';
+import { setQuiet, setVerbose, error, isHelperFormattedError } from '../lib/utils';
 import authCommand = require('../commands/auth');
 import listVideosCommand = require('../commands/list-videos');
 import getVideoCommand = require('../commands/get-video');
@@ -74,8 +74,22 @@ function withHelpWrapper(commandName: string, actionFn: (...args: any[]) => Prom
       }
     }
 
-    // Otherwise, execute the original action
-    return actionFn(...args);
+    // Otherwise, execute the original action. If the action throws (issue #110 —
+    // helpers like runOrExit/withSpinner used to call process.exit(1) directly,
+    // which killed the process and any long-running caller such as the MCP
+    // server), catch the error here, log it, and exit with code 1.
+    try {
+      return await actionFn(...args);
+    } catch (err) {
+      // Helpers (runOrExit, withSpinner) mark their errors so we don't
+      // double-print. A fresh throw from a command's own code (no helper
+      // wrap) needs printing here.
+      if (!isHelperFormattedError(err)) {
+        const message = err instanceof Error ? err.message : String(err);
+        error(message);
+      }
+      process.exit(1);
+    }
   };
 }
 
@@ -371,7 +385,7 @@ program
 program
   .command('mcp')
   .description('Start MCP server for AI assistant integration')
-  .action(mcpCommand);
+  .action(withHelpWrapper('mcp', mcpCommand));
 
 // Playlist commands
 // Get single playlist command (singular)

@@ -356,24 +356,56 @@ function validatePrivacyFilter(privacy: string[] | undefined): void {
 }
 
 /**
- * Run a throwing validator (or any void/value function) and catch-and-die on
- * failure: print the error message via `error()` and exit(1). This is the
- * caller side of the project's throw-and-catch helper contract — validators
- * throw, the command decides to exit via this wrapper. Keeps every command's
+ * Run a throwing validator (or any void/value function) and on failure:
+ * print the error message via `error()` and re-throw. This is the caller
+ * side of the project's throw-and-catch helper contract — validators
+ * throw, the command catches via this wrapper, formats the error, then
+ * propagates it so a single CLI top-level catch (in `withHelpWrapper`)
+ * can decide to exit. Keeps every command's
  * `try { validate() } catch (e) { error(...); process.exit(1); }` boilerplate
  * in one place.
  *
  * For async work wrapped in a spinner, prefer `withSpinner` (it owns its own
- * catch-and-die). Use `runOrExit` for the synchronous validation calls that
- * run at the top of a command before any spinner starts.
+ * catch-and-rethrow). Use `runOrExit` for the synchronous validation calls
+ * that run at the top of a command before any spinner starts.
+ *
+ * Note: this used to call `process.exit(1)` directly (issue #110). That made
+ * it impossible to use the helpers from any context that must survive an
+ * error path (e.g. an MCP server running multiple tools in one process).
+ * Throwing is strictly safer and the CLI top-level handler keeps exit
+ * semantics unchanged.
  */
 function runOrExit<T>(fn: () => T): T {
   try {
     return fn();
   } catch (e) {
-    error((e as Error).message);
-    process.exit(1);
+    const err = e as Error;
+    error(err.message);
+    throw markFormatted(err);
   }
+}
+
+/**
+ * Wrap an error to signal "already printed to the user by a helper layer".
+ * The CLI top-level catch in `withHelpWrapper` checks for this marker and
+ * skips re-printing. The original error is preserved on `cause` (and the
+ * marker itself chains the same message so the surface behavior is
+ * unchanged for callers that don't care).
+ */
+function markFormatted(original: Error): Error {
+  const marked = new Error(original.message);
+  marked.name = original.name || 'Error';
+  (marked as Error & { cause?: unknown }).cause = original;
+  (marked as Error & { __helperFormatted?: boolean }).__helperFormatted = true;
+  return marked;
+}
+
+/**
+ * True if `err` was already printed by a helper layer (`runOrExit` or
+ * `withSpinner`). The CLI top-level catch uses this to avoid double-printing.
+ */
+export function isHelperFormattedError(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { __helperFormatted?: boolean }).__helperFormatted === true;
 }
 
 /**
@@ -418,9 +450,14 @@ function createSpinner(message: string): Ora {
 /**
  * Run an async function wrapped in an ora spinner.
  * On success the caller is responsible for calling spinner.succeed() inside fn.
- * On error: stops the spinner with failMessage, prints the error, and exits 1.
+ * On error: stops the spinner with failMessage, prints the error, and re-throws
+ * so a single CLI top-level catch (in `withHelpWrapper`) can exit 1.
  *
  * When quiet mode is enabled, uses a silent spinner that does nothing.
+ *
+ * Note: this used to call `process.exit(1)` directly (issue #110). That
+ * killed the entire process — including any long-running caller such as the
+ * MCP server. Throwing lets the caller decide whether to exit.
  */
 async function withSpinner<T>(
   message: string,
@@ -450,8 +487,13 @@ async function withSpinner<T>(
     try {
       return await fn(silentSpinner);
     } catch (err) {
-      error((err as Error).message);
-      process.exit(1);
+      // Mirror the CLI top-level guard: if a nested helper already printed
+      // this message and marked it, don't print it again here. Prevents
+      // double-output for chains like runOrExit → withSpinner.
+      if (!isHelperFormattedError(err)) {
+        error((err as Error).message);
+      }
+      throw markFormatted(err as Error);
     }
   }
 
@@ -462,8 +504,11 @@ async function withSpinner<T>(
   } catch (err) {
     spinner.fail(failMessage);
     console.log('');
-    error((err as Error).message);
-    process.exit(1);
+    // Same double-print guard as the silent-mode branch (CodeRabbit #121).
+    if (!isHelperFormattedError(err)) {
+      error((err as Error).message);
+    }
+    throw markFormatted(err as Error);
   }
 }
 
