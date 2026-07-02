@@ -93,7 +93,7 @@ remote: To find out more about visit: https://github.com/prog893/staqan-yt-cli/s
 gh api '/repos/prog893/staqan-yt-cli/dependabot-alerts?state=open' | jq .
 
 # Check dependency chain
-bun pm ls <vulnerable-package>
+bun why <vulnerable-package>
 ```
 
 #### 2. Update Dependencies
@@ -126,7 +126,7 @@ bun run build
 
 ```bash
 # Commit the fix
-git add bun.lock
+git add package-lock.json
 git commit -m "Fix: Update <package> to address security vulnerabilities
 
 - Updated <package> from X.Y.Z to A.B.C
@@ -172,7 +172,7 @@ Based on security best practices:
 
 **Root cause analysis:**
 ```bash
-bun pm ls hono
+bun why hono
 # staqan-yt-cli
 # └── @modelcontextprotocol/sdk@1.25.2
 #     └── @hono/node-server@1.19.8
@@ -199,7 +199,7 @@ bun update @modelcontextprotocol/sdk
 ### Check Dependency Chains
 
 - Transitive dependencies often bring vulnerabilities
-- Use `bun pm ls <package>` to trace chains
+- Use `bun why <package>` to trace chains
 - Update direct dependencies to fix transitive issues
 
 ### Test After Updates
