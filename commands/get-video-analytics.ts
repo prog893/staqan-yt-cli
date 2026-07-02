@@ -6,6 +6,68 @@ import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { AnalyticsOptions } from '../types';
 
+/**
+ * Allowlist of Analytics API dimensions valid for video-level queries.
+ * See https://developers.google.com/youtube/v3/docs/analytics_api/dimensions/dims
+ */
+const VIDEO_DIMENSIONS: ReadonlySet<string> = new Set([
+  'video',
+  'day',
+  'month',
+  'insightTrafficSourceType',
+  'insightTrafficSourceDetail',
+  'creatorContentType',
+  'country',
+  'province',
+  'city',
+  'deviceType',
+  'operatingSystem',
+  'insightPlaybackLocationType',
+  'insightPlayerLocationType',
+  'subscribedStatus',
+]);
+
+/**
+ * Known-bad dimension combinations the Analytics API rejects at runtime.
+ * Checking up-front gives a clean error message instead of an API error.
+ */
+const INVALID_DIMENSION_COMBOS: ReadonlyArray<ReadonlyArray<string>> = [
+  // creatorContentType is not a valid dimension for traffic-source detail reports
+  // (see PR #90 — original issue: get-channel-search-terms #88).
+  ['creatorContentType', 'insightTrafficSourceDetail'],
+];
+
+/**
+ * Validate a comma-separated --dimensions string against the allowlist and
+ * known-bad combos. Returns the normalized (trimmed) string on success;
+ * throws on any invalid dimension or rejected combination.
+ */
+function validateVideoDimensions(raw: string): string {
+  const dims = raw.split(',').map(d => d.trim()).filter(d => d.length > 0);
+  if (dims.length === 0) {
+    throw new Error('--dimensions cannot be empty');
+  }
+
+  for (const d of dims) {
+    if (!VIDEO_DIMENSIONS.has(d)) {
+      throw new Error(
+        `Invalid --dimensions value: "${d}". Valid values: ${[...VIDEO_DIMENSIONS].join(', ')}`,
+      );
+    }
+  }
+
+  for (const combo of INVALID_DIMENSION_COMBOS) {
+    if (combo.every(d => dims.includes(d))) {
+      throw new Error(
+        `Invalid --dimensions combination: ${combo.join(' + ')}. ` +
+        `The Analytics API does not support this combination.`,
+      );
+    }
+  }
+
+  return dims.join(',');
+}
+
 async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void> {
   initCommand(options);
 
@@ -62,9 +124,15 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
     // Default metrics
     const metrics = options.metrics || 'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares';
 
+    // Default dimensions: 'video' preserves legacy behavior (aggregated by video).
+    // Any user-supplied --dimensions is validated against the Analytics API allowlist
+    // and known-bad combinations are rejected up-front (issue #99).
+    const dimensions = runOrExit(() => validateVideoDimensions(options.dimensions ?? 'video'));
+
     // Chunk date range into 90-day periods
     const dateChunks = chunkDateRange(startDate, endDate);
     debug(`Split into ${dateChunks.length} chunk(s) of 90 days`);
+    debug(`Dimensions: ${dimensions}, Metrics: ${metrics}`);
 
     // Fetch analytics for each chunk
     const allRows: unknown[][] = [];
@@ -80,7 +148,7 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
           startDate: chunk.start,
           endDate: chunk.end,
           metrics,
-          dimensions: 'video',
+          dimensions,
           filters: `video==${parsedId}`,
         });
       });
