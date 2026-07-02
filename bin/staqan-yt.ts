@@ -385,7 +385,7 @@ program
 program
   .command('mcp')
   .description('Start MCP server for AI assistant integration')
-  .action(mcpCommand);
+  .action(withHelpWrapper('mcp', mcpCommand));
 
 // Playlist commands
 // Get single playlist command (singular)

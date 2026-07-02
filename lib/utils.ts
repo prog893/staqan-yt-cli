@@ -487,7 +487,12 @@ async function withSpinner<T>(
     try {
       return await fn(silentSpinner);
     } catch (err) {
-      error((err as Error).message);
+      // Mirror the CLI top-level guard: if a nested helper already printed
+      // this message and marked it, don't print it again here. Prevents
+      // double-output for chains like runOrExit → withSpinner.
+      if (!isHelperFormattedError(err)) {
+        error((err as Error).message);
+      }
       throw markFormatted(err as Error);
     }
   }
@@ -499,7 +504,10 @@ async function withSpinner<T>(
   } catch (err) {
     spinner.fail(failMessage);
     console.log('');
-    error((err as Error).message);
+    // Same double-print guard as the silent-mode branch (CodeRabbit #121).
+    if (!isHelperFormattedError(err)) {
+      error((err as Error).message);
+    }
     throw markFormatted(err as Error);
   }
 }
