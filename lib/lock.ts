@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import os from 'os';
 import { debug, CACHE_DIR } from './utils';
+import { DATA_DIR } from './cache';
 
 export interface LockOptions {
   timeout?: number;        // Max wait time (ms) before giving up
@@ -130,11 +130,22 @@ async function isProcessAlive(pid: number): Promise<boolean> {
 }
 
 /**
- * Get lock file path for a given resource
+ * Get lock file path for a given resource.
+ *
+ * Lock file naming convention (issue #107):
+ *   - Each lock file lives next to the resource it protects
+ *     (in the resource's parent directory, not inside it).
+ *   - File name = "{resource-basename}.lock"
+ *     where resource-basename is the file/dir the lock guards.
+ *   - Hidden leading dot is NOT used (POSIX hidden files can confuse
+ *     completion, ls -l defaults, etc.).
+ *
+ * Resulting paths:
+ *   - completion →  ~/.staqan-yt-cli/cache/{channelId}/completion_cache.json.lock
+ *   - handles    →  ~/.staqan-yt-cli/cache/handle-to-channel-id.json.lock
+ *   - reports    →  ~/.staqan-yt-cli/data/{channelId}/reports.lock
  */
 export function getLockPath(type: 'completion' | 'handles' | 'reports', channelId?: string): string {
-  const dataDir = path.join(os.homedir(), '.staqan-yt-cli', 'data');
-
   switch (type) {
     case 'completion':
       if (!channelId) throw new Error('channelId required for completion lock');
@@ -143,6 +154,6 @@ export function getLockPath(type: 'completion' | 'handles' | 'reports', channelI
       return path.join(CACHE_DIR, 'handle-to-channel-id.json.lock');
     case 'reports':
       if (!channelId) throw new Error('channelId required for reports lock');
-      return path.join(dataDir, channelId, 'reports', '.lock');
+      return path.join(DATA_DIR, channelId, 'reports.lock');
   }
 }
