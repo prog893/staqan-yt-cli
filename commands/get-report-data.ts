@@ -9,16 +9,12 @@ import {
   loadReportMetadata,
   readCachedReport,
   saveReportToCache,
-  parseCsvAndExtractRange,
   ensureCacheDir,
 } from '../lib/cache';
 import { getChannelId } from '../lib/youtube';
 import { acquireLock, getLockPath } from '../lib/lock';
+import { downloadReport, safeReportPath } from '../lib/reports';
 import { CacheIndexEntry } from '../types';
-import https from 'https';
-import { createWriteStream, unlinkSync } from 'fs';
-import { unlink } from 'fs/promises';
-import path from 'path';
 import chalk from 'chalk';
 
 interface ReportDataOptions {
@@ -29,66 +25,6 @@ interface ReportDataOptions {
   endDate?: string;
   output?: 'json' | 'csv';
   verbose?: boolean;
-}
-
-/**
- * Download a report from YouTube
- */
-async function downloadReport(
-  report: { id?: string | null; downloadUrl?: string | null; startTime?: string | null; endTime?: string | null; createTime?: string | null },
-  auth: { getAccessToken(): Promise<{ token?: string | null }> },
-  tmpPath: string
-): Promise<{ csvData: string; headers: string[]; data: Record<string, string>[] }> {
-  // Get access token for authenticated request
-  const credentials = await auth.getAccessToken();
-  const accessToken = credentials.token || '';
-
-  await new Promise<void>((resolve, reject) => {
-    const url = new URL(report.downloadUrl!);
-
-    debug(`Downloading from: ${report.downloadUrl}`);
-
-    const options = {
-      hostname: url.hostname,
-      path: url.pathname + url.search,
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      }
-    };
-
-    https.get(options, (response) => {
-      debug(`Response status: ${response.statusCode}`);
-
-      if (response.statusCode !== 200) {
-        unlink(tmpPath).catch(() => {});
-        reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
-        return;
-      }
-
-      const file = createWriteStream(tmpPath);
-      response.pipe(file);
-
-      file.on('finish', () => {
-        file.close();
-        resolve();
-      });
-
-      file.on('error', (err) => {
-        unlink(tmpPath).catch(() => {});
-        reject(err);
-      });
-    }).on('error', (err) => {
-      unlink(tmpPath).catch(() => {});
-      reject(err);
-    });
-  });
-
-  // Parse CSV
-  const fs = await import('fs');
-  const csvData = fs.readFileSync(tmpPath, 'utf-8');
-  const parsed = parseCsvAndExtractRange(csvData);
-
-  return { csvData, headers: parsed.headers, data: parsed.data };
 }
 
 /**
@@ -377,72 +313,79 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
     const tmpDir = '/tmp';
 
-    // Acquire lock just before writes; soft-fail with warning if busy
-    let writeRelease: (() => Promise<void>) | null = null;
-    try {
-      writeRelease = await acquireLock(getLockPath('reports', channelId), { timeout: 5000 });
-    } catch {
-      console.log(chalk.gray('Info: could not acquire lock for reports, skipping cache update'));
-    }
+    // NOTE: the write lock is acquired and released per-iteration around the
+    // cache write, NOT held across the whole download loop. `downloadReport`
+    // from lib/reports.ts can now retry/backoff for minutes on HTTP 429 or
+    // transient network errors, and holding the lock that long would block
+    // concurrent `fetch-reports` / `get-report-data` runs from the same
+    // channel. The lock guards the cache index write only.
 
-    try {
-      for (let i = 0; i < reportsToFetch.length; i++) {
-        const report = reportsToFetch[i];
-        const tmpPath = path.join(tmpDir, `${report.id}.csv`);
+    for (let i = 0; i < reportsToFetch.length; i++) {
+      const report = reportsToFetch[i];
+      // Use the shared sanitizer so a malicious report.id can't escape
+      // `tmpDir` (path-traversal hardening — see lib/reports.ts).
+      // Append pid + timestamp to keep the path unique per process — the
+      // reports lock is now scoped to just the cache write, so two
+      // concurrent runs on the same channel would otherwise clobber each
+      // other's temp CSV (CodeRabbit round 2).
+      const tmpPath = safeReportPath(tmpDir, `${report.id ?? 'report'}-${process.pid}-${Date.now()}`);
 
-        spinner.text = `Downloading report ${i + 1}/${reportsToFetch.length}...`;
+      spinner.text = `Downloading report ${i + 1}/${reportsToFetch.length}...`;
 
-        // Download report
-        const { csvData, headers, data } = await downloadReport(report, auth, tmpPath);
+      // Download report (shared retry-wrapped helper from lib/reports.ts).
+      // Returns minDate/maxDate directly — no separate parseCsvAndExtractRange call needed.
+      const { csvData, headers, data, minDate, maxDate } = await downloadReport(report, auth, { tmpPath });
 
-        // Calculate expiration date
-        const jobCreated = new Date(matchingJob.createTime || '');
-        const reportCreated = new Date(report.createTime || '');
-        const isHistorical = reportCreated.getTime() - jobCreated.getTime() < 4 * 24 * 60 * 60 * 1000;
-        const expirationDays = isHistorical ? 30 : 60;
-        const expiresAt = new Date(reportCreated.getTime() + expirationDays * 24 * 60 * 60 * 1000);
+      // Calculate expiration date
+      const jobCreated = new Date(matchingJob.createTime || '');
+      const reportCreated = new Date(report.createTime || '');
+      const isHistorical = reportCreated.getTime() - jobCreated.getTime() < 4 * 24 * 60 * 60 * 1000;
+      const expirationDays = isHistorical ? 30 : 60;
+      const expiresAt = new Date(reportCreated.getTime() + expirationDays * 24 * 60 * 60 * 1000);
 
-        // Parse CSV to get actual date range
-        const parsed = parseCsvAndExtractRange(csvData);
-
-        if (writeRelease) {
-          // Save to cache (non-fatal: warn on failure so API data is still returned)
-          try {
-            await saveReportToCache(channelId, report.id || '', options.type, csvData, {
-              reportId: report.id || '',
-              reportTypeId: options.type,
-              channelId,
-              jobId,
-              startTime: report.startTime || '',
-              endTime: report.endTime || '',
-              startTimeActual: parsed.minDate,
-              endTimeActual: parsed.maxDate,
-              downloadedAt: new Date().toISOString(),
-              expiresAt: expiresAt.toISOString(),
-              downloadUrl: report.downloadUrl || '',
-              columns: headers,
-              isComplete: true,
-              fileSize: csvData.length,
-              row_count: data.length,
-            });
-          } catch (cacheErr) {
-            warning(`Cache save failed for ${report.id}: ${(cacheErr as Error).message} — data will be re-fetched on next run`);
-          }
-        }
-
-        allData.push(...data);
-
-        // Cleanup
-        try {
-          unlinkSync(tmpPath);
-        } catch {
-          // Ignore cleanup errors
-        }
-
-        debug(`Downloaded: ${report.startTime} to ${report.endTime}`);
+      // Acquire the write lock just long enough to update the cache index.
+      // If the lock is busy, skip the cache write (the run still returns data)
+      // rather than queueing behind a possibly-slow download backoff.
+      let writeRelease: (() => Promise<void>) | null = null;
+      try {
+        writeRelease = await acquireLock(getLockPath('reports', channelId), { timeout: 1000 });
+      } catch {
+        // Route to stderr: stdout carries the machine-readable data output
+        // (json/csv) and a console.log here would interleave with the
+        // payload and break downstream parsing (CodeRabbit round 2).
+        process.stderr.write(chalk.gray(`Info: cache lock busy, skipping cache write for ${report.id}\n`));
       }
-    } finally {
-      if (writeRelease) await writeRelease();
+
+      if (writeRelease) {
+        // Save to cache (non-fatal: warn on failure so API data is still returned)
+        try {
+          await saveReportToCache(channelId, report.id || '', options.type, csvData, {
+            reportId: report.id || '',
+            reportTypeId: options.type,
+            channelId,
+            jobId,
+            startTime: report.startTime || '',
+            endTime: report.endTime || '',
+            startTimeActual: minDate,
+            endTimeActual: maxDate,
+            downloadedAt: new Date().toISOString(),
+            expiresAt: expiresAt.toISOString(),
+            downloadUrl: report.downloadUrl || '',
+            columns: headers,
+            isComplete: true,
+            fileSize: csvData.length,
+            row_count: data.length,
+          });
+        } catch (cacheErr) {
+          warning(`Cache save failed for ${report.id}: ${(cacheErr as Error).message} — data will be re-fetched on next run`);
+        } finally {
+          await writeRelease();
+        }
+      }
+
+      allData.push(...data);
+
+      debug(`Downloaded: ${report.startTime} to ${report.endTime}`);
     }
 
     spinner.succeed(`Retrieved ${cachedReports.length} cached + ${reportsToFetch.length} new report(s)`);
