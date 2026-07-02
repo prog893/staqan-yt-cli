@@ -12,7 +12,6 @@
 
 import { promises as fs } from 'fs';
 import { createWriteStream } from 'fs';
-import { unlinkSync } from 'fs';
 import { unlink } from 'fs/promises';
 import { pipeline } from 'stream/promises';
 import https from 'https';
@@ -44,7 +43,16 @@ export interface TokenSource {
 
 /** Optional overrides for `downloadReport`. */
 export interface DownloadReportOptions {
-  /** Override the temp path used for the downloaded CSV. Defaults to safeTmpReportPath(report.id). */
+  /**
+   * Override the temp path used for the downloaded CSV. Defaults to
+   * `safeTmpReportPath(report.id)`.
+   *
+   * The path is used verbatim — `downloadReport` does NOT re-sanitize.
+   * Callers MUST build the path via `safeReportPath(tmpDir, reportId)`
+   * (or otherwise strip unsafe characters) to avoid path traversal. The
+   * typical reason to override is to keep the temp file in a per-command
+   * scratch dir (e.g. `get-report-data`) — use `safeReportPath` for that.
+   */
   tmpPath?: string;
 }
 
@@ -56,8 +64,21 @@ export interface DownloadReportOptions {
  * malformed ID (e.g. "../foo" or "id/with/slashes") can't escape /tmp.
  */
 export function safeTmpReportPath(reportId: string | null | undefined): string {
+  return safeReportPath('/tmp', reportId);
+}
+
+/**
+ * Build a filesystem-safe temp path for a report download under a caller-
+ * supplied directory. Same sanitization as `safeTmpReportPath` — strips
+ * anything outside [A-Za-z0-9._-] from the report id so it can't escape
+ * `tmpDir` or introduce path separators. This is the helper callers should
+ * use when they want to control which directory the temp file lives in
+ * (e.g. a per-command scratch dir), so they don't have to reimplement the
+ * sanitization themselves.
+ */
+export function safeReportPath(tmpDir: string, reportId: string | null | undefined): string {
   const safeId = String(reportId ?? 'report').replace(/[^A-Za-z0-9._-]/g, '_');
-  return path.join('/tmp', `${safeId}.csv`);
+  return path.join(tmpDir, `${safeId}.csv`);
 }
 
 /**
@@ -81,12 +102,17 @@ export function downloadOnce(
     const options = {
       hostname: url.hostname,
       path: url.pathname + url.search,
+      // 30s request timeout. Without this, a stalled server connection
+      // would hang forever — `https.get` does NOT time out on its own and
+      // would never produce the ECONNRESET/ETIMEDOUT signals the retry
+      // loop in `downloadReport` is watching for. (CodeRabbit #118 review.)
+      timeout: 30000,
       headers: {
         'Authorization': `Bearer ${accessToken}`,
       },
     };
 
-    https
+    const req = https
       .get(options, (response) => {
         debug(`Response status: ${response.statusCode}`);
 
@@ -121,6 +147,13 @@ export function downloadOnce(
             reject(err);
           },
         );
+      })
+      .on('timeout', () => {
+        // Socket-level timeout — destroy the request so the underlying
+        // socket closes and the error handler below fires (which rejects
+        // the promise, surfaces the timeout as an error, and lets the
+        // caller's retry loop run).
+        req.destroy(new Error('Download request timed out after 30000ms'));
       })
       .on('error', (err) => {
         unlink(dest).catch(() => {});
@@ -218,7 +251,7 @@ export async function downloadReport(
 
   // Cleanup
   try {
-    unlinkSync(tmpPath);
+    await unlink(tmpPath);
   } catch {
     // Ignore cleanup errors
   }
