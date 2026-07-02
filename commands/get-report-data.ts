@@ -324,7 +324,11 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       const report = reportsToFetch[i];
       // Use the shared sanitizer so a malicious report.id can't escape
       // `tmpDir` (path-traversal hardening — see lib/reports.ts).
-      const tmpPath = safeReportPath(tmpDir, report.id);
+      // Append pid + timestamp to keep the path unique per process — the
+      // reports lock is now scoped to just the cache write, so two
+      // concurrent runs on the same channel would otherwise clobber each
+      // other's temp CSV (CodeRabbit round 2).
+      const tmpPath = safeReportPath(tmpDir, `${report.id ?? 'report'}-${process.pid}-${Date.now()}`);
 
       spinner.text = `Downloading report ${i + 1}/${reportsToFetch.length}...`;
 
@@ -346,7 +350,10 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       try {
         writeRelease = await acquireLock(getLockPath('reports', channelId), { timeout: 1000 });
       } catch {
-        console.log(chalk.gray(`Info: cache lock busy, skipping cache write for ${report.id}`));
+        // Route to stderr: stdout carries the machine-readable data output
+        // (json/csv) and a console.log here would interleave with the
+        // payload and break downstream parsing (CodeRabbit round 2).
+        process.stderr.write(chalk.gray(`Info: cache lock busy, skipping cache write for ${report.id}\n`));
       }
 
       if (writeRelease) {

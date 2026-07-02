@@ -151,9 +151,12 @@ export function downloadOnce(
       .on('timeout', () => {
         // Socket-level timeout — destroy the request so the underlying
         // socket closes and the error handler below fires (which rejects
-        // the promise, surfaces the timeout as an error, and lets the
-        // caller's retry loop run).
-        req.destroy(new Error('Download request timed out after 30000ms'));
+        // the promise, surfaces the timeout as a typed error, and lets
+        // the caller's retry loop recognize it via `code === 'ETIMEDOUT'`
+        // and back off + retry like any other transient network error).
+        const timeoutErr: NodeJS.ErrnoException = new Error('Download request timed out after 30000ms');
+        timeoutErr.code = 'ETIMEDOUT';
+        req.destroy(timeoutErr);
       })
       .on('error', (err) => {
         unlink(dest).catch(() => {});
