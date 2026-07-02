@@ -4,7 +4,7 @@
 
 ### 🚨 NEVER COMMIT DIRECTLY TO MAIN BRANCH 🚨
 
-**Exception: version bumps (`npm version patch/minor`) are committed directly on main.**
+**Exception: version bumps (`bun pm version patch/minor`) are committed directly on main.**
 
 **EVERY other commit MUST be on a feature branch:**
 
@@ -383,7 +383,7 @@ git checkout main
 
 # Bump patch version (creates a commit + tag automatically)
 # This also clones/pulls homebrew-tap, commits the updated formula, and pushes it
-npm version patch
+bun pm version patch
 
 # After the release, upgrade locally via Homebrew
 brew upgrade staqan-yt

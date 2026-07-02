@@ -84,11 +84,10 @@ staqan-yt update-video dQw4w9WgXcQ --title "New Title" --yes
 bun install
 ```
 
-> **Note**: this repo still tracks `package-lock.json` (the
-> `package-lock.json` → `bun.lock` migration is intentionally out of scope
-> for this docs PR). Running `bun install` here will *additionally* create
-> a `bun.lock` — either commit it as part of the migration when it lands,
-> or delete it before committing. Either way, do not be surprised.
+> **Note**: this repo tracks `bun.lock` (the `package-lock.json` →
+> `bun.lock` migration has been done). `bun install` will update it when
+> dependencies change — commit it alongside the relevant `package.json`
+> edits. Do not be surprised when it appears after `bun install`.
 
 ### Test the Local Build
 

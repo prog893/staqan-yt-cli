@@ -126,7 +126,7 @@ bun run build
 
 ```bash
 # Commit the fix
-git add package-lock.json
+git add bun.lock
 git commit -m "Fix: Update <package> to address security vulnerabilities
 
 - Updated <package> from X.Y.Z to A.B.C
@@ -139,7 +139,7 @@ git commit -m "Fix: Update <package> to address security vulnerabilities
 Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
 
 # Bump patch version
-npm version patch
+bun pm version patch
 
 # Push to GitHub
 git push && git push --tags
