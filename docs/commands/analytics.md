@@ -21,6 +21,7 @@ staqan-yt get-video-analytics --video-id <videoId>
 - `--start-date <date>` - Start date (YYYY-MM-DD), defaults to upload date
 - `--end-date <date>` - End date (YYYY-MM-DD), defaults to today
 - `--metrics <metrics>` - Comma-separated list of metrics to fetch
+- `--dimensions <dims>` - Comma-separated Analytics API dimensions (default: `video`)
 - `--output <format>` - Output format: json, table, text, pretty, csv (default: pretty)
 - `-v, --verbose` - Enable verbose output with debug information
 - `-h, --help` - Show help
@@ -39,6 +40,18 @@ staqan-yt get-video-analytics --video-id dQw4w9WgXcQ \
 # Get specific metrics only
 staqan-yt get-video-analytics --video-id dQw4w9WgXcQ \
   --metrics views,estimatedMinutesWatched,averageViewDuration
+
+# Break down views by day
+staqan-yt get-video-analytics --video-id dQw4w9WgXcQ \
+  --dimensions day --metrics views,estimatedMinutesWatched
+
+# Break down views by traffic source type
+staqan-yt get-video-analytics --video-id dQw4w9WgXcQ \
+  --dimensions insightTrafficSourceType --metrics views
+
+# Break down views by country
+staqan-yt get-video-analytics --video-id dQw4w9WgXcQ \
+  --dimensions country --metrics views,estimatedMinutesWatched
 
 # Export to CSV
 staqan-yt get-video-analytics --video-id dQw4w9WgXcQ --output csv > analytics.csv
@@ -77,6 +90,22 @@ Full list: [YouTube Analytics Metrics](https://developers.google.com/youtube/ana
 - **Start date only**: Start date to today
 - **Both dates**: Specified range
 - **Max range**: YouTube Analytics API limits to ~500 days
+
+### Available Dimensions
+
+By default, queries aggregate by `video` (the only dimension when `--dimensions` is omitted). Supply `--dimensions` to break results out along one or more Analytics API dimensions.
+
+Supported dimensions for video-level queries:
+
+- `day`, `month` — Time buckets
+- `insightTrafficSourceType`, `insightTrafficSourceDetail` — Traffic sources (aggregate and per-referrer)
+- `creatorContentType` — `SHORT`, `LONG_FORM`, `LIVE`
+- `country`, `province`, `city` — Geography
+- `deviceType`, `operatingSystem` — Device
+- `insightPlaybackLocationType`, `insightPlayerLocationType` — Where playback happened
+- `subscribedStatus` — Subscribed vs non-subscribed viewers
+
+Combine multiple dimensions with commas (e.g. `--dimensions day,country`). The CLI rejects unknown dimensions and known-bad combinations (e.g. `creatorContentType + insightTrafficSourceDetail` — see #88, fixed in PR #90) with a clear error before any API call.
 
 ---
 
