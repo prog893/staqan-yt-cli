@@ -9,15 +9,12 @@ import {
   loadReportMetadata,
   readCachedReport,
   saveReportToCache,
-  parseCsvAndExtractRange,
   ensureCacheDir,
 } from '../lib/cache';
 import { getChannelId } from '../lib/youtube';
 import { acquireLock, getLockPath } from '../lib/lock';
+import { downloadReport } from '../lib/reports';
 import { CacheIndexEntry } from '../types';
-import https from 'https';
-import { createWriteStream, unlinkSync } from 'fs';
-import { unlink } from 'fs/promises';
 import path from 'path';
 import chalk from 'chalk';
 
@@ -29,66 +26,6 @@ interface ReportDataOptions {
   endDate?: string;
   output?: 'json' | 'csv';
   verbose?: boolean;
-}
-
-/**
- * Download a report from YouTube
- */
-async function downloadReport(
-  report: { id?: string | null; downloadUrl?: string | null; startTime?: string | null; endTime?: string | null; createTime?: string | null },
-  auth: { getAccessToken(): Promise<{ token?: string | null }> },
-  tmpPath: string
-): Promise<{ csvData: string; headers: string[]; data: Record<string, string>[] }> {
-  // Get access token for authenticated request
-  const credentials = await auth.getAccessToken();
-  const accessToken = credentials.token || '';
-
-  await new Promise<void>((resolve, reject) => {
-    const url = new URL(report.downloadUrl!);
-
-    debug(`Downloading from: ${report.downloadUrl}`);
-
-    const options = {
-      hostname: url.hostname,
-      path: url.pathname + url.search,
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      }
-    };
-
-    https.get(options, (response) => {
-      debug(`Response status: ${response.statusCode}`);
-
-      if (response.statusCode !== 200) {
-        unlink(tmpPath).catch(() => {});
-        reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
-        return;
-      }
-
-      const file = createWriteStream(tmpPath);
-      response.pipe(file);
-
-      file.on('finish', () => {
-        file.close();
-        resolve();
-      });
-
-      file.on('error', (err) => {
-        unlink(tmpPath).catch(() => {});
-        reject(err);
-      });
-    }).on('error', (err) => {
-      unlink(tmpPath).catch(() => {});
-      reject(err);
-    });
-  });
-
-  // Parse CSV
-  const fs = await import('fs');
-  const csvData = fs.readFileSync(tmpPath, 'utf-8');
-  const parsed = parseCsvAndExtractRange(csvData);
-
-  return { csvData, headers: parsed.headers, data: parsed.data };
 }
 
 /**
@@ -392,8 +329,9 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
         spinner.text = `Downloading report ${i + 1}/${reportsToFetch.length}...`;
 
-        // Download report
-        const { csvData, headers, data } = await downloadReport(report, auth, tmpPath);
+        // Download report (shared retry-wrapped helper from lib/reports.ts).
+        // Returns minDate/maxDate directly — no separate parseCsvAndExtractRange call needed.
+        const { csvData, headers, data, minDate, maxDate } = await downloadReport(report, auth, { tmpPath });
 
         // Calculate expiration date
         const jobCreated = new Date(matchingJob.createTime || '');
@@ -401,9 +339,6 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
         const isHistorical = reportCreated.getTime() - jobCreated.getTime() < 4 * 24 * 60 * 60 * 1000;
         const expirationDays = isHistorical ? 30 : 60;
         const expiresAt = new Date(reportCreated.getTime() + expirationDays * 24 * 60 * 60 * 1000);
-
-        // Parse CSV to get actual date range
-        const parsed = parseCsvAndExtractRange(csvData);
 
         if (writeRelease) {
           // Save to cache (non-fatal: warn on failure so API data is still returned)
@@ -415,8 +350,8 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
               jobId,
               startTime: report.startTime || '',
               endTime: report.endTime || '',
-              startTimeActual: parsed.minDate,
-              endTimeActual: parsed.maxDate,
+              startTimeActual: minDate,
+              endTimeActual: maxDate,
               downloadedAt: new Date().toISOString(),
               expiresAt: expiresAt.toISOString(),
               downloadUrl: report.downloadUrl || '',
@@ -431,13 +366,6 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
         }
 
         allData.push(...data);
-
-        // Cleanup
-        try {
-          unlinkSync(tmpPath);
-        } catch {
-          // Ignore cleanup errors
-        }
 
         debug(`Downloaded: ${report.startTime} to ${report.endTime}`);
       }
