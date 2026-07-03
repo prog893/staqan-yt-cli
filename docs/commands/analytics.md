@@ -182,6 +182,14 @@ staqan-yt get-search-terms --video-id dQw4w9WgXcQ --output csv > search_terms.cs
 - **Content ideas** - Find related search terms for new videos
 - **Title optimization** - Align titles with successful search terms
 
+### Limitations
+
+The YouTube Analytics API's `insightTrafficSourceDetail` dimension has intermittent data availability: search terms are not consistently returned even when `get-traffic-sources` confirms traffic from YouTube Search. In practice, individual search-term rows are often empty or sparse.
+
+This is an **API limitation**, not a code issue — see #23 for the original investigation and reproduction.
+
+**Workaround:** use [`get-traffic-sources`](#get-traffic-sources), which queries the `insightTrafficSourceType` dimension and reliably returns aggregated traffic-source categories (YouTube Search, Suggested Videos, External, Subscriber Feed, etc.). For actionable search-traffic insight, prefer the aggregated categories over per-term rows.
+
 ---
 
 ## get-traffic-sources
