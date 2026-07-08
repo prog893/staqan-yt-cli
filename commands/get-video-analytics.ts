@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, debug, formatNumber, convertToCSV, chunkDateRange, retryWithBackoff, initCommand, withSpinner, toLocalYmd, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
+import { parseVideoId, error, debug, formatNumber, convertToCSV, chunkDateRange, withRateLimitRetry, initCommand, withSpinner, toLocalYmd, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { AnalyticsOptions } from '../types';
@@ -74,7 +74,7 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
       const chunk = dateChunks[i];
       spinner.text = `Fetching chunk ${i + 1}/${dateChunks.length} (${chunk.start} to ${chunk.end})...`;
 
-      const analyticsResponse = await retryWithBackoff(async () => {
+      const analyticsResponse = await withRateLimitRetry(async () => {
         return await youtubeAnalytics.reports.query({
           ids: 'channel==MINE',
           startDate: chunk.start,
@@ -83,7 +83,7 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
           dimensions: 'video',
           filters: `video==${parsedId}`,
         });
-      });
+      }, { label: 'reports.query(video analytics)' });
 
       // Save headers from first response
       if (i === 0 && analyticsResponse.data.columnHeaders) {

@@ -22,7 +22,7 @@ import {
 } from '../lib/youtube';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, chunkDateRange, retryWithBackoff, initCommand, toLocalYmd, validateDateOption, validateDateRange, parseDuration } from '../lib/utils';
+import { parseVideoId, chunkDateRange, withRateLimitRetry, initCommand, toLocalYmd, validateDateOption, validateDateRange, parseDuration } from '../lib/utils';
 import { requireChannel } from '../lib/config';
 
 // Tool definitions
@@ -807,7 +807,7 @@ async function handleToolCall(name: string, args: any) {
       for (let i = 0; i < dateChunks.length; i++) {
         const chunk = dateChunks[i];
 
-        const analyticsResponse = await retryWithBackoff(async () => {
+        const analyticsResponse = await withRateLimitRetry(async () => {
           return await youtubeAnalytics.reports.query({
             ids: 'channel==MINE',
             startDate: chunk.start,
@@ -816,7 +816,7 @@ async function handleToolCall(name: string, args: any) {
             dimensions: 'video',
             filters: `video==${parsedId}`,
           });
-        });
+        }, { label: 'reports.query(video analytics)' });
 
         // Save headers from first response
         if (i === 0 && analyticsResponse.data.columnHeaders) {
