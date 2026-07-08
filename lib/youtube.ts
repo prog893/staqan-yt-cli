@@ -108,18 +108,18 @@ async function getChannelId(handleOrId: string): Promise<string> {
   const youtube = await getYouTubeClient();
   let channelId: string | null = null;
 
-  // If it starts with @, search by handle
+  // Exact handle lookup — channels.list costs 1 quota unit vs 100 for
+  // search.list, and unlike text search it can never match a similarly-named
+  // channel (a wrong search match would be persisted to the handle cache).
   if (handleOrId.startsWith('@')) {
-    debug('Searching by handle using search endpoint');
-    const searchResponse = await youtube.search.list({
-      part: ['snippet'],
-      q: handleOrId,
-      type: ['channel'],
-      maxResults: 1,
+    debug('Looking up channel by handle via channels.list forHandle');
+    const response = await youtube.channels.list({
+      part: ['id'],
+      forHandle: handleOrId.replace('@', ''),
     });
 
-    if (searchResponse.data.items && searchResponse.data.items.length > 0) {
-      channelId = searchResponse.data.items[0].snippet!.channelId!;
+    if (response.data.items && response.data.items.length > 0) {
+      channelId = response.data.items[0].id!;
       debug(`Found channel ID: ${channelId}`);
     }
   } else {
@@ -134,26 +134,25 @@ async function getChannelId(handleOrId: string): Promise<string> {
         channelId = response.data.items[0].id!;
       }
     } catch {
-      // Continue to search
+      // Continue to legacy username lookup
     }
 
-    // Fall back to username search
+    // Fall back to legacy YouTube username (youtube.com/user/<name>) —
+    // also an exact 1-unit lookup, unlike the search.list fallback it replaces
     if (!channelId) {
-      const searchResponse = await youtube.search.list({
-        part: ['snippet'],
-        q: handleOrId,
-        type: ['channel'],
-        maxResults: 1,
+      const response = await youtube.channels.list({
+        part: ['id'],
+        forUsername: handleOrId,
       });
 
-      if (searchResponse.data.items && searchResponse.data.items.length > 0) {
-        channelId = searchResponse.data.items[0].snippet!.channelId!;
+      if (response.data.items && response.data.items.length > 0) {
+        channelId = response.data.items[0].id!;
       }
     }
   }
 
   if (!channelId) {
-    throw new Error(`Channel not found: ${handleOrId}`);
+    throw new Error(`Channel not found: ${handleOrId}. Pass an @handle or a UC… channel ID.`);
   }
 
   // Persist to FS cache so future calls skip the API
