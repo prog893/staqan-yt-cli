@@ -30,30 +30,38 @@ async function ensureConfigDir(): Promise<void> {
 }
 
 /**
- * Extract channel ID from various input formats
+ * Classify channel input (handle, ID, or URL) as a handle or a channel ID.
+ * Throws on legacy /c/ and /user/ URLs — their path segment is neither a
+ * handle nor a channel ID, so no downstream lookup could succeed (issue #123).
  */
 function parseChannelHandle(input: string): ChannelHandle {
-  // Remove @ if present
   if (input.startsWith('@')) {
     return { type: 'handle', value: input };
   }
 
-  // Extract from URL
-  const urlPatterns = [
-    /youtube\.com\/@([^\/\?]+)/,
-    /youtube\.com\/channel\/([^\/\?]+)/,
-    /youtube\.com\/c\/([^\/\?]+)/,
-    /youtube\.com\/user\/([^\/\?]+)/,
-  ];
-
-  for (const pattern of urlPatterns) {
-    const match = input.match(pattern);
-    if (match) {
-      return { type: 'id', value: match[1] };
-    }
+  // @-handle URLs are handles, not IDs. The previous code returned these as
+  // type 'id' (with the @ stripped), which sent a bare handle into
+  // channels.list({ id }) and produced silent empty results (issue #123).
+  const handleUrl = input.match(/youtube\.com\/@([^/?]+)/);
+  if (handleUrl) {
+    return { type: 'handle', value: `@${handleUrl[1]}` };
   }
 
-  // Assume it's a channel ID or handle
+  const channelUrl = input.match(/youtube\.com\/channel\/([^/?]+)/);
+  if (channelUrl) {
+    return { type: 'id', value: channelUrl[1] };
+  }
+
+  const legacyUrl = input.match(/youtube\.com\/(?:c|user)\/([^/?]+)/);
+  if (legacyUrl) {
+    throw new Error(
+      `Legacy channel URL not supported: ${input}\n` +
+      `The /c/ and /user/ path segments are not channel IDs. ` +
+      `Pass the channel's @handle or its UC… channel ID instead.`
+    );
+  }
+
+  // Assume it's a raw channel ID
   return { type: 'id', value: input };
 }
 

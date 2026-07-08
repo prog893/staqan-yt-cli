@@ -89,10 +89,13 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
         part: channelParts,
         id: [parsedChannel.value],
       });
-      if (channelResponse.data.items && channelResponse.data.items.length > 0) {
-        channelTitle = channelResponse.data.items[0].snippet?.title || '';
-        uploadsPlaylistId = channelResponse.data.items[0].contentDetails?.relatedPlaylists?.uploads || '';
+      if (!channelResponse.data.items || channelResponse.data.items.length === 0) {
+        // Previously this silently proceeded with the unresolved input as the
+        // channel ID, producing an opaque Analytics failure downstream (#123).
+        throw new Error(`Channel not found: ${channelArg}`);
       }
+      channelTitle = channelResponse.data.items[0].snippet?.title || '';
+      uploadsPlaylistId = channelResponse.data.items[0].contentDetails?.relatedPlaylists?.uploads || '';
     }
 
     debug('Resolved channel ID:', channelId);
