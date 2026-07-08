@@ -26,15 +26,19 @@ const version = packageJson.version;
 
 console.log(`📦 Syncing version ${version} to all files...\n`);
 
-// 1. Update bin/staqan-yt.ts fallback version
-const binFilePath = join(rootDir, 'bin/staqan-yt.ts');
-let binContent = readFileSync(binFilePath, 'utf-8');
-binContent = binContent.replace(
-  /let version = '[^']+'; \/\/ Fallback version for compiled binaries/,
-  `let version = '${version}'; // Fallback version for compiled binaries`
+// 1. Update lib/version.ts fallback version (shared by the CLI entry point
+// and the MCP server via getVersion())
+const versionFilePath = join(rootDir, 'lib/version.ts');
+const versionContent = readFileSync(versionFilePath, 'utf-8');
+const updatedVersionContent = versionContent.replace(
+  /export const FALLBACK_VERSION = '[^']+'; \/\/ synced by scripts\/version\.ts/,
+  `export const FALLBACK_VERSION = '${version}'; // synced by scripts/version.ts`
 );
-writeFileSync(binFilePath, binContent, 'utf-8');
-console.log(`  ✓ Updated bin/staqan-yt.ts`);
+if (updatedVersionContent === versionContent) {
+  throw new Error('FALLBACK_VERSION marker not found in lib/version.ts — sync regex needs updating');
+}
+writeFileSync(versionFilePath, updatedVersionContent, 'utf-8');
+console.log(`  ✓ Updated lib/version.ts`);
 
 // 2. Update homebrew-tap/Formula/staqan-yt.rb version (tap clone)
 const tapFormulaPath = join(tapDir, 'Formula/staqan-yt.rb');
@@ -47,7 +51,7 @@ writeFileSync(tapFormulaPath, formulaContent, 'utf-8');
 console.log(`  ✓ Updated homebrew-tap/Formula/staqan-yt.rb`);
 
 // 3. Add files to npm's commit (tap formula is committed separately by postversion)
-git('git add bin/staqan-yt.ts package.json');
+git('git add lib/version.ts package.json');
 console.log('  ✓ Added files to npm commit');
 
 console.log(`\n✅ Version ${version} synced! npm will now commit and tag.\n`);

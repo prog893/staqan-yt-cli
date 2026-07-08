@@ -453,4 +453,4 @@ async function getVideo() { /* API only */ }
 
 ## Version
 
-Current version: **2.0.7** (see `package.json` for source of truth)
+See `package.json` for the current version (single source of truth — the number is not duplicated here because it drifts).
