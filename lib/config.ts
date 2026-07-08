@@ -193,8 +193,13 @@ export async function requireChannel(provided?: string): Promise<string> {
  * CLI flag takes precedence over config
  */
 export async function getOutputFormat(formatFlag?: OutputFormat): Promise<OutputFormat> {
-  // If flag is explicitly set, use it
+  // If flag is explicitly set, validate and use it. Commander passes the raw
+  // string through, so without this check an unknown value (--output yaml)
+  // would silently fall through to each command's default/pretty branch.
   if (formatFlag !== undefined) {
+    if (!VALID_OUTPUT_FORMATS.includes(formatFlag)) {
+      throw new Error(`Invalid output format: ${formatFlag}. Must be one of: ${VALID_OUTPUT_FORMATS.join(', ')}`);
+    }
     return formatFlag;
   }
 
