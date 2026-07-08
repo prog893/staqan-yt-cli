@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '../lib/auth';
-import { error, warning, debug, initCommand, withSpinner, formatTimestampWithTimezone, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
+import { warning, debug, initCommand, withSpinner, formatTimestampWithTimezone, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
 import { getOutputFormat, getConfigValue } from '../lib/config';
 import { formatJson, formatTable, formatCsv, formatText } from '../lib/formatters';
 import {
@@ -42,10 +42,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
     // Resolve channel handle → canonical channel ID for cache namespacing
     const channelHandle = options.channel || await getConfigValue('default.channel');
     if (!channelHandle) {
-      spinner.fail('No channel configured');
-      console.log('');
-      error('No channel specified. Set a default channel:\n  staqan-yt config set default.channel @yourchannel\nor pass --channel @yourchannel');
-      process.exit(1);
+      throw new Error('No channel specified. Set a default channel:\n  staqan-yt config set default.channel @yourchannel\nor pass --channel @yourchannel');
     }
 
     spinner.text = `Resolving channel ID for ${channelHandle}...`;
@@ -56,9 +53,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
     try {
       await ensureCacheDir(channelId);
     } catch (err) {
-      spinner.fail('Failed to create cache directory');
-      error((err as Error).message);
-      process.exit(1);
+      throw new Error(`Failed to create cache directory: ${(err as Error).message}`);
     }
 
     const auth = await getAuthenticatedClient();
@@ -101,7 +96,9 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       console.log(chalk.yellow('Run this command again after:') + ' ' + chalk.cyan(`${formatted.local} (${formatted.timezone})`));
       console.log('');
 
-      process.exit(0);
+      // Nothing to fetch yet — successful no-op, not an error. `return`
+      // instead of process.exit(0) so an MCP-server caller survives (issue #110).
+      return;
     }
 
     // Step 2: Check if reports are available
@@ -138,7 +135,8 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       console.log(chalk.yellow('Wait:') + ' ' + chalk.cyan(`${hoursUntilReady} hours remaining`));
       console.log('');
 
-      process.exit(0);
+      // Successful no-op (reports not ready yet) — see note above about #110.
+      return;
     }
 
     // Step 3: Validate date range (API returns timestamps, compare date portions only)
@@ -150,21 +148,13 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
     // Check if requested range is available
     if (!minDate || !maxDate || !requestedStart || !requestedEnd) {
-      spinner.fail('Unable to determine date range');
-      console.log('');
-      error('Unable to determine date range');
-      process.exit(1);
+      throw new Error('Unable to determine date range');
     }
 
     try {
       validateDateRange(requestedStart, requestedEnd);
     } catch (e) {
-      spinner.fail('Invalid date range');
-      console.log('');
-      error((e as Error).message);
-      console.log(chalk.gray('Provided:') + ` start-date=${requestedStart}, end-date=${requestedEnd}`);
-      console.log('');
-      process.exit(1);
+      throw new Error(`${(e as Error).message}\nProvided: start-date=${requestedStart}, end-date=${requestedEnd}`);
     }
 
     // Adjust date range to available data if needed.
@@ -202,13 +192,11 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
     // Validate that adjusted range has overlap (i.e., requested range is not entirely before/after available data)
     if (adjustedStart > adjustedEnd) {
-      spinner.fail('No overlap between requested range and available data');
-      process.stderr.write('\n');
-      process.stderr.write(chalk.red('Error:') + ' Requested date range has no overlap with available data\n');
-      process.stderr.write(chalk.gray('Requested:') + ` ${requestedStart} to ${requestedEnd}\n`);
-      process.stderr.write(chalk.gray('Available:') + ` ${effectiveMinDate} to ${effectiveMaxDate}\n`);
-      process.stderr.write('\n');
-      process.exit(1);
+      throw new Error(
+        'Requested date range has no overlap with available data\n' +
+        `Requested: ${requestedStart} to ${requestedEnd}\n` +
+        `Available: ${effectiveMinDate} to ${effectiveMaxDate}`
+      );
     }
 
     // Warn if range was adjusted
@@ -248,10 +236,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
     // It's okay if no API reports match — data may still be available from cache
     // (e.g. expired from API but present in local archive).
     if (reports.length === 0 && cacheEntries.length === 0) {
-      spinner.fail('No reports match the specified date range');
-      console.log('');
-      error('No reports match the specified date range.');
-      process.exit(1);
+      throw new Error('No reports match the specified date range.');
     }
 
     // Step 5: Analyze cache coverage
@@ -405,20 +390,13 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       filteredData = allData.filter(row => row.video_id === options.videoId);
 
       if (filteredData.length === 0) {
-        spinner.fail('No data found for video ID');
-        console.log('');
-        error(`No data found for video ID: ${options.videoId}`);
-        console.log('');
-        console.log(chalk.gray('Available video IDs in this date range:'));
         const uniqueVideoIds = [...new Set(allData.map(row => row.video_id))];
-        uniqueVideoIds.forEach((vid, i) => {
-          if (i < 10) console.log('  ' + chalk.cyan(vid));
-        });
-        if (uniqueVideoIds.length > 10) {
-          console.log(chalk.gray(`  ... and ${uniqueVideoIds.length - 10} more`));
-        }
-        console.log('');
-        process.exit(1);
+        const shown = uniqueVideoIds.slice(0, 10).map(vid => `  ${vid}`).join('\n');
+        const more = uniqueVideoIds.length > 10 ? `\n  ... and ${uniqueVideoIds.length - 10} more` : '';
+        throw new Error(
+          `No data found for video ID: ${options.videoId}\n` +
+          `Available video IDs in this date range:\n${shown}${more}`
+        );
       }
     }
 
