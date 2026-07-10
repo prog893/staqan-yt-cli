@@ -38,10 +38,7 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
     // Resolve channel handle → canonical channel ID for cache namespacing
     const channelHandle = options.channel || await getConfigValue('default.channel');
     if (!channelHandle) {
-      spinner.fail('No channel configured');
-      console.log('');
-      error('No channel specified. Set a default channel:\n  staqan-yt config set default.channel @yourchannel\nor pass --channel @yourchannel');
-      process.exit(1);
+      throw new Error('No channel specified. Set a default channel:\n  staqan-yt config set default.channel @yourchannel\nor pass --channel @yourchannel');
     }
 
     spinner.text = `Resolving channel ID for ${channelHandle}...`;
@@ -52,9 +49,7 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
     try {
       await ensureCacheDir(channelId);
     } catch (err) {
-      spinner.fail('Failed to create cache directory');
-      error((err as Error).message);
-      process.exit(1);
+      throw new Error(`Failed to create cache directory: ${(err as Error).message}`);
     }
 
     // Acquire lock for entire fetch operation
@@ -87,27 +82,19 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
       } else if (options.types !== undefined) {
         const requestedIds = options.types.split(',').map(s => s.trim()).filter(Boolean);
         if (requestedIds.length === 0) {
-          spinner.fail('Invalid --types');
-          error('--types cannot be empty. Provide comma-separated type IDs or omit the flag.');
-          process.exit(1);
+          throw new Error('--types cannot be empty. Provide comma-separated type IDs or omit the flag.');
         }
         const availableIds = new Set(reportTypes.map(t => t.id).filter((id): id is string => Boolean(id)));
         const invalidIds = requestedIds.filter(id => !availableIds.has(id));
         if (invalidIds.length > 0) {
-          spinner.fail('Invalid --types');
-          error(`Unknown report type ID(s): ${invalidIds.join(', ')}`);
-          process.exit(1);
+          throw new Error(`Unknown report type ID(s): ${invalidIds.join(', ')}`);
         }
         reportTypes = reportTypes.filter(t => requestedIds.includes(t.id!));
         debug(`Filtering by multiple types: ${requestedIds.join(', ')}`);
       }
 
       if (reportTypes.length === 0) {
-        spinner.fail('No report types found');
-        console.log('');
-        error('No report types found matching your criteria.');
-        if (release) await release(); release = null;
-        process.exit(1);
+        throw new Error('No report types found matching your criteria.');
       }
 
       spinner.succeed(`Found ${reportTypes.length} report type(s)`);
@@ -224,10 +211,7 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
         try {
           validateDateRange(filteredStart, filteredEnd);
         } catch (e) {
-          error((e as Error).message);
-          console.log(chalk.gray('Provided:') + ` start-date=${filteredStart}, end-date=${filteredEnd}`);
-          console.log('');
-          process.exit(1);
+          throw new Error(`${(e as Error).message}\nProvided: start-date=${filteredStart}, end-date=${filteredEnd}`);
         }
 
         reports = reports.filter((report: typeof reports[0]) => {
@@ -351,20 +335,21 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
 
     success('Fetch complete!');
     } catch (err) {
-      if (!release) {
-        // Lock acquisition failed
-        const lockPath = getLockPath('reports', channelId);
-        spinner.fail('Could not acquire lock for reports');
-        console.log('');
-        error('Another fetch operation is in progress. Wait for it to complete, or remove the lock:');
-        error(`  rm ${lockPath}`);
-      } else {
-        // Lock was acquired, error occurred during operation
-        await release();  // Release lock before exiting
-        spinner.fail('Failed while fetching reports');
-        error((err as Error).message);
+      // Translate lock *contention* into an actionable message. acquireLock
+      // throws "Failed to acquire lock <path> after <ms>ms" only when the
+      // lock stayed held past the timeout; permission/filesystem failures
+      // propagate unchanged so they aren't misreported as a concurrent run
+      // (CodeRabbit on #132). Everything rethrows — the finally below
+      // releases the lock and withSpinner prints and rethrows for the CLI
+      // top-level catch to exit(1). No process.exit here: this code path
+      // must be survivable when invoked from the MCP server (issue #110).
+      if (!release && (err as Error).message?.startsWith('Failed to acquire lock')) {
+        throw new Error(
+          'Another fetch operation is in progress. Wait for it to complete, or remove the lock:\n' +
+          `  rm ${getLockPath('reports', channelId)}`
+        );
       }
-      process.exit(1);
+      throw err;
     } finally {
       if (release) await release();
     }
