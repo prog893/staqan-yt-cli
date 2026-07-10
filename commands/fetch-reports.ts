@@ -335,13 +335,15 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
 
     success('Fetch complete!');
     } catch (err) {
-      // release === null means acquireLock itself failed (it's the first
-      // await in this try) — translate to an actionable message. Any later
-      // error propagates as-is; the finally below releases the lock and
-      // withSpinner prints the message and rethrows for the CLI top-level
-      // catch to exit(1). No process.exit here — this code path must be
-      // survivable when invoked from the MCP server (issue #110).
-      if (!release) {
+      // Translate lock *contention* into an actionable message. acquireLock
+      // throws "Failed to acquire lock <path> after <ms>ms" only when the
+      // lock stayed held past the timeout; permission/filesystem failures
+      // propagate unchanged so they aren't misreported as a concurrent run
+      // (CodeRabbit on #132). Everything rethrows — the finally below
+      // releases the lock and withSpinner prints and rethrows for the CLI
+      // top-level catch to exit(1). No process.exit here: this code path
+      // must be survivable when invoked from the MCP server (issue #110).
+      if (!release && (err as Error).message?.startsWith('Failed to acquire lock')) {
         throw new Error(
           'Another fetch operation is in progress. Wait for it to complete, or remove the lock:\n' +
           `  rm ${getLockPath('reports', channelId)}`
