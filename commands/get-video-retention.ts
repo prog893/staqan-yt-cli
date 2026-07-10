@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, debug, convertToCSV, chunkDateRange, retryWithBackoff, parseDuration, formatTimestamp, initCommand, withSpinner, toLocalYmd } from '../lib/utils';
+import { parseVideoId, error, debug, convertToCSV, chunkDateRange, withRateLimitRetry, parseDuration, formatTimestamp, initCommand, withSpinner, toLocalYmd } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { RetentionOptions } from '../types';
@@ -65,7 +65,7 @@ async function getRetentionCommand(options: RetentionOptions): Promise<void> {
       const chunk = dateChunks[i];
       spinner.text = `Fetching chunk ${i + 1}/${dateChunks.length} (${chunk.start} to ${chunk.end})...`;
 
-      const retentionResponse = await retryWithBackoff(async () => {
+      const retentionResponse = await withRateLimitRetry(async () => {
         return await youtubeAnalytics.reports.query({
           ids: 'channel==MINE',
           startDate: chunk.start,
@@ -75,7 +75,7 @@ async function getRetentionCommand(options: RetentionOptions): Promise<void> {
           filters: `video==${parsedId}`,
           sort: 'elapsedVideoTimeRatio',
         });
-      });
+      }, { label: 'reports.query(retention)' });
 
       // Save headers from first response
       if (i === 0 && retentionResponse.data.columnHeaders) {

@@ -307,13 +307,8 @@ function chunkDateRange(startDate: string, endDate: string): { start: string; en
 }
 
 /**
- * Validate --privacy flag values before any API calls.
- * Exits with an error message if any value is not public/private/unlisted.
- *
- * Accepts string[] (not PrivacyStatus[]) because Commander.js parses option
- * values as raw strings before this validation runs. The call site's option
- * type is PrivacyStatus[], but at runtime the values are unvalidated strings
- * until this function confirms them.
+ * Parse a numeric flag value, falling back to a default when absent.
+ * Throws if the value is not a positive integer.
  */
 function parsePositiveInt(flag: string, opt: string | undefined, defaultValue: number): number {
   const n = opt ? parseInt(opt, 10) : defaultValue;
@@ -346,6 +341,15 @@ function validateDateRange(startDate: string, endDate: string): void {
   }
 }
 
+/**
+ * Validate --privacy flag values before any API calls.
+ * Throws if any value is not public/private/unlisted.
+ *
+ * Accepts string[] (not PrivacyStatus[]) because Commander.js parses option
+ * values as raw strings before this validation runs. The call site's option
+ * type is PrivacyStatus[], but at runtime the values are unvalidated strings
+ * until this function confirms them.
+ */
 function validatePrivacyFilter(privacy: string[] | undefined): void {
   if (!privacy || privacy.length === 0) return;
   const valid = ['public', 'private', 'unlisted'];
@@ -464,47 +468,20 @@ async function withSpinner<T>(
   failMessage: string,
   fn: (spinner: Ora) => Promise<T>
 ): Promise<T> {
-  // In quiet mode, create a silent spinner
-  if (isQuietEnabled) {
-    const silentSpinner = {
-      succeed: () => {}, // Do nothing
-      fail: () => {}, // Do nothing
-      info: () => {}, // Do nothing
-      warn: () => {}, // Do nothing
-      start: () => silentSpinner as unknown as Ora,
-      stop: () => {},
-      stopAndPersist: () => {},
-      clear: () => {},
-      render: () => {},
-      frame: () => '',
-      text: '',
-      indent: 0,
-      spinner: {},
-      color: 'cyan',
-      hideCursor: true,
-    } as unknown as Ora;
-
-    try {
-      return await fn(silentSpinner);
-    } catch (err) {
-      // Mirror the CLI top-level guard: if a nested helper already printed
-      // this message and marked it, don't print it again here. Prevents
-      // double-output for chains like runOrExit → withSpinner.
-      if (!isHelperFormattedError(err)) {
-        error((err as Error).message);
-      }
-      throw markFormatted(err as Error);
-    }
-  }
-
-  // Normal mode: use spinner
-  const spinner = ora(message).start();
+  // createSpinner returns a silent no-op spinner in quiet mode, so a single
+  // code path covers both modes (previously the silent-spinner literal was
+  // duplicated here).
+  const spinner = createSpinner(message).start();
   try {
     return await fn(spinner);
   } catch (err) {
     spinner.fail(failMessage);
-    console.log('');
-    // Same double-print guard as the silent-mode branch (CodeRabbit #121).
+    if (!isQuietEnabled) {
+      console.log('');
+    }
+    // Mirror the CLI top-level guard: if a nested helper already printed
+    // this message and marked it, don't print it again here. Prevents
+    // double-output for chains like runOrExit → withSpinner (CodeRabbit #121).
     if (!isHelperFormattedError(err)) {
       error((err as Error).message);
     }
@@ -559,7 +536,7 @@ function isRateLimitError(err: unknown): 'rpm' | 'daily' | null {
   for (const msg of messages) {
     const lower = msg.toLowerCase();
     if (lower.includes('per day')) return 'daily';
-    if (lower.includes('per minute') || lower.includes('per minute ')) return 'rpm';
+    if (lower.includes('per minute')) return 'rpm';
   }
   return null;
 }
@@ -594,38 +571,6 @@ function getRetryAfterMs(err: unknown): number | undefined {
     return Number.isFinite(n) && n >= 0 ? n * 1000 : undefined;
   }
   return undefined;
-}
-
-/**
- * Retry a function with exponential backoff
- */
-async function retryWithBackoff<T>(
-  fn: () => Promise<T>,
-  maxRetries = 3,
-  initialDelay = 1000
-): Promise<T> {
-  let lastError: Error | undefined;
-
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err as Error;
-
-      // Check if it's a quota error
-      const errorMessage = lastError.message || '';
-      if (errorMessage.includes('quota') || errorMessage.includes('429')) {
-        const delay = initialDelay * Math.pow(2, i);
-        progress(`Quota limit hit, retrying in ${delay / 1000}s...`);
-        await sleep(delay);
-      } else {
-        // Not a quota error, throw immediately
-        throw lastError;
-      }
-    }
-  }
-
-  throw lastError || new Error('Max retries exceeded');
 }
 
 /**
@@ -762,7 +707,6 @@ export {
   convertToCSV,
   chunkDateRange,
   sleep,
-  retryWithBackoff,
   isRateLimitError,
   getRetryAfterMs,
   withRateLimitRetry,
