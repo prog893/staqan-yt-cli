@@ -17,15 +17,15 @@ async function putVideoLocalizationCommand(options: PutLocalizationOptions): Pro
 
   // Validation: Required options
   if (!language) {
-    throw new Error('Error: --language is required');
+    throw new Error('Required: --language');
   }
 
   if (!title) {
-    throw new Error('Error: --title is required');
+    throw new Error('Required: --title');
   }
 
   if (!description) {
-    throw new Error('Error: --description is required');
+    throw new Error('Required: --description');
   }
 
   const langCode = normalizeLanguage(language);

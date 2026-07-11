@@ -17,12 +17,12 @@ async function updateVideoLocalizationCommand(options: UpdateLocalizationOptions
 
   // Validation: Required language
   if (!language) {
-    throw new Error('Error: --language is required');
+    throw new Error('Required: --language');
   }
 
   // Validation: At least one of title or description must be provided
   if (!title && !description) {
-    throw new Error('Error: At least one of --title or --description must be provided');
+    throw new Error('At least one of --title or --description must be provided');
   }
 
   const langCode = normalizeLanguage(language);

@@ -97,11 +97,7 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
     const startDate = options.startDate ||
       toLocalYmd(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
 
-    try {
-      validateDateRange(startDate, endDate);
-    } catch (e) {
-      throw new Error((e as Error).message);
-    }
+    validateDateRange(startDate, endDate);
     debug(`Date range: ${startDate} to ${endDate}`);
 
     // Determine dimensions and metrics based on report type or custom

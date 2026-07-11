@@ -11,15 +11,17 @@ async function updateMetadataCommand(options: UpdateVideoOptions & VideoIdOption
     throw new Error('Required: --video-id');
   }
 
+  // Validate that at least one update is provided — before the try block so
+  // the catch below can't re-wrap this as a misleading "Failed to update
+  // metadata" (the request never leaves the client).
+  if (!options.title && !options.description) {
+    throw new Error('Please provide at least one of --title or --description');
+  }
+
   try {
     debug(`Video ID input: ${videoId}`);
     const parsedId = parseVideoId(videoId);
     debug(`Parsed video ID: ${parsedId}`);
-
-    // Validate that at least one update is provided
-    if (!options.title && !options.description) {
-      throw new Error('Please provide at least one of --title or --description');
-    }
 
     // Fetch current video info
     const spinner = createSpinner('Fetching current video metadata...').start();
