@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
 import { parseChannelHandle, error, debug, formatNumber, initCommand, withSpinner, createSpinner, toLocalYmd, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
-import { requireChannel } from '../lib/config';
+import { requireChannel, getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ChannelAnalyticsOptions } from '../types';
 
@@ -36,6 +36,10 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
   runOrExit(() => { if (options.startDate) validateDateOption('--start-date', options.startDate); });
   runOrExit(() => { if (options.endDate) validateDateOption('--end-date', options.endDate); });
   runOrExit(() => { if (options.startDate && options.endDate) validateDateRange(options.startDate, options.endDate); });
+
+  // Resolve output format up front: honors `default.output` from config and
+  // rejects invalid values before any API call is spent.
+  const outputFormat = await getOutputFormat(options.output);
 
   await withSpinner('Fetching channel analytics...', 'Failed to fetch channel analytics', async (spinner) => {
     // Determine channel ID
@@ -181,8 +185,6 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
       debug('Column headers:', columnHeaders);
 
       // Format output
-      const outputFormat = options.output;
-
       if (outputFormat === 'json') {
         const jsonData = {
           channelId: actualChannelId,
