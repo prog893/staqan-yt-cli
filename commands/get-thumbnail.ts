@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, debug, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { GetThumbnailOptions } from '../types';
@@ -13,8 +13,7 @@ async function getThumbnailCommand(options: GetThumbnailOptions): Promise<void> 
 
   const videoId = options.videoId;
   if (!videoId) {
-    error('Required: --video-id');
-    process.exit(1);
+    throw new Error('Required: --video-id');
   }
 
   await withSpinner('Fetching video thumbnail...', 'Failed to fetch video thumbnail', async (spinner) => {
@@ -30,9 +29,7 @@ async function getThumbnailCommand(options: GetThumbnailOptions): Promise<void> 
     });
 
     if (!response.data.items || response.data.items.length === 0) {
-      spinner.fail('Video not found');
-      error(`No video found with ID: ${parsedId}`);
-      process.exit(1);
+      throw new Error(`No video found with ID: ${parsedId}`);
     }
 
     const video = response.data.items[0];

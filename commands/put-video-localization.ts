@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { putVideoLocalization } from '../lib/youtube';
-import { parseVideoId, error, debug, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
 import { normalizeLanguage, getLanguageName } from '../lib/language';
 import { PutLocalizationOptions } from '../types';
 
@@ -10,26 +10,22 @@ async function putVideoLocalizationCommand(options: PutLocalizationOptions): Pro
   // Extract video ID from options
   const videoId = options.videoId;
   if (!videoId) {
-    error('Required: --video-id');
-    process.exit(1);
+    throw new Error('Required: --video-id');
   }
 
   const { language, title, description } = options;
 
   // Validation: Required options
   if (!language) {
-    error('Error: --language is required');
-    process.exit(1);
+    throw new Error('Error: --language is required');
   }
 
   if (!title) {
-    error('Error: --title is required');
-    process.exit(1);
+    throw new Error('Error: --title is required');
   }
 
   if (!description) {
-    error('Error: --description is required');
-    process.exit(1);
+    throw new Error('Error: --description is required');
   }
 
   const langCode = normalizeLanguage(language);

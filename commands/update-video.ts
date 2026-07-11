@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getVideoInfo, updateVideoMetadata } from '../lib/youtube';
-import { parseVideoId, confirm, success, error, warning, info, debug, initCommand, createSpinner } from '../lib/utils';
+import { parseVideoId, confirm, success, warning, info, debug, initCommand, createSpinner } from '../lib/utils';
 import { UpdateVideoOptions, VideoIdOption } from '../types';
 
 async function updateMetadataCommand(options: UpdateVideoOptions & VideoIdOption): Promise<void> {
@@ -8,8 +8,7 @@ async function updateMetadataCommand(options: UpdateVideoOptions & VideoIdOption
 
   const videoId = options.videoId;
   if (!videoId) {
-    error('Required: --video-id');
-    process.exit(1);
+    throw new Error('Required: --video-id');
   }
 
   try {
@@ -19,8 +18,7 @@ async function updateMetadataCommand(options: UpdateVideoOptions & VideoIdOption
 
     // Validate that at least one update is provided
     if (!options.title && !options.description) {
-      error('Please provide at least one of --title or --description');
-      process.exit(1);
+      throw new Error('Please provide at least one of --title or --description');
     }
 
     // Fetch current video info
@@ -81,8 +79,7 @@ async function updateMetadataCommand(options: UpdateVideoOptions & VideoIdOption
     success(`Video updated: https://youtube.com/watch?v=${parsedId}`);
   } catch (err) {
     console.log('');
-    error(`Failed to update metadata: ${(err as Error).message}`);
-    process.exit(1);
+    throw new Error(`Failed to update metadata: ${(err as Error).message}`);
   }
 }
 

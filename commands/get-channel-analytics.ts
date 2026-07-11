@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseChannelHandle, error, debug, formatNumber, initCommand, withSpinner, createSpinner, toLocalYmd, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
+import { parseChannelHandle, debug, formatNumber, initCommand, withSpinner, createSpinner, toLocalYmd, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
 import { requireChannel, getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ChannelAnalyticsOptions } from '../types';
@@ -100,8 +100,7 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
     try {
       validateDateRange(startDate, endDate);
     } catch (e) {
-      error((e as Error).message);
-      process.exit(1);
+      throw new Error((e as Error).message);
     }
     debug(`Date range: ${startDate} to ${endDate}`);
 
@@ -114,18 +113,14 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
       options.report !== undefined &&
       (options.dimensions !== undefined || options.metrics !== undefined)
     ) {
-      spinner.fail('Conflicting options');
-      error('Cannot combine --report with --dimensions or --metrics. Use one or the other.');
-      process.exit(1);
+      throw new Error('Cannot combine --report with --dimensions or --metrics. Use one or the other.');
     }
 
     if (options.report) {
       // Use predefined report type
       const reportConfig = REPORT_TYPES[options.report];
       if (!reportConfig) {
-        spinner.fail('Invalid report type');
-        error(`Unknown report type: ${options.report}`);
-        process.exit(1);
+        throw new Error(`Unknown report type: ${options.report}`);
       }
       dimensions = reportConfig.dimensions;
       metrics = reportConfig.metrics;
@@ -139,19 +134,17 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
       reportName = 'custom';
       debug('Using custom dimensions and metrics');
     } else {
-      spinner.fail('Report specification required');
-      error('Must specify either --report type or both --dimensions and --metrics');
-      console.log('');
-      console.log('Predefined report types:');
-      console.log('  demographics    - Audience age and gender');
-      console.log('  devices         - Device and OS breakdown');
-      console.log('  geography       - Top countries');
-      console.log('  traffic-sources - Traffic source types');
-      console.log('  subscription-status - Subscribed vs non-subscribed');
-      console.log('');
-      console.log('Or use custom query:');
-      console.log('  --dimensions "deviceType,operatingSystem" --metrics "views,estimatedMinutesWatched"');
-      process.exit(1);
+      throw new Error(
+        'Must specify either --report type or both --dimensions and --metrics\n' +
+        'Predefined report types:\n' +
+        '  demographics    - Audience age and gender\n' +
+        '  devices         - Device and OS breakdown\n' +
+        '  geography       - Top countries\n' +
+        '  traffic-sources - Traffic source types\n' +
+        '  subscription-status - Subscribed vs non-subscribed\n' +
+        'Or use custom query:\n' +
+        '  --dimensions "deviceType,operatingSystem" --metrics "views,estimatedMinutesWatched"'
+      );
     }
 
     // Fetch analytics
@@ -276,35 +269,35 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
       }
     } catch (analyticsErr) {
       analyticsSpinner.fail('Failed to fetch analytics');
-      console.log('');
       const errorMessage = (analyticsErr as Error).message || '';
 
-      // Handle common errors
+      // Translate common API errors into actionable messages; the throw
+      // propagates through withSpinner → withHelpWrapper for the exit(1).
       if (errorMessage.includes('403') || errorMessage.includes('insufficientPermissions')) {
-        error('YouTube Analytics API access denied. Make sure you have:');
-        console.log('  1. Enabled YouTube Analytics API in Google Cloud Console');
-        console.log('  2. Re-authenticated with: staqan-yt auth');
-        console.log('');
-        console.log('Required scope: https://www.googleapis.com/auth/yt-analytics.readonly');
-      } else if (errorMessage.includes('400')) {
-        error('Invalid analytics request. Check your date range, dimensions, and metrics.');
-        console.log('');
-        console.log('Valid report types: demographics, devices, geography, traffic-sources, subscription-status');
-      } else if (errorMessage.includes('not supported')) {
-        error('Report type not available for this channel.');
-        console.log('');
-        console.log(chalk.dim('Demographic data might be limited because:'));
-        console.log(chalk.dim('  1. Metrics do not meet certain thresholds'));
-        console.log(chalk.dim('  2. Channel has limited traffic during the time period'));
-        console.log('');
-        console.log(chalk.dim('Learn more: https://developers.google.com/youtube/analytics/data_model#data-anonymization'));
-        console.log('');
-        console.log(chalk.dim('Try other report types: devices, geography, traffic-sources, subscription-status'));
-      } else {
-        error(errorMessage);
+        throw new Error(
+          'YouTube Analytics API access denied. Make sure you have:\n' +
+          '  1. Enabled YouTube Analytics API in Google Cloud Console\n' +
+          '  2. Re-authenticated with: staqan-yt auth\n' +
+          'Required scope: https://www.googleapis.com/auth/yt-analytics.readonly'
+        );
       }
-
-      process.exit(1);
+      if (errorMessage.includes('400')) {
+        throw new Error(
+          'Invalid analytics request. Check your date range, dimensions, and metrics.\n' +
+          'Valid report types: demographics, devices, geography, traffic-sources, subscription-status'
+        );
+      }
+      if (errorMessage.includes('not supported')) {
+        throw new Error(
+          'Report type not available for this channel.\n' +
+          'Demographic data might be limited because:\n' +
+          '  1. Metrics do not meet certain thresholds\n' +
+          '  2. Channel has limited traffic during the time period\n' +
+          'Learn more: https://developers.google.com/youtube/analytics/data_model#data-anonymization\n' +
+          'Try other report types: devices, geography, traffic-sources, subscription-status'
+        );
+      }
+      throw analyticsErr;
     }
   });
 }

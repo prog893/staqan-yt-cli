@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseChannelHandle, error, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, validateDateOption, validateDateRange, parseDuration, runOrExit } from '../lib/utils';
+import { parseChannelHandle, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, validateDateOption, validateDateRange, parseDuration, runOrExit } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ChannelSearchTermsOptions } from '../types';
@@ -45,8 +45,7 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
   // silently fall through to the 'all' branch below.
   const validContentTypes = ['all', 'video', 'shorts'];
   if (options.contentType !== undefined && !validContentTypes.includes(options.contentType)) {
-    error(`Invalid --content-type "${options.contentType}". Valid values: ${validContentTypes.join(', ')}`);
-    process.exit(1);
+    throw new Error(`Invalid --content-type "${options.contentType}". Valid values: ${validContentTypes.join(', ')}`);
   }
 
   await withSpinner('Resolving channel...', 'Failed to fetch channel search terms', async (spinner) => {
@@ -76,9 +75,7 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
       });
 
       if (!channelResponse.data.items || channelResponse.data.items.length === 0) {
-        spinner.fail('Channel not found');
-        error(`Channel not found: ${channelArg}`);
-        process.exit(1);
+        throw new Error(`Channel not found: ${channelArg}`);
       }
 
       channelId = channelResponse.data.items[0].id!;
@@ -103,9 +100,7 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
     debug('Uploads playlist ID:', uploadsPlaylistId);
 
     if (!uploadsPlaylistId) {
-      spinner.fail('Could not determine uploads playlist');
-      error('Unable to find the uploads playlist for this channel.');
-      process.exit(1);
+      throw new Error('Unable to find the uploads playlist for this channel.');
     }
 
     // Fetch video IDs from the uploads playlist.
@@ -136,9 +131,7 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
     debug(`Collected ${videoIds.length} video IDs`);
 
     if (videoIds.length === 0) {
-      spinner.fail('No videos found');
-      error('No videos found for this channel.');
-      process.exit(1);
+      throw new Error('No videos found for this channel.');
     }
 
     // --content-type filtering is done CLIENT-SIDE by duration, because the
@@ -177,12 +170,10 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
       debug(`Content-type filter (${contentType}): ${videoIds.length} → ${filtered.length} videos`);
 
       if (filtered.length === 0) {
-        spinner.fail(`No ${wantShorts ? 'Shorts' : 'long-form videos'} found`);
-        error(
+        throw new Error(
           `No ${wantShorts ? 'Shorts' : 'long-form videos'} found for this channel. ` +
           `Try a different --content-type value or omit the flag for all videos.`
         );
-        process.exit(1);
       }
 
       // Mutate in place: subsequent filter assembly uses the trimmed list.

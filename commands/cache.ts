@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import chalk from 'chalk';
-import { CACHE_DIR, error, success, info, initCommand, confirm } from '../lib/utils';
+import { CACHE_DIR, success, info, initCommand, confirm } from '../lib/utils';
 
 interface CacheOptions {
   yes?: boolean;
@@ -76,11 +76,11 @@ async function cacheCommand(action?: string, options: CacheOptions = {}): Promis
     return;
   }
 
-  error(`Unknown action: ${action}`);
-  console.log('');
-  console.log('Available actions:');
-  console.log('  clean   Remove all cached data');
-  process.exit(1);
+  throw new Error(
+    `Unknown action: ${action}\n` +
+    'Available actions:\n' +
+    '  clean   Remove all cached data'
+  );
 }
 
 export = cacheCommand;

@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd } from '../lib/utils';
+import { parseVideoId, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { TrafficSourcesOptions } from '../types';
@@ -12,8 +12,7 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
   // Extract video ID from options
   const videoId = options.videoId;
   if (!videoId) {
-    error('Required: --video-id');
-    process.exit(1);
+    throw new Error('Required: --video-id');
   }
 
   await withSpinner('Fetching traffic sources...', 'Failed to fetch traffic sources', async (spinner) => {
@@ -31,9 +30,7 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
     });
 
     if (!videoResponse.data.items || videoResponse.data.items.length === 0) {
-      spinner.fail('Video not found');
-      error(`No video found with ID: ${parsedId}`);
-      process.exit(1);
+      throw new Error(`No video found with ID: ${parsedId}`);
     }
 
     const title = videoResponse.data.items[0].snippet?.title || 'Untitled';

@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { listCaptions } from '../lib/youtube';
-import { debug, error, initCommand, withSpinner } from '../lib/utils';
+import { debug, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ListCaptionsOptions } from '../types';
@@ -11,8 +11,7 @@ async function listCaptionsCommand(options: ListCaptionsOptions): Promise<void> 
   // Extract video ID from options
   const videoId = options.videoId;
   if (!videoId) {
-    error('Required: --video-id');
-    process.exit(1);
+    throw new Error('Required: --video-id');
   }
 
   await withSpinner('Fetching captions...', 'Failed to fetch captions', async (spinner) => {

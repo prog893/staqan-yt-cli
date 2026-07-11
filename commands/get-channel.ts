@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getChannelInfo } from '../lib/youtube';
-import { formatDate, formatNumber, error, debug, initCommand, withSpinner } from '../lib/utils';
+import { formatDate, formatNumber, debug, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ChannelOption, OutputOption, VerboseOption } from '../types';
@@ -14,11 +14,11 @@ async function getChannelCommand(options: ChannelOption & OutputOption & Verbose
     handleOrId = await requireChannel(options.channel);
     debug(`Using channel: ${handleOrId}`);
   } catch (err) {
-    error((err as Error).message);
-    console.log('');
-    console.log(chalk.gray('Usage:') + ' staqan-yt get-channel --channel @yourchannel');
-    console.log(chalk.gray('Or set default:') + ' staqan-yt config set default.channel @yourchannel');
-    process.exit(1);
+    throw new Error(
+      `${(err as Error).message}\n` +
+      'Usage: staqan-yt get-channel --channel @yourchannel\n' +
+      'Or set default: staqan-yt config set default.channel @yourchannel'
+    );
   }
 
   await withSpinner('Fetching channel information...', 'Failed to fetch channel information', async (spinner) => {
