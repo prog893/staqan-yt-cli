@@ -2,15 +2,12 @@ import chalk from 'chalk';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { getConfig, getConfigValue, setConfigValue, DEFAULT_LOCK_TIMEOUT_MS } from '../lib/config';
-import { success, error, info, CACHE_DIR } from '../lib/utils';
+import { success, info, CACHE_DIR } from '../lib/utils';
 import { ConfigKey, CONFIG_KEYS, CONFIG_KEY_HELP } from '../types';
 import { installCompletion, detectShell } from '../lib/completion';
 
-function printAvailableConfigKeys(): void {
-  console.log('Available keys:');
-  CONFIG_KEYS.forEach(k => {
-    console.log(`  ${k.padEnd(18)} - ${CONFIG_KEY_HELP[k]}`);
-  });
+function availableConfigKeysHelp(): string {
+  return 'Available keys:\n' + CONFIG_KEYS.map(k => `  ${k.padEnd(18)} - ${CONFIG_KEY_HELP[k]}`).join('\n');
 }
 
 async function invalidateChannelCache(): Promise<void> {
@@ -45,121 +42,100 @@ async function configCommand(
   value?: string,
   options?: ConfigOptions
 ): Promise<void> {
-  try {
-    // Handle --show flag (list all settings)
-    if (options?.show || action === 'list' || !action) {
-      const config = await getConfig();
-      console.log(chalk.bold('\nCurrent Configuration:'));
-      console.log('');
-      console.log(chalk.cyan('default.channel:') + '  ' + (config.default?.channel || chalk.dim('(not set)')));
-      console.log(chalk.cyan('default.output:') + '   ' + (config.default?.output || chalk.dim('pretty')));
-      // getConfigValue returns undefined when lock.timeout was never explicitly
-      // stored, so we correctly show "(default)" only when the user hasn't set it.
-      const explicitLockTimeout = await getConfigValue('lock.timeout');
-      const lockTimeoutDisplay = explicitLockTimeout === undefined
-        ? chalk.dim(`${DEFAULT_LOCK_TIMEOUT_MS}ms (default)`)
-        : `${explicitLockTimeout}ms`;
-      console.log(chalk.cyan('lock.timeout:') + '     ' + lockTimeoutDisplay);
-      console.log('');
-      return;
-    }
-
-    // Handle 'set' action
-    if (action === 'set') {
-      if (!key || !value) {
-        error('Usage: staqan-yt config set <key> <value>');
-        console.log('');
-        printAvailableConfigKeys();
-        process.exit(1);
-      }
-
-      // Validate key
-      if (!CONFIG_KEYS.includes(key as ConfigKey)) {
-        error(`Invalid config key: ${key}`);
-        console.log('');
-        printAvailableConfigKeys();
-        process.exit(1);
-      }
-
-      await setConfigValue(key as ConfigKey, value);
-      if (key === 'default.channel') {
-        await invalidateChannelCache();
-      }
-      const displayValue = key === 'lock.timeout' ? `${value}ms` : value;
-      success(`Set ${chalk.cyan(key)} = ${chalk.yellow(displayValue)}`);
-      return;
-    }
-
-    // Handle 'get' action
-    if (action === 'get') {
-      if (!key) {
-        error('Usage: staqan-yt config get <key>');
-        process.exit(1);
-      }
-
-      if (!CONFIG_KEYS.includes(key as ConfigKey)) {
-        error(`Invalid config key: ${key}`);
-        console.log('');
-        printAvailableConfigKeys();
-        process.exit(1);
-      }
-
-      const currentValue = await getConfigValue(key as ConfigKey);
-
-      if (currentValue !== undefined) {
-        console.log(key === 'lock.timeout' ? `${currentValue}ms` : currentValue);
-      } else {
-        info(`${key} is not set`);
-      }
-      return;
-    }
-
-    // Handle 'completion' action
-    if (action === 'completion') {
-      // Determine shell type
-      let shell: 'bash' | 'zsh';
-      if (key && ['bash', 'zsh'].includes(key)) {
-        shell = key as 'bash' | 'zsh';
-      } else if (key === 'auto' || !key) {
-        const detected = detectShell();
-        if (detected === 'auto') {
-          error('Could not detect shell type. Please specify bash or zsh.');
-          process.exit(1);
-        }
-        shell = detected;
-        info(`Auto-detected shell: ${shell}`);
-      } else {
-        error(`Invalid shell type: ${key}`);
-        console.log('');
-        console.log('Usage: staqan-yt config completion <bash|zsh|auto> [--install|--print]');
-        process.exit(1);
-      }
-
-      const install = options?.install || false;
-      options?.print || false; // Reserved for future use
-
-      try {
-        await installCompletion(shell, !install);
-      } catch (err) {
-        error((err as Error).message);
-        process.exit(1);
-      }
-      return;
-    }
-
-    // Invalid action
-    error(`Unknown action: ${action}`);
+  // Handle --show flag (list all settings)
+  if (options?.show || action === 'list' || !action) {
+    const config = await getConfig();
+    console.log(chalk.bold('\nCurrent Configuration:'));
     console.log('');
-    console.log('Usage:');
-    console.log('  staqan-yt config list              - Show all configuration');
-    console.log('  staqan-yt config set <key> <value> - Set a configuration value');
-    console.log('  staqan-yt config get <key>         - Get a configuration value');
-    console.log('  staqan-yt config completion <bash|zsh|auto> [--install|--print]');
-    process.exit(1);
-  } catch (err) {
-    error((err as Error).message);
-    process.exit(1);
+    console.log(chalk.cyan('default.channel:') + '  ' + (config.default?.channel || chalk.dim('(not set)')));
+    console.log(chalk.cyan('default.output:') + '   ' + (config.default?.output || chalk.dim('pretty')));
+    // getConfigValue returns undefined when lock.timeout was never explicitly
+    // stored, so we correctly show "(default)" only when the user hasn't set it.
+    const explicitLockTimeout = await getConfigValue('lock.timeout');
+    const lockTimeoutDisplay = explicitLockTimeout === undefined
+      ? chalk.dim(`${DEFAULT_LOCK_TIMEOUT_MS}ms (default)`)
+      : `${explicitLockTimeout}ms`;
+    console.log(chalk.cyan('lock.timeout:') + '     ' + lockTimeoutDisplay);
+    console.log('');
+    return;
   }
+
+  // Handle 'set' action
+  if (action === 'set') {
+    if (!key || !value) {
+      throw new Error(`Usage: staqan-yt config set <key> <value>\n${availableConfigKeysHelp()}`);
+    }
+
+    // Validate key
+    if (!CONFIG_KEYS.includes(key as ConfigKey)) {
+      throw new Error(`Invalid config key: ${key}\n${availableConfigKeysHelp()}`);
+    }
+
+    await setConfigValue(key as ConfigKey, value);
+    if (key === 'default.channel') {
+      await invalidateChannelCache();
+    }
+    const displayValue = key === 'lock.timeout' ? `${value}ms` : value;
+    success(`Set ${chalk.cyan(key)} = ${chalk.yellow(displayValue)}`);
+    return;
+  }
+
+  // Handle 'get' action
+  if (action === 'get') {
+    if (!key) {
+      throw new Error('Usage: staqan-yt config get <key>');
+    }
+
+    if (!CONFIG_KEYS.includes(key as ConfigKey)) {
+      throw new Error(`Invalid config key: ${key}\n${availableConfigKeysHelp()}`);
+    }
+
+    const currentValue = await getConfigValue(key as ConfigKey);
+
+    if (currentValue !== undefined) {
+      console.log(key === 'lock.timeout' ? `${currentValue}ms` : currentValue);
+    } else {
+      info(`${key} is not set`);
+    }
+    return;
+  }
+
+  // Handle 'completion' action
+  if (action === 'completion') {
+    // Determine shell type
+    let shell: 'bash' | 'zsh';
+    if (key && ['bash', 'zsh'].includes(key)) {
+      shell = key as 'bash' | 'zsh';
+    } else if (key === 'auto' || !key) {
+      const detected = detectShell();
+      if (detected === 'auto') {
+        throw new Error('Could not detect shell type. Please specify bash or zsh.');
+      }
+      shell = detected;
+      info(`Auto-detected shell: ${shell}`);
+    } else {
+      throw new Error(
+        `Invalid shell type: ${key}\n` +
+        'Usage: staqan-yt config completion <bash|zsh|auto> [--install|--print]'
+      );
+    }
+
+    const install = options?.install || false;
+    options?.print || false; // Reserved for future use
+
+    await installCompletion(shell, !install);
+    return;
+  }
+
+  // Invalid action
+  throw new Error(
+    `Unknown action: ${action}\n` +
+    'Usage:\n' +
+    '  staqan-yt config list              - Show all configuration\n' +
+    '  staqan-yt config set <key> <value> - Set a configuration value\n' +
+    '  staqan-yt config get <key>         - Get a configuration value\n' +
+    '  staqan-yt config completion <bash|zsh|auto> [--install|--print]'
+  );
 }
 
 export = configCommand;

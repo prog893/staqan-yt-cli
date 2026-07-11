@@ -1,6 +1,10 @@
 import { authenticate, CredentialsMissingError, printCredentialsSetupInstructions } from '../lib/auth';
 import { success, error } from '../lib/utils';
 
+// NOTE (#110): auth deliberately keeps its process.exit calls. It is an
+// interactive-only command (never reachable from the MCP server), and the
+// OAuth loopback callback server can keep the event loop alive after the
+// flow finishes — exiting is the reliable way to terminate the process.
 async function authCommand(): Promise<void> {
   try {
     console.log('Starting authentication process...\n');

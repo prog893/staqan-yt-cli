@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getVideoLocalization } from '../lib/youtube';
-import { parseVideoId, error, debug, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { LocalizationOptions } from '../types';
@@ -11,8 +11,7 @@ async function getVideoLocalizationCommand(options: LocalizationOptions): Promis
   // Extract video ID from options
   const videoId = options.videoId;
   if (!videoId) {
-    error('Required: --video-id');
-    process.exit(1);
+    throw new Error('Required: --video-id');
   }
 
   const language = options.language; // Can be undefined, will default to main metadata language

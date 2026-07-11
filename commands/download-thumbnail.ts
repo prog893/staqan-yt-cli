@@ -7,7 +7,7 @@ import { randomUUID } from 'crypto';
 import path from 'path';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, debug, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson } from '../lib/formatters';
 import { DownloadThumbnailOptions } from '../types';
@@ -63,14 +63,12 @@ async function downloadThumbnailCommand(options: DownloadThumbnailOptions): Prom
   initCommand(options);
 
   if (!options.videoId) {
-    error('Required: --video-id');
-    process.exit(1);
+    throw new Error('Required: --video-id');
   }
 
   const quality: Quality = (options.quality as Quality) || 'maxres';
   if (!VALID_QUALITIES.has(quality)) {
-    error(`Invalid --quality "${quality}". Valid values: ${QUALITY_ORDER.join(', ')}`);
-    process.exit(1);
+    throw new Error(`Invalid --quality "${quality}". Valid values: ${QUALITY_ORDER.join(', ')}`);
   }
 
   const outputDir = options.path ? path.resolve(options.path) : process.cwd();
@@ -89,16 +87,12 @@ async function downloadThumbnailCommand(options: DownloadThumbnailOptions): Prom
     });
 
     if (!response.data.items || response.data.items.length === 0) {
-      spinner.fail('Video not found');
-      error(`No video found with ID: ${parsedId}`);
-      process.exit(1);
+      throw new Error(`No video found with ID: ${parsedId}`);
     }
 
     const thumbnails = response.data.items[0].snippet?.thumbnails;
     if (!thumbnails) {
-      spinner.fail('No thumbnails available');
-      error('No thumbnail data returned for this video');
-      process.exit(1);
+      throw new Error('No thumbnail data returned for this video');
     }
 
     // Find the best available quality, falling back down the order if not present
@@ -121,9 +115,7 @@ async function downloadThumbnailCommand(options: DownloadThumbnailOptions): Prom
     }
 
     if (!resolvedQuality || !thumbnailUrl) {
-      spinner.fail('No thumbnail available');
-      error(`No thumbnail found for video: ${parsedId}`);
-      process.exit(1);
+      throw new Error(`No thumbnail found for video: ${parsedId}`);
     }
 
     if (resolvedQuality !== quality) {

@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, debug, convertToCSV, chunkDateRange, withRateLimitRetry, parseDuration, formatTimestamp, initCommand, withSpinner, toLocalYmd } from '../lib/utils';
+import { parseVideoId, debug, convertToCSV, chunkDateRange, withRateLimitRetry, parseDuration, formatTimestamp, initCommand, withSpinner, toLocalYmd } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { RetentionOptions } from '../types';
@@ -12,8 +12,7 @@ async function getRetentionCommand(options: RetentionOptions): Promise<void> {
   // Extract video ID from options
   const videoId = options.videoId;
   if (!videoId) {
-    error('Required: --video-id');
-    process.exit(1);
+    throw new Error('Required: --video-id');
   }
 
   await withSpinner('Fetching video information...', 'Failed to fetch retention data', async (spinner) => {
@@ -31,9 +30,7 @@ async function getRetentionCommand(options: RetentionOptions): Promise<void> {
     });
 
     if (!videoResponse.data.items || videoResponse.data.items.length === 0) {
-      spinner.fail('Video not found');
-      error(`No video found with ID: ${parsedId}`);
-      process.exit(1);
+      throw new Error(`No video found with ID: ${parsedId}`);
     }
 
     const video = videoResponse.data.items[0];
@@ -42,9 +39,7 @@ async function getRetentionCommand(options: RetentionOptions): Promise<void> {
     const duration = video.contentDetails?.duration || '';
 
     if (!publishedAt) {
-      spinner.fail('Could not determine video publish date');
-      error('Video publish date is missing');
-      process.exit(1);
+      throw new Error('Video publish date is missing');
     }
 
     // Calculate date range (default: full historical data)

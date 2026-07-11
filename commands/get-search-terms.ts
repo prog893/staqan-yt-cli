@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, error, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, runOrExit } from '../lib/utils';
+import { parseVideoId, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, runOrExit } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { SearchTermsOptions } from '../types';
@@ -12,8 +12,7 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
   // Extract video ID from options
   const videoId = options.videoId;
   if (!videoId) {
-    error('Required: --video-id');
-    process.exit(1);
+    throw new Error('Required: --video-id');
   }
 
   const limit = runOrExit(() => parsePositiveInt('--limit', options.limit, 50));
@@ -33,9 +32,7 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
     });
 
     if (!videoResponse.data.items || videoResponse.data.items.length === 0) {
-      spinner.fail('Video not found');
-      error(`No video found with ID: ${parsedId}`);
-      process.exit(1);
+      throw new Error(`No video found with ID: ${parsedId}`);
     }
 
     const title = videoResponse.data.items[0].snippet?.title || 'Untitled';

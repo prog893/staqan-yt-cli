@@ -61,7 +61,10 @@ const VALID_TYPES: CompletionType[] = ['video-id', 'playlist-id', 'report-type']
 
 async function completeCommand(options: { type: string }): Promise<void> {
   try {
-    if (!VALID_TYPES.includes(options.type as CompletionType)) process.exit(0);
+    // Shell completion must always terminate quietly with status 0 — a loud
+    // failure here would garble the user's tab-completion. `return` keeps
+    // that contract without process.exit (issue #110).
+    if (!VALID_TYPES.includes(options.type as CompletionType)) return;
     const type = options.type as CompletionType;
 
     let items: Array<{ id: string; title: string }> | undefined;
@@ -74,7 +77,7 @@ async function completeCommand(options: { type: string }): Promise<void> {
       if (type === 'video-id' || type === 'playlist-id') {
         // Video/playlist completions are channel-specific — require configured channel
         const channel = await getConfigValue('default.channel');
-        if (!channel) process.exit(0);
+        if (!channel) return;
 
         const channelId = await getChannelId(channel);
         const cachePath = getChannelCachePath(channelId);
@@ -144,7 +147,9 @@ async function completeCommand(options: { type: string }): Promise<void> {
       }
     }
   } catch {
-    process.exit(0);
+    // Swallow everything: completion failures must be silent successes
+    // (see note at the top of the function). Return, don't exit (#110).
+    return;
   }
 }
 
