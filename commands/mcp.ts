@@ -24,6 +24,7 @@ import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
 import { parseVideoId, chunkDateRange, withRateLimitRetry, initCommand, toLocalYmd, validateDateOption, validateDateRange, parseDuration } from '../lib/utils';
 import { requireChannel } from '../lib/config';
+import { getVersion } from '../lib/version';
 
 // Tool definitions
 const TOOLS: Tool[] = [
@@ -1415,7 +1416,7 @@ async function mcpCommand(options: { verbose?: boolean } = {}): Promise<void> {
   const server = new Server(
     {
       name: 'staqan-yt-mcp',
-      version: '1.3.0',
+      version: getVersion(),
     },
     {
       capabilities: {

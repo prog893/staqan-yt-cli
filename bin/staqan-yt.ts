@@ -2,8 +2,8 @@
 
 import { program, Command } from 'commander';
 import chalk from 'chalk';
-import * as path from 'path';
 import { GroupedHelp } from '../lib/customHelp';
+import { getVersion } from '../lib/version';
 import { setQuiet, setVerbose, error, isHelperFormattedError } from '../lib/utils';
 import authCommand = require('../commands/auth');
 import listVideosCommand = require('../commands/list-videos');
@@ -93,14 +93,7 @@ function withHelpWrapper(commandName: string, actionFn: (...args: any[]) => Prom
   };
 }
 
-// Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
-let version = '2.0.11'; // Fallback version for compiled binaries
-try {
-  const packageJson = require(path.join(__dirname, '../../package.json'));
-  version = packageJson.version;
-} catch {
-  // Running as compiled binary - use hardcoded version
-}
+const version = getVersion();
 
 program
   .name('staqan-yt')
