@@ -54,40 +54,37 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
     let channelTitle = '';
     let actualChannelId = parsedChannel.value;
 
-    try {
-      // Resolve channel handle to ID if needed
-      if (parsedChannel.type === 'handle') {
-        debug('Looking up channel by handle:', parsedChannel.value);
-        const channelResponse = await youtube.channels.list({
-          part: ['id', 'snippet'],
-          forHandle: parsedChannel.value.replace('@', ''),
-        });
+    // Resolve channel handle to ID if needed. A not-found channel fails the
+    // command here — previously the ID branch swallowed the empty response
+    // (and any lookup error) into a debug-only catch and proceeded, so the
+    // Analytics query failed later with an opaque message (#123).
+    if (parsedChannel.type === 'handle') {
+      debug('Looking up channel by handle:', parsedChannel.value);
+      const channelResponse = await youtube.channels.list({
+        part: ['id', 'snippet'],
+        forHandle: parsedChannel.value.replace('@', ''),
+      });
 
-        if (channelResponse.data.items && channelResponse.data.items.length > 0) {
-          actualChannelId = channelResponse.data.items[0].id!;
-          channelTitle = channelResponse.data.items[0].snippet?.title || '';
-        } else {
-          spinner.fail('Channel not found');
-          error(`Channel not found: ${channelId}`);
-          process.exit(1);
-        }
-      } else {
-        // Get channel by ID
-        const channelResponse = await youtube.channels.list({
-          part: ['snippet'],
-          id: [parsedChannel.value],
-        });
-
-        if (channelResponse.data.items && channelResponse.data.items.length > 0) {
-          channelTitle = channelResponse.data.items[0].snippet?.title || '';
-        }
+      if (!channelResponse.data.items || channelResponse.data.items.length === 0) {
+        throw new Error(`Channel not found: ${channelId}`);
       }
+      actualChannelId = channelResponse.data.items[0].id!;
+      channelTitle = channelResponse.data.items[0].snippet?.title || '';
+    } else {
+      // Get channel by ID
+      const channelResponse = await youtube.channels.list({
+        part: ['snippet'],
+        id: [parsedChannel.value],
+      });
 
-      debug('Resolved channel ID:', actualChannelId);
-      debug('Channel title:', channelTitle);
-    } catch (err) {
-      debug('Error fetching channel info:', err);
+      if (!channelResponse.data.items || channelResponse.data.items.length === 0) {
+        throw new Error(`Channel not found: ${channelId}`);
+      }
+      channelTitle = channelResponse.data.items[0].snippet?.title || '';
     }
+
+    debug('Resolved channel ID:', actualChannelId);
+    debug('Channel title:', channelTitle);
 
     spinner.succeed('Channel information retrieved');
 
