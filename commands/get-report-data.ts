@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '../lib/auth';
-import { warning, debug, initCommand, withSpinner, formatTimestampWithTimezone, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
+import { warning, debug, initCommand, withSpinner, formatTimestampWithTimezone, validateDateOption, validateDateRange, runOrExit, withRateLimitRetry } from '../lib/utils';
 import { getOutputFormat, getConfigValue } from '../lib/config';
 import { formatJson, formatTable, formatCsv, formatText } from '../lib/formatters';
 import {
@@ -61,9 +61,10 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
 
     // Step 1: Find or create reporting job
 
-    const jobsResponse = await youtubeReporting.jobs.list({
-      onBehalfOfContentOwner: undefined,
-    });
+    const jobsResponse = await withRateLimitRetry(
+      () => youtubeReporting.jobs.list({ onBehalfOfContentOwner: undefined }),
+      { label: 'jobs.list' }
+    );
 
     const jobs = jobsResponse.data.jobs || [];
     const matchingJob = jobs.find((job: typeof jobs[0]) => job.reportTypeId === options.type);
@@ -77,12 +78,15 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       // Create new job
       spinner.text = `Creating new reporting job for type: ${options.type}...`;
 
-      const createResponse = await youtubeReporting.jobs.create({
-        requestBody: {
-          reportTypeId: options.type,
-          name: `${options.type} Report Job`,
-        },
-      });
+      const createResponse = await withRateLimitRetry(
+        () => youtubeReporting.jobs.create({
+          requestBody: {
+            reportTypeId: options.type,
+            name: `${options.type} Report Job`,
+          },
+        }),
+        { label: `jobs.create(${options.type})` }
+      );
 
       jobId = createResponse.data.id!;
       const jobCreated = new Date(createResponse.data.createTime || '');
@@ -109,11 +113,14 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
     const allFetchedReports: any[] = [];
     let reportsPageToken: string | undefined;
     do {
-      const reportsResponse = await youtubeReporting.jobs.reports.list({
-        jobId,
-        onBehalfOfContentOwner: undefined,
-        pageToken: reportsPageToken,
-      });
+      const reportsResponse = await withRateLimitRetry(
+        () => youtubeReporting.jobs.reports.list({
+          jobId,
+          onBehalfOfContentOwner: undefined,
+          pageToken: reportsPageToken,
+        }),
+        { label: `jobs.reports.list(${options.type})` }
+      );
       const pageReports = reportsResponse.data.reports || [];
       allFetchedReports.push(...pageReports);
       reportsPageToken = reportsResponse.data.nextPageToken || undefined;
