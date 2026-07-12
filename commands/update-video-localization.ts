@@ -2,6 +2,8 @@ import chalk from 'chalk';
 import { updateVideoLocalization } from '../lib/youtube';
 import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
 import { normalizeLanguage, getLanguageName } from '../lib/language';
+import { getOutputFormat } from '../lib/config';
+import { formatData } from '../lib/formatters';
 import { UpdateLocalizationOptions } from '../types';
 
 async function updateVideoLocalizationCommand(options: UpdateLocalizationOptions): Promise<void> {
@@ -31,6 +33,8 @@ async function updateVideoLocalizationCommand(options: UpdateLocalizationOptions
   if (title) debug(`New title length: ${title.length} chars`);
   if (description) debug(`New description length: ${description.length} chars`);
 
+  const outputFormat = await getOutputFormat(options.output);
+
   await withSpinner(`Updating ${langName} localization...`, 'Failed to update localization', async (spinner) => {
     debug(`Video ID input: ${videoId}`);
     const parsedId = parseVideoId(videoId);
@@ -38,7 +42,21 @@ async function updateVideoLocalizationCommand(options: UpdateLocalizationOptions
 
     await updateVideoLocalization(parsedId, language, title || null, description || null);
 
+    // Spinner output goes to stderr, so machine formats stay pipeable.
     spinner.succeed(chalk.green(`Successfully updated ${langName} (${langCode}) localization`));
+
+    if (outputFormat !== 'pretty') {
+      console.log(formatData([{
+        videoId: parsedId,
+        language: langCode,
+        languageName: langName,
+        title: title ?? null,
+        description: description ?? null,
+        action: 'updated',
+      }], outputFormat));
+      return;
+    }
+
     console.log('');
     console.log(chalk.gray(`Video ID: ${parsedId}`));
     if (title) {

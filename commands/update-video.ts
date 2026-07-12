@@ -1,6 +1,8 @@
 import chalk from 'chalk';
 import { getVideoInfo, updateVideoMetadata } from '../lib/youtube';
 import { parseVideoId, confirm, success, warning, info, debug, initCommand, createSpinner } from '../lib/utils';
+import { getOutputFormat } from '../lib/config';
+import { formatData } from '../lib/formatters';
 import { UpdateVideoOptions, VideoIdOption } from '../types';
 
 async function updateMetadataCommand(options: UpdateVideoOptions & VideoIdOption): Promise<void> {
@@ -18,6 +20,8 @@ async function updateMetadataCommand(options: UpdateVideoOptions & VideoIdOption
     throw new Error('Please provide at least one of --title or --description');
   }
 
+  const outputFormat = await getOutputFormat(options.output);
+
   try {
     debug(`Video ID input: ${videoId}`);
     const parsedId = parseVideoId(videoId);
@@ -27,38 +31,42 @@ async function updateMetadataCommand(options: UpdateVideoOptions & VideoIdOption
     const spinner = createSpinner('Fetching current video metadata...').start();
     const [currentVideo] = await getVideoInfo([parsedId]);
     spinner.succeed('Current metadata retrieved');
-    console.log('');
 
-    // Show current state
-    console.log(chalk.bold('Current metadata:'));
-    console.log(chalk.gray('Title:       ') + currentVideo.title);
-    console.log(chalk.gray('Description: ') + (currentVideo.description.substring(0, 100) + '...'));
-    console.log('');
-
-    // Show proposed changes
-    console.log(chalk.bold('Proposed changes:'));
     const updates: { title?: string; description?: string } = {};
+    if (options.title) updates.title = options.title;
+    if (options.description) updates.description = options.description;
 
-    if (options.title) {
-      updates.title = options.title;
-      console.log(chalk.gray('Title:       ') + chalk.green(options.title));
-    } else {
-      console.log(chalk.gray('Title:       ') + chalk.dim('(no change)'));
-    }
+    // Human preview only in pretty mode — machine formats keep stdout as
+    // pure data (spinner/success/info/confirm all write to stderr).
+    if (outputFormat === 'pretty') {
+      console.log('');
+      console.log(chalk.bold('Current metadata:'));
+      console.log(chalk.gray('Title:       ') + currentVideo.title);
+      console.log(chalk.gray('Description: ') + (currentVideo.description.substring(0, 100) + '...'));
+      console.log('');
 
-    if (options.description) {
-      updates.description = options.description;
-      const preview = options.description.length > 100
-        ? options.description.substring(0, 100) + '...'
-        : options.description;
-      console.log(chalk.gray('Description: ') + chalk.green(preview));
-    } else {
-      console.log(chalk.gray('Description: ') + chalk.dim('(no change)'));
+      console.log(chalk.bold('Proposed changes:'));
+      if (updates.title) {
+        console.log(chalk.gray('Title:       ') + chalk.green(updates.title));
+      } else {
+        console.log(chalk.gray('Title:       ') + chalk.dim('(no change)'));
+      }
+      if (updates.description) {
+        const preview = updates.description.length > 100
+          ? updates.description.substring(0, 100) + '...'
+          : updates.description;
+        console.log(chalk.gray('Description: ') + chalk.green(preview));
+      } else {
+        console.log(chalk.gray('Description: ') + chalk.dim('(no change)'));
+      }
+      console.log('');
     }
-    console.log('');
 
     // Dry run mode
     if (options.dryRun) {
+      if (outputFormat !== 'pretty') {
+        console.log(formatData([{ videoId: parsedId, ...updates, dryRun: true }], outputFormat));
+      }
       info('Dry run mode - no changes will be applied');
       success('Preview complete');
       return;
@@ -77,10 +85,19 @@ async function updateMetadataCommand(options: UpdateVideoOptions & VideoIdOption
     const updateSpinner = createSpinner('Updating video metadata...').start();
     await updateVideoMetadata(parsedId, updates);
     updateSpinner.succeed('Metadata updated successfully');
-    console.log('');
+
+    if (outputFormat !== 'pretty') {
+      console.log(formatData([{
+        videoId: parsedId,
+        ...updates,
+        url: `https://youtube.com/watch?v=${parsedId}`,
+        dryRun: false,
+      }], outputFormat));
+    } else {
+      console.log('');
+    }
     success(`Video updated: https://youtube.com/watch?v=${parsedId}`);
   } catch (err) {
-    console.log('');
     throw new Error(`Failed to update metadata: ${(err as Error).message}`);
   }
 }

@@ -178,11 +178,11 @@ program
     program.help();
   });
 
-// Auth command
+// Auth command. No --output flag: the interactive OAuth flow produces no
+// data to format (the flag was advertised but never read — issue #124).
 program
   .command('auth')
   .description('Authenticate with YouTube API using OAuth 2.0')
-  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(authCommand);
 

@@ -158,7 +158,7 @@ export interface ChannelOption {
   channel?: string;
 }
 
-export interface UpdateVideoOptions extends VerboseOption {
+export interface UpdateVideoOptions extends VerboseOption, OutputOption {
   title?: string;
   description?: string;
   dryRun?: boolean;
@@ -170,13 +170,13 @@ export interface LocalizationOptions extends VerboseOption, OutputOption, VideoI
   languages?: string;
 }
 
-export interface PutLocalizationOptions extends VerboseOption, VideoIdOption {
+export interface PutLocalizationOptions extends VerboseOption, OutputOption, VideoIdOption {
   language: string;
   title: string;
   description: string;
 }
 
-export interface UpdateLocalizationOptions extends VerboseOption, VideoIdOption {
+export interface UpdateLocalizationOptions extends VerboseOption, OutputOption, VideoIdOption {
   language: string;
   title?: string;
   description?: string;
@@ -201,7 +201,7 @@ export interface RetentionOptions extends OutputOption, VerboseOption, VideoIdOp
 // Tags command options
 export interface GetTagsOptions extends OutputOption, VerboseOption, VideoIdOption {}
 
-export interface UpdateTagsOptions extends VerboseOption, VideoIdOption {
+export interface UpdateTagsOptions extends VerboseOption, OutputOption, VideoIdOption {
   replace?: string;
   add?: string;
   remove?: string;

@@ -199,9 +199,11 @@ function info(message: string): void {
  * Prompt user for confirmation
  */
 async function confirm(message: string): Promise<boolean> {
+  // Prompt goes to stderr so machine-readable stdout (--output json/csv/…)
+  // stays clean when the caller pipes it.
   const readline = createInterface({
     input: process.stdin,
-    output: process.stdout,
+    output: process.stderr,
   });
 
   return new Promise((resolve) => {

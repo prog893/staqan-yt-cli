@@ -2,6 +2,8 @@ import chalk from 'chalk';
 import { putVideoLocalization } from '../lib/youtube';
 import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
 import { normalizeLanguage, getLanguageName } from '../lib/language';
+import { getOutputFormat } from '../lib/config';
+import { formatData } from '../lib/formatters';
 import { PutLocalizationOptions } from '../types';
 
 async function putVideoLocalizationCommand(options: PutLocalizationOptions): Promise<void> {
@@ -34,6 +36,8 @@ async function putVideoLocalizationCommand(options: PutLocalizationOptions): Pro
   debug(`Title length: ${title.length} chars`);
   debug(`Description length: ${description.length} chars`);
 
+  const outputFormat = await getOutputFormat(options.output);
+
   await withSpinner(`Creating ${langName} localization...`, 'Failed to create localization', async (spinner) => {
     debug(`Video ID input: ${videoId}`);
     const parsedId = parseVideoId(videoId);
@@ -41,7 +45,21 @@ async function putVideoLocalizationCommand(options: PutLocalizationOptions): Pro
 
     await putVideoLocalization(parsedId, language, title, description);
 
+    // Spinner output goes to stderr, so machine formats stay pipeable.
     spinner.succeed(chalk.green(`Successfully created ${langName} (${langCode}) localization`));
+
+    if (outputFormat !== 'pretty') {
+      console.log(formatData([{
+        videoId: parsedId,
+        language: langCode,
+        languageName: langName,
+        title,
+        description,
+        action: 'created',
+      }], outputFormat));
+      return;
+    }
+
     console.log('');
     console.log(chalk.gray(`Video ID: ${parsedId}`));
     const titlePreview = title.length > 60 ? title.substring(0, 60) + '...' : title;

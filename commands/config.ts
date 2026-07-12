@@ -1,9 +1,10 @@
 import chalk from 'chalk';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { getConfig, getConfigValue, setConfigValue, DEFAULT_LOCK_TIMEOUT_MS } from '../lib/config';
+import { getConfig, getConfigValue, setConfigValue, getOutputFormat, DEFAULT_LOCK_TIMEOUT_MS } from '../lib/config';
 import { success, info, CACHE_DIR } from '../lib/utils';
-import { ConfigKey, CONFIG_KEYS, CONFIG_KEY_HELP } from '../types';
+import { formatData } from '../lib/formatters';
+import { ConfigKey, CONFIG_KEYS, CONFIG_KEY_HELP, OutputFormat } from '../types';
 import { installCompletion, detectShell } from '../lib/completion';
 
 function availableConfigKeysHelp(): string {
@@ -30,6 +31,7 @@ interface ConfigOptions {
   show?: boolean;
   install?: boolean;
   print?: boolean;
+  output?: OutputFormat;
 }
 
 /**
@@ -42,16 +44,28 @@ async function configCommand(
   value?: string,
   options?: ConfigOptions
 ): Promise<void> {
+  const outputFormat = await getOutputFormat(options?.output);
+
   // Handle --show flag (list all settings)
   if (options?.show || action === 'list' || !action) {
     const config = await getConfig();
+    // getConfigValue returns undefined when lock.timeout was never explicitly
+    // stored, so we correctly show "(default)" only when the user hasn't set it.
+    const explicitLockTimeout = await getConfigValue('lock.timeout');
+
+    if (outputFormat !== 'pretty') {
+      console.log(formatData([
+        { key: 'default.channel', value: config.default?.channel ?? null },
+        { key: 'default.output', value: config.default?.output ?? 'pretty' },
+        { key: 'lock.timeout', value: explicitLockTimeout !== undefined ? Number(explicitLockTimeout) : DEFAULT_LOCK_TIMEOUT_MS },
+      ], outputFormat));
+      return;
+    }
+
     console.log(chalk.bold('\nCurrent Configuration:'));
     console.log('');
     console.log(chalk.cyan('default.channel:') + '  ' + (config.default?.channel || chalk.dim('(not set)')));
     console.log(chalk.cyan('default.output:') + '   ' + (config.default?.output || chalk.dim('pretty')));
-    // getConfigValue returns undefined when lock.timeout was never explicitly
-    // stored, so we correctly show "(default)" only when the user hasn't set it.
-    const explicitLockTimeout = await getConfigValue('lock.timeout');
     const lockTimeoutDisplay = explicitLockTimeout === undefined
       ? chalk.dim(`${DEFAULT_LOCK_TIMEOUT_MS}ms (default)`)
       : `${explicitLockTimeout}ms`;
@@ -75,6 +89,9 @@ async function configCommand(
     if (key === 'default.channel') {
       await invalidateChannelCache();
     }
+    if (outputFormat !== 'pretty') {
+      console.log(formatData([{ key, value }], outputFormat));
+    }
     const displayValue = key === 'lock.timeout' ? `${value}ms` : value;
     success(`Set ${chalk.cyan(key)} = ${chalk.yellow(displayValue)}`);
     return;
@@ -91,6 +108,13 @@ async function configCommand(
     }
 
     const currentValue = await getConfigValue(key as ConfigKey);
+
+    // 'text' and 'pretty' keep the raw-value contract (`config get x` has
+    // always printed just the value — scripts depend on it).
+    if (outputFormat !== 'pretty' && outputFormat !== 'text') {
+      console.log(formatData([{ key, value: currentValue ?? null }], outputFormat));
+      return;
+    }
 
     if (currentValue !== undefined) {
       console.log(key === 'lock.timeout' ? `${currentValue}ms` : currentValue);
