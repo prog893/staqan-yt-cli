@@ -9,7 +9,9 @@ export default [
       parserOptions: {
         ecmaVersion: 2020,
         sourceType: 'module',
-        project: './tsconfig.json',
+        // tests/ has its own tsconfig (bun types, noEmit) — both projects
+        // are listed so typed linting covers test files too.
+        project: ['./tsconfig.json', './tests/tsconfig.json'],
       },
       globals: {
         console: 'readonly',
