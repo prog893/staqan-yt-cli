@@ -15,6 +15,11 @@ async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void>
     throw new Error('Required: --video-id');
   }
 
+  // Resolve output format before the try block and any API call: an invalid
+  // --output fails fast without spending quota or being re-wrapped by the
+  // catch below as "Failed to update tags" (CodeRabbit on #140).
+  const outputFormat = await getOutputFormat(options.output);
+
   try {
     const parsedId = parseVideoId(videoId);
     debug(`Parsed video ID: ${parsedId}`);
@@ -52,8 +57,6 @@ async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void>
     const title = video.snippet?.title || 'Untitled';
 
     spinner.succeed('Current tags retrieved');
-
-    const outputFormat = await getOutputFormat(options.output);
 
     // Calculate new tags
     let newTags: string[] = [];

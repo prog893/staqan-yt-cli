@@ -23,6 +23,12 @@ export function formatData(data: unknown, format: Exclude<OutputFormat, 'pretty'
     case 'table': return formatTable(data);
     case 'csv': return formatCsv(data);
     case 'text': return formatText(data);
+    default: {
+      // Exhaustiveness guard: a new OutputFormat member fails compilation
+      // here instead of silently falling through.
+      const unreachable: never = format;
+      throw new Error(`Unhandled output format: ${unreachable}`);
+    }
   }
 }
 
