@@ -21,7 +21,7 @@ staqan-yt get-video-analytics --video-id <videoId>
 - `--start-date <date>` - Start date (YYYY-MM-DD), defaults to upload date
 - `--end-date <date>` - End date (YYYY-MM-DD), defaults to today
 - `--metrics <metrics>` - Comma-separated list of metrics to fetch
-- `--dimensions <dims>` - Comma-separated Analytics API dimensions (default: `video`)
+- `--dimensions <dims>` - Comma-separated Analytics API dimensions (default: `video`). See the [dimension compatibility guide](../dimension-compatibility.md) for which combinations the API actually accepts (live-tested matrix)
 - `--output <format>` - Output format: json, table, text, pretty, csv (default: pretty)
 - `-v, --verbose` - Enable verbose output with debug information
 - `-h, --help` - Show help
