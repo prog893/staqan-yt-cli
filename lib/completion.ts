@@ -123,7 +123,7 @@ export function getCommandOptions(command: string): string[] {
     'get-video-localization': ['--language', ...outputOptions, ...verboseOption],
     'put-video-localization': ['--language', '--title', '--description', ...outputOptions, ...verboseOption],
     'update-video-localization': ['--language', '--title', '--description', ...outputOptions, ...verboseOption],
-    'get-video-analytics': ['--start-date', '--end-date', '--metrics', ...outputOptions, ...verboseOption],
+    'get-video-analytics': ['--start-date', '--end-date', '--metrics', '--dimensions', ...outputOptions, ...verboseOption],
     'get-search-terms': ['--limit', '-l', ...outputOptions, ...verboseOption],
     'get-traffic-sources': [...outputOptions, ...verboseOption],
     'get-video-retention': [...outputOptions, ...verboseOption],
@@ -296,6 +296,8 @@ _staqa_nyt_completion() {
       COMPREPLY=( \$(compgen -W "top new" -- "\${cur}") ); return ;;
     --format)
       COMPREPLY=( \$(compgen -W "srt vtt sbv scc ttml json" -- "\${cur}") ); return ;;
+    --dimensions)
+      COMPREPLY=( \$(compgen -W "video day month insightTrafficSourceType insightTrafficSourceDetail creatorContentType country province city deviceType operatingSystem insightPlaybackLocationType insightPlayerLocationType subscribedStatus" -- "\${cur}") ); return ;;
     staqan-yt)
       COMPREPLY=( \$(compgen -W "${commands}" -- "\${cur}") )
       return
@@ -318,8 +320,11 @@ _staqa_nyt_completion() {
     get-video-localization|put-video-localization|update-video-localization)
       COMPREPLY=( \$(compgen -W "--video-id --language --title --description --output --verbose" -- "\${cur}") )
       ;;
-    get-video-analytics|get-channel-analytics)
-      COMPREPLY=( \$(compgen -W "--video-id --start-date --end-date --metrics --report --dimensions --output --verbose" -- "\${cur}") )
+    get-video-analytics)
+      COMPREPLY=( \$(compgen -W "--video-id --start-date --end-date --metrics --dimensions --output --verbose" -- "\${cur}") )
+      ;;
+    get-channel-analytics)
+      COMPREPLY=( \$(compgen -W "--channel --report --start-date --end-date --dimensions --metrics --output --verbose" -- "\${cur}") )
       ;;
     get-search-terms|get-traffic-sources|get-video-retention|get-video-tags|list-captions)
       COMPREPLY=( \$(compgen -W "--video-id --output --verbose" -- "\${cur}") )
@@ -615,6 +620,7 @@ ${commandList}
         '--start-date[Start date (YYYY-MM-DD)]:date:' \\
         '--end-date[End date (YYYY-MM-DD)]:date:' \\
         '--metrics[Metrics to fetch]:metrics:' \\
+        '--dimensions[Analytics dimensions (comma-separated)]:dims:(video day month insightTrafficSourceType insightTrafficSourceDetail creatorContentType country province city deviceType operatingSystem insightPlaybackLocationType insightPlayerLocationType subscribedStatus)' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
