@@ -2,7 +2,7 @@ import * as path from 'path';
 
 // Fallback for compiled binaries where package.json isn't on disk.
 // Do not edit by hand: scripts/version.ts rewrites this line on `bun pm version`.
-export const FALLBACK_VERSION = '2.0.11'; // synced by scripts/version.ts
+export const FALLBACK_VERSION = '2.1.0'; // synced by scripts/version.ts
 
 /**
  * Resolve the CLI version: package.json when running from the repo/npm
