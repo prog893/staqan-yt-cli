@@ -14,7 +14,6 @@ staqan-yt auth
 
 ### Options
 
-- `--output <format>` - Output format: json, table, text, pretty, csv
 - `-v, --verbose` - Enable verbose output with debug information
 - `-h, --help` - Show help
 
@@ -92,7 +91,7 @@ staqan-yt config [action] [key] [value]
 - `--show` - Show all configuration settings (same as `show` action)
 - `--install` - Install shell completion to appropriate location (for `completion` action)
 - `--print` - Print completion script to stdout (for `completion` action)
-- `--output <format>` - Output format: json, table, text, pretty, csv
+- `--output <format>` - Output format: json, table, text, pretty, csv. Machine formats emit `{key, value}` rows for `list`/`get`/`set` (`get` keeps its raw-value output for `text` and `pretty`, so scripts using `config get` are unaffected)
 - `-v, --verbose` - Enable verbose output with debug information
 - `-h, --help` - Show help
 

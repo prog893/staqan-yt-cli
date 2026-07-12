@@ -2,6 +2,8 @@ import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
 import { parseVideoId, confirm, success, warning, info, debug, initCommand, createSpinner } from '../lib/utils';
+import { getOutputFormat } from '../lib/config';
+import { formatData } from '../lib/formatters';
 import { UpdateTagsOptions } from '../types';
 
 async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void> {
@@ -50,7 +52,8 @@ async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void>
     const title = video.snippet?.title || 'Untitled';
 
     spinner.succeed('Current tags retrieved');
-    console.log('');
+
+    const outputFormat = await getOutputFormat(options.output);
 
     // Calculate new tags
     let newTags: string[] = [];
@@ -79,50 +82,57 @@ async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void>
       }
     }
 
-    // Show current state
-    console.log(chalk.bold.cyan(title));
-    console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
-    console.log('');
-
-    console.log(chalk.bold('Current tags:'));
-    if (currentTags.length === 0) {
-      console.log(chalk.gray('  (No tags)'));
-    } else {
-      currentTags.forEach(tag => {
-        console.log(`  ${tag}`);
-      });
-    }
-    console.log('');
-
-    // Show proposed changes
-    console.log(chalk.bold('New tags:'));
-    if (newTags.length === 0) {
-      console.log(chalk.gray('  (No tags)'));
-    } else {
-      newTags.forEach(tag => {
-        const isNew = !currentTags.includes(tag);
-        if (isNew) {
-          console.log(chalk.green(`  + ${tag}`));
-        } else {
-          console.log(`  ${tag}`);
-        }
-      });
-    }
-
-    // Show removed tags
     const removedTags = currentTags.filter(tag => !newTags.includes(tag));
-    if (removedTags.length > 0) {
-      console.log('');
-      console.log(chalk.bold('Removed tags:'));
-      removedTags.forEach(tag => {
-        console.log(chalk.red(`  - ${tag}`));
-      });
-    }
+    const addedTags = newTags.filter(tag => !currentTags.includes(tag));
 
-    console.log('');
+    // Human preview only in pretty mode — machine formats keep stdout as
+    // pure data (spinner/success/info/confirm all write to stderr).
+    if (outputFormat === 'pretty') {
+      console.log('');
+      console.log(chalk.bold.cyan(title));
+      console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
+      console.log('');
+
+      console.log(chalk.bold('Current tags:'));
+      if (currentTags.length === 0) {
+        console.log(chalk.gray('  (No tags)'));
+      } else {
+        currentTags.forEach(tag => {
+          console.log(`  ${tag}`);
+        });
+      }
+      console.log('');
+
+      console.log(chalk.bold('New tags:'));
+      if (newTags.length === 0) {
+        console.log(chalk.gray('  (No tags)'));
+      } else {
+        newTags.forEach(tag => {
+          const isNew = !currentTags.includes(tag);
+          if (isNew) {
+            console.log(chalk.green(`  + ${tag}`));
+          } else {
+            console.log(`  ${tag}`);
+          }
+        });
+      }
+
+      if (removedTags.length > 0) {
+        console.log('');
+        console.log(chalk.bold('Removed tags:'));
+        removedTags.forEach(tag => {
+          console.log(chalk.red(`  - ${tag}`));
+        });
+      }
+
+      console.log('');
+    }
 
     // Dry run mode
     if (options.dryRun) {
+      if (outputFormat !== 'pretty') {
+        console.log(formatData([{ videoId: parsedId, title, previousTags: currentTags, newTags, addedTags, removedTags, dryRun: true }], outputFormat));
+      }
       info('Dry run mode - no changes will be applied');
       success('Preview complete');
       return;
@@ -153,7 +163,12 @@ async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void>
     });
 
     updateSpinner.succeed('Tags updated successfully');
-    console.log('');
+
+    if (outputFormat !== 'pretty') {
+      console.log(formatData([{ videoId: parsedId, title, previousTags: currentTags, newTags, addedTags, removedTags, dryRun: false }], outputFormat));
+    } else {
+      console.log('');
+    }
     success(`Video updated: https://youtube.com/watch?v=${parsedId}`);
   } catch (err) {
     const errorMessage = (err as Error).message;
