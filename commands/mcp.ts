@@ -22,7 +22,8 @@ import {
 } from '../lib/youtube';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, chunkDateRange, withRateLimitRetry, initCommand, toLocalYmd, validateDateOption, validateDateRange, parseDuration } from '../lib/utils';
+import { parseVideoId, initCommand, toLocalYmd, validateDateOption, validateDateRange, parseDuration } from '../lib/utils';
+import { fetchVideoAnalytics } from '../lib/analytics';
 import { requireChannel } from '../lib/config';
 import { getVersion } from '../lib/version';
 
@@ -259,6 +260,10 @@ const TOOLS: Tool[] = [
         metrics: {
           type: 'string',
           description: 'Comma-separated list of metrics (default: views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares)',
+        },
+        dimensions: {
+          type: 'string',
+          description: 'Comma-separated Analytics API dimensions to break results out by (default: video = aggregate). E.g. "day", "insightTrafficSourceType", "country,deviceType". See docs/dimension-compatibility.md for valid combinations.',
         },
       },
       required: ['videoId'],
@@ -768,73 +773,25 @@ async function handleToolCall(name: string, args: any) {
     }
 
     case 'youtube_get_video_analytics': {
-      const parsedId = parseVideoId(args.videoId);
-
-      // Get video info for publish date
-      const videoResponse = await youtube.videos.list({
-        part: ['snippet'],
-        id: [parsedId],
-      });
-
-      if (!videoResponse.data.items || videoResponse.data.items.length === 0) {
-        throw new Error(`Video not found: ${parsedId}`);
-      }
-
-      const video = videoResponse.data.items[0];
-      const publishedAt = video.snippet?.publishedAt;
-
-      if (!publishedAt) {
-        throw new Error('Video publish date is missing');
-      }
-
+      // Shared data layer (lib/analytics.ts, #102) — same code path as the
+      // get-video-analytics CLI command, so features like --dimensions can't
+      // drift between the two surfaces again.
       if (args.startDate) validateDateOption('startDate', args.startDate);
       if (args.endDate) validateDateOption('endDate', args.endDate);
 
-      // Calculate date range
-      const endDate = args.endDate || toLocalYmd(new Date());
-      const startDate = args.startDate || publishedAt.split('T')[0];
-      validateDateRange(startDate, endDate);
-
-      // Default metrics
-      const metrics = args.metrics || 'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares';
-
-      // Chunk date range into 90-day periods
-      const dateChunks = chunkDateRange(startDate, endDate);
-
-      // Fetch analytics for each chunk
-      const allRows: unknown[][] = [];
-      let columnHeaders: { name?: string | null }[] = [];
-
-      for (let i = 0; i < dateChunks.length; i++) {
-        const chunk = dateChunks[i];
-
-        const analyticsResponse = await withRateLimitRetry(async () => {
-          return await youtubeAnalytics.reports.query({
-            ids: 'channel==MINE',
-            startDate: chunk.start,
-            endDate: chunk.end,
-            metrics,
-            dimensions: 'video',
-            filters: `video==${parsedId}`,
-          });
-        }, { label: 'reports.query(video analytics)' });
-
-        // Save headers from first response
-        if (i === 0 && analyticsResponse.data.columnHeaders) {
-          columnHeaders = analyticsResponse.data.columnHeaders;
-        }
-
-        // Aggregate rows
-        if (analyticsResponse.data.rows && analyticsResponse.data.rows.length > 0) {
-          allRows.push(...analyticsResponse.data.rows);
-        }
-      }
+      const result = await fetchVideoAnalytics({
+        videoId: parseVideoId(args.videoId),
+        startDate: args.startDate,
+        endDate: args.endDate,
+        metrics: args.metrics,
+        dimensions: args.dimensions,
+      });
 
       return {
         content: [
           {
             type: 'text',
-            text: JSON.stringify({ columnHeaders, rows: allRows }, null, 2),
+            text: JSON.stringify(result, null, 2),
           },
         ],
       };
