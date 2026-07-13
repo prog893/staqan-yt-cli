@@ -2,6 +2,23 @@
 
 This guide covers testing strategies and patterns for the staqan-yt-cli project.
 
+## Automated Tests (`bun test`)
+
+Unit tests live in `tests/` and run with the built-in bun runner — no extra framework:
+
+```bash
+bun test              # run everything (fast: pure functions + tmpdir-scoped lock tests)
+bun test utils        # run a single file by fragment
+```
+
+Current coverage (first wave, issue #108): the pure `lib/` functions — ID/URL/duration parsing, date chunking and validation, CSV/table/text/JSON formatters and the `formatData` dispatch, quota-error classification (`isRateLimitError`/`getRetryAfterMs`), language normalization, `getVersion` (including the release-sync marker contract), and `acquireLock` semantics (contention timeout, dead-PID steal, stale-age steal) against temp directories — tests never touch `~/.staqan-yt-cli`.
+
+Conventions:
+
+- `tests/tsconfig.json` extends the root config with bun types; `bun run type-check` covers both projects, and the build tsconfig excludes `tests/` so nothing lands in `dist/`.
+- Write TZ-independent date assertions (parse with `Date.parse`/UTC): the dev machine is UTC+9, CI is UTC — both must pass.
+- No YouTube API calls in unit tests. API-touching behavior is verified manually (below) or against live data during PR review.
+
 ## Manual Testing
 
 ### Test Authentication
