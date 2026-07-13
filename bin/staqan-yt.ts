@@ -457,7 +457,7 @@ program
   .description('Upload a new caption track to a video (fails if same language+name track exists)')
   .requiredOption('--video-id <id>', 'Video ID (must be on your channel)')
   .requiredOption('--language <lang>', 'Caption language (BCP-47 code, e.g. "ja", "en")')
-  .requiredOption('--file <path>', 'Caption file: srt, vtt, sbv, scc, or ttml')
+  .requiredOption('--file <path>', 'Caption file: srt, sbv, vtt, ttml, dfxp, or scc')
   .option('--name <name>', 'Track name shown in the player (default: empty)')
   .option('--draft', 'Upload as draft (not visible to viewers)')
   .option('-f, --force', 'Replace the existing track content if one matches the language+name')

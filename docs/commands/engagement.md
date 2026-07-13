@@ -235,7 +235,7 @@ staqan-yt put-caption --video-id <videoId> --language <lang> --file <path>
 
 - `--video-id <id>` - Video ID (must be on your authenticated channel) (required)
 - `--language <lang>` - Caption language as a BCP-47 code, e.g. `ja`, `en`, `ko` (required)
-- `--file <path>` - Caption file: srt, vtt, sbv, scc, or ttml (required)
+- `--file <path>` - Caption file: `.srt`, `.sbv`, `.vtt`, `.ttml`, `.dfxp`, or `.scc` (required). Other file types (e.g. `.txt`) are rejected client-side — the API would accept them and then fail processing with `unknownFormat`, leaving a broken track
 - `--name <name>` - Track name shown in the player (default: empty)
 - `--draft` - Upload as a draft (not visible to viewers until published in YouTube Studio)
 - `-f, --force` - If a track with the same language and name already exists, replace its content (via `captions.update`) instead of failing

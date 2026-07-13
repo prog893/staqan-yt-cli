@@ -939,6 +939,44 @@ export interface UploadedCaption {
   isDraft: boolean;
   /** True when --force replaced an existing track's content instead of creating one. */
   replaced: boolean;
+  /** Processing status from the API: 'serving' | 'syncing' | 'failed'. */
+  status: string;
+}
+
+/**
+ * Verify the API accepted the caption content. captions.insert/update accept
+ * ANY file and only report unparseable content afterwards via
+ * snippet.status === 'failed' (live-verified 2026-07-13: a .txt upload
+ * succeeds, then the track sits at status=failed / failureReason=unknownFormat).
+ * Throws so callers fail loudly instead of leaving a zombie track the user
+ * only discovers in YouTube Studio. `cleanup` deletes the just-created track
+ * first (insert path only — never delete a pre-existing track on the update
+ * path, its content is already replaced either way).
+ */
+async function assertCaptionProcessed(
+  youtube: youtube_v3.Youtube,
+  captionId: string,
+  snippet: youtube_v3.Schema$CaptionSnippet | undefined,
+  cleanup: boolean
+): Promise<string> {
+  const status = snippet?.status ?? 'serving';
+  if (status !== 'failed') {
+    return status;
+  }
+  const reason = snippet?.failureReason || 'unknown reason';
+  if (cleanup) {
+    await youtube.captions.delete({ id: captionId }).catch(err => {
+      debug(`Cleanup of failed caption track ${captionId} failed:`, (err as Error).message);
+    });
+    throw new Error(
+      `Caption upload was accepted but processing failed (${reason}). ` +
+      'The file content is not a supported subtitle format. The failed track was removed.'
+    );
+  }
+  throw new Error(
+    `Caption content replacement failed processing (${reason}). ` +
+    `The existing track ${captionId} is now in a failed state — re-run with a valid subtitle file to fix it.`
+  );
 }
 
 /**
@@ -983,6 +1021,9 @@ async function uploadCaption(
         });
 
         const snippet = response.data.snippet;
+        const status = await assertCaptionProcessed(
+          youtube, response.data.id || existing.id, snippet ?? undefined, false
+        );
         return {
           id: response.data.id || existing.id,
           videoId,
@@ -990,6 +1031,7 @@ async function uploadCaption(
           name: snippet?.name ?? trackName,
           isDraft: snippet?.isDraft ?? false,
           replaced: true,
+          status,
         };
       } catch (err) {
         media.destroy();
@@ -1015,6 +1057,7 @@ async function uploadCaption(
     });
 
     const snippet = response.data.snippet;
+    const status = await assertCaptionProcessed(youtube, response.data.id!, snippet ?? undefined, true);
     return {
       id: response.data.id!,
       videoId: snippet?.videoId || videoId,
@@ -1022,6 +1065,7 @@ async function uploadCaption(
       name: snippet?.name ?? '',
       isDraft: snippet?.isDraft ?? false,
       replaced: false,
+      status,
     };
   } catch (err) {
     media.destroy();
