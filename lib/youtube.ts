@@ -1,5 +1,5 @@
 import { google, youtube_v3 } from 'googleapis';
-import { promises as fs } from 'fs';
+import { promises as fs, createReadStream } from 'fs';
 import path from 'path';
 import { getAuthenticatedClient } from './auth';
 import { normalizeLanguage, getLanguageName } from './language';
@@ -931,6 +931,104 @@ async function downloadCaption(captionId: string, format: CaptionFormat = 'json'
   return content;
 }
 
+export interface UploadedCaption {
+  id: string;
+  videoId: string;
+  language: string;
+  name: string;
+  isDraft: boolean;
+  /** True when --force replaced an existing track's content instead of creating one. */
+  replaced: boolean;
+}
+
+/**
+ * Upload a caption track for a video.
+ *
+ * Default (put-* contract): captions.insert — the API rejects the upload if
+ * a track with the same language+name already exists. With `force: true`,
+ * an existing matching track is looked up first and its content replaced
+ * via captions.update instead (the only way the API offers to overwrite
+ * subtitles). Requires ownership of the video (youtube.force-ssl scope).
+ */
+async function uploadCaption(
+  videoId: string,
+  language: string,
+  filePath: string,
+  options: { name?: string; draft?: boolean; force?: boolean } = {}
+): Promise<UploadedCaption> {
+  debug(`Uploading caption for video ${videoId} (${language}) from ${filePath}`);
+  const youtube = await getYouTubeClient();
+  const trackName = options.name ?? '';
+
+  if (options.force) {
+    const list = await youtube.captions.list({ part: ['snippet'], videoId });
+    const existing = (list.data.items || []).find(
+      item => item.snippet?.language === language && (item.snippet?.name ?? '') === trackName
+    );
+
+    if (existing?.id) {
+      debug(`--force: replacing existing caption track ${existing.id}`);
+      // Retain the stream so it can be destroyed if the API call fails —
+      // otherwise the file descriptor leaks until GC (matters for the
+      // long-running MCP server case).
+      const media = createReadStream(filePath);
+      try {
+        const response = await youtube.captions.update({
+          part: ['snippet'],
+          requestBody: {
+            id: existing.id,
+            snippet: { isDraft: options.draft ?? false },
+          },
+          media: { body: media },
+        });
+
+        const snippet = response.data.snippet;
+        return {
+          id: response.data.id || existing.id,
+          videoId,
+          language: snippet?.language || language,
+          name: snippet?.name ?? trackName,
+          isDraft: snippet?.isDraft ?? false,
+          replaced: true,
+        };
+      } catch (err) {
+        media.destroy();
+        throw err;
+      }
+    }
+    debug('--force: no matching track found, falling through to insert');
+  }
+
+  const media = createReadStream(filePath);
+  try {
+    const response = await youtube.captions.insert({
+      part: ['snippet'],
+      requestBody: {
+        snippet: {
+          videoId,
+          language,
+          name: trackName,
+          isDraft: options.draft ?? false,
+        },
+      },
+      media: { body: media },
+    });
+
+    const snippet = response.data.snippet;
+    return {
+      id: response.data.id!,
+      videoId: snippet?.videoId || videoId,
+      language: snippet?.language || language,
+      name: snippet?.name ?? '',
+      isDraft: snippet?.isDraft ?? false,
+      replaced: false,
+    };
+  } catch (err) {
+    media.destroy();
+    throw err;
+  }
+}
+
 export {
   getYouTubeClient,
   getChannelId,
@@ -950,4 +1048,5 @@ export {
   listVideoComments,
   listCaptions,
   downloadCaption,
+  uploadCaption,
 };
