@@ -316,6 +316,7 @@ export interface PutCaptionOptions extends OutputOption, VerboseOption, VideoIdO
   file: string;
   name?: string;
   draft?: boolean;
+  force?: boolean;
 }
 
 // Channel analytics command options

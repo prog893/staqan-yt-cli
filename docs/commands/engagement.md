@@ -238,6 +238,7 @@ staqan-yt put-caption --video-id <videoId> --language <lang> --file <path>
 - `--file <path>` - Caption file: srt, vtt, sbv, scc, or ttml (required)
 - `--name <name>` - Track name shown in the player (default: empty)
 - `--draft` - Upload as a draft (not visible to viewers until published in YouTube Studio)
+- `-f, --force` - If a track with the same language and name already exists, replace its content (via `captions.update`) instead of failing
 - `--output <format>` - Output format: json, table, text, pretty, csv (default: pretty). Machine formats emit the created track (`id`, `videoId`, `language`, `name`, `isDraft`)
 - `-v, --verbose` - Enable verbose output with debug information
 
@@ -251,7 +252,7 @@ staqan-yt put-caption --video-id dQw4w9WgXcQ --language ja --file ./subs/ja.srt
 staqan-yt put-caption --video-id dQw4w9WgXcQ --language en --file en.vtt --draft --output json
 ```
 
-> **PUT semantics:** like `put-video-localization`, this creates a new track and the API rejects the upload if a track with the same language and name already exists. Use `list-captions` to check what exists first.
+> **PUT semantics:** like `put-video-localization`, this creates a new track and the API rejects the upload if a track with the same language and name already exists. Use `list-captions` to check what exists first, or pass `--force` to overwrite the existing track's content.
 
 ## Common Patterns
 

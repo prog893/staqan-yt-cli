@@ -50,22 +50,26 @@ async function putCaptionCommand(options: PutCaptionOptions): Promise<void> {
 
   const outputFormat = await getOutputFormat(options.output);
 
-  await withSpinner(`Uploading ${langName} caption track...`, 'Failed to upload caption', async (spinner) => {
-    const parsedId = parseVideoId(videoId);
-    debug(`Parsed video ID: ${parsedId}`);
+  // Parse before the spinner so a malformed ID fails with an accurate
+  // message rather than "Failed to upload caption" (CodeRabbit on #148).
+  const parsedId = parseVideoId(videoId);
+  debug(`Parsed video ID: ${parsedId}`);
 
+  await withSpinner(`Uploading ${langName} caption track...`, 'Failed to upload caption', async (spinner) => {
     const result = await uploadCaption(parsedId, langCode, filePath, {
       name: options.name,
       draft: options.draft,
+      force: options.force,
     });
 
+    const verb = result.replaced ? 'Replaced' : 'Uploaded';
     // Spinner output goes to stderr, so machine formats stay pipeable.
     spinner.succeed(chalk.green(
-      `Uploaded ${langName} (${result.language}) caption track${result.isDraft ? ' as draft' : ''}`
+      `${verb} ${langName} (${result.language}) caption track${result.isDraft ? ' as draft' : ''}`
     ));
 
     if (outputFormat !== 'pretty') {
-      console.log(formatData([{ ...result, action: 'uploaded' }], outputFormat));
+      console.log(formatData([{ ...result, action: result.replaced ? 'replaced' : 'uploaded' }], outputFormat));
       return;
     }
 
@@ -74,6 +78,9 @@ async function putCaptionCommand(options: PutCaptionOptions): Promise<void> {
     console.log(chalk.gray(`Video ID:   ${result.videoId}`));
     if (result.name) {
       console.log(chalk.gray(`Track name: ${result.name}`));
+    }
+    if (result.replaced) {
+      console.log(chalk.yellow('Existing track content was overwritten (--force)'));
     }
     if (result.isDraft) {
       console.log(chalk.yellow('Draft: not visible to viewers until published in YouTube Studio'));

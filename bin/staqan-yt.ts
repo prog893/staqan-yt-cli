@@ -460,6 +460,7 @@ program
   .requiredOption('--file <path>', 'Caption file: srt, vtt, sbv, scc, or ttml')
   .option('--name <name>', 'Track name shown in the player (default: empty)')
   .option('--draft', 'Upload as draft (not visible to viewers)')
+  .option('-f, --force', 'Replace the existing track content if one matches the language+name')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('put-caption', putCaptionCommand));

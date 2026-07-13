@@ -140,7 +140,7 @@ export function getCommandOptions(command: string): string[] {
     'list-playlists': ['--channel', '--limit', '-l', '--privacy', ...outputOptions, ...verboseOption],
     'list-captions': [...outputOptions, ...verboseOption],
     'get-caption': ['--format', ...verboseOption],
-    'put-caption': ['--language', '--file', '--name', '--draft', ...outputOptions, ...verboseOption],
+    'put-caption': ['--language', '--file', '--name', '--draft', '--force', '-f', ...outputOptions, ...verboseOption],
     'list-report-types': ['--output', 'json', 'table', 'text', ...verboseOption],
     'list-report-jobs': ['--type', '--output', 'json', 'table', 'text', ...verboseOption],
     'get-report-data': ['--type', '--video-id', '--start-date', '--end-date', '--output', 'json', 'csv', ...verboseOption],
@@ -357,7 +357,7 @@ _staqa_nyt_completion() {
       COMPREPLY=( \$(compgen -W "--caption-id --format --verbose" -- "\${cur}") )
       ;;
     put-caption)
-      COMPREPLY=( \$(compgen -W "--video-id --language --file --name --draft --output --verbose" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--video-id --language --file --name --draft --force --output --verbose" -- "\${cur}") )
       ;;
     get-channel)
       COMPREPLY=( \$(compgen -W "--channel --output --verbose" -- "\${cur}") )
@@ -799,6 +799,7 @@ ${commandList}
         '--file[Caption file]:file:_files' \\
         '--name[Track name]:name:' \\
         '--draft[Upload as draft]' \\
+        '--force[Replace existing matching track]' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
