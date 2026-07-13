@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { parseVideoId, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, runOrExit } from '../lib/utils';
+import { parseVideoId, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, daysAgoYmd, runOrExit } from '../lib/utils';
 import { fetchSearchTerms } from '../lib/analytics';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
@@ -23,11 +23,7 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
     // CLI default: last 30 days (MCP defaults to all-time; the shared lib
     // takes an explicit range — see lib/analytics.ts #102).
     const endDate = toLocalYmd(new Date());
-    const startDate = (() => {
-      const date = new Date();
-      date.setDate(date.getDate() - 30);
-      return toLocalYmd(date);
-    })();
+    const startDate = daysAgoYmd(30);
     debug(`Date range: ${startDate} to ${endDate}`);
 
     const result = await fetchSearchTerms({ videoId: parsedId, startDate, endDate, limit });

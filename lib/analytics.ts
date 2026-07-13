@@ -111,6 +111,7 @@ export const DEFAULT_VIDEO_METRICS =
  * dimensions, or an inverted date range.
  */
 export async function fetchVideoAnalytics(params: VideoAnalyticsParams): Promise<VideoAnalyticsResult> {
+  assertVideoId(params.videoId);
   const auth = await getAuthenticatedClient();
   const youtube = google.youtube({ version: 'v3', auth });
   const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
@@ -198,6 +199,17 @@ export interface VideoReportResult {
   rows: unknown[][];
 }
 
+/**
+ * Strict video-ID check before interpolating into an Analytics `filters`
+ * string. parseVideoId passes unmatched input through unchanged, so without
+ * this a malformed value could inject extra filter clauses.
+ */
+function assertVideoId(videoId: string): void {
+  if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+    throw new Error(`Invalid video ID: ${videoId}`);
+  }
+}
+
 interface VideoSnippetInfo {
   title: string;
   publishedAt: string;
@@ -240,6 +252,7 @@ export async function fetchTrafficSources(params: {
   startDate: string;
   endDate: string;
 }): Promise<VideoReportResult> {
+  assertVideoId(params.videoId);
   const { title } = await lookupVideoSnippet(params.videoId);
   const auth = await getAuthenticatedClient();
   const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
@@ -274,6 +287,7 @@ export async function fetchSearchTerms(params: {
   endDate: string;
   limit: number;
 }): Promise<VideoReportResult> {
+  assertVideoId(params.videoId);
   const { title } = await lookupVideoSnippet(params.videoId);
   const auth = await getAuthenticatedClient();
   const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
@@ -311,6 +325,7 @@ export interface VideoRetentionResult extends VideoReportResult {
  * returns exactly 100 unique ratio points, 0.01 → 1).
  */
 export async function fetchVideoRetention(params: { videoId: string }): Promise<VideoRetentionResult> {
+  assertVideoId(params.videoId);
   const { title, publishedAt, duration } = await lookupVideoSnippet(params.videoId);
   const auth = await getAuthenticatedClient();
   const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });

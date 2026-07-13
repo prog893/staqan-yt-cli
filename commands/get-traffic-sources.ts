@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { parseVideoId, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd } from '../lib/utils';
+import { parseVideoId, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, daysAgoYmd } from '../lib/utils';
 import { fetchTrafficSources } from '../lib/analytics';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
@@ -22,11 +22,7 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
     // shared lib takes an explicit range so neither surface's documented
     // behavior changes; see lib/analytics.ts #102).
     const endDate = toLocalYmd(new Date());
-    const startDate = (() => {
-      const date = new Date();
-      date.setDate(date.getDate() - 30);
-      return toLocalYmd(date);
-    })();
+    const startDate = daysAgoYmd(30);
     debug(`Date range: ${startDate} to ${endDate}`);
 
     const result = await fetchTrafficSources({ videoId: parsedId, startDate, endDate });
@@ -72,7 +68,7 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
 
     switch (outputFormat) {
       case 'csv':
-        if (columnHeaders && rows) {
+        if (columnHeaders.length > 0 && rows.length > 0) {
           console.log(convertToCSV(columnHeaders, rows));
         } else {
           console.log(formatCsv(trafficData));
