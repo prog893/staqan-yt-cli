@@ -1,7 +1,6 @@
 import chalk from 'chalk';
-import { getAuthenticatedClient } from '../lib/auth';
-import { google } from 'googleapis';
 import { parseVideoId, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd } from '../lib/utils';
+import { fetchTrafficSources } from '../lib/analytics';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { TrafficSourcesOptions } from '../types';
@@ -19,51 +18,24 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
     const parsedId = parseVideoId(videoId);
     debug('Parsed video ID', parsedId);
 
-    const auth = await getAuthenticatedClient();
-    const youtube = google.youtube({ version: 'v3', auth });
-    const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
-
-    // Get video info for title
-    const videoResponse = await youtube.videos.list({
-      part: ['snippet'],
-      id: [parsedId],
-    });
-
-    if (!videoResponse.data.items || videoResponse.data.items.length === 0) {
-      throw new Error(`No video found with ID: ${parsedId}`);
-    }
-
-    const title = videoResponse.data.items[0].snippet?.title || 'Untitled';
-
-    // Date range: last 30 days
+    // CLI default: last 30 days (the MCP tool defaults to all-time — the
+    // shared lib takes an explicit range so neither surface's documented
+    // behavior changes; see lib/analytics.ts #102).
     const endDate = toLocalYmd(new Date());
     const startDate = (() => {
       const date = new Date();
       date.setDate(date.getDate() - 30);
       return toLocalYmd(date);
     })();
-
     debug(`Date range: ${startDate} to ${endDate}`);
 
-    // Fetch traffic sources data
-    const analyticsResponse = await youtubeAnalytics.reports.query({
-      ids: 'channel==MINE',
-      startDate,
-      endDate,
-      metrics: 'views',
-      dimensions: 'insightTrafficSourceType',
-      filters: `video==${parsedId}`,
-      sort: '-views',
-    });
+    const result = await fetchTrafficSources({ videoId: parsedId, startDate, endDate });
+    const { title, columnHeaders, rows } = result;
 
     spinner.succeed('Traffic sources data retrieved');
     console.log('');
 
     const outputFormat = await getOutputFormat(options.output);
-
-    // Prepare data
-    const rows = analyticsResponse.data.rows || [];
-    const columnHeaders = analyticsResponse.data.columnHeaders || [];
 
     // Traffic source labels
     const sourceLabels: { [key: string]: string } = {

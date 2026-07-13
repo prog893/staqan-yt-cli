@@ -23,7 +23,7 @@ import {
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
 import { parseVideoId, initCommand, toLocalYmd, validateDateOption, validateDateRange, parseDuration } from '../lib/utils';
-import { fetchVideoAnalytics } from '../lib/analytics';
+import { fetchVideoAnalytics, fetchTrafficSources, fetchSearchTerms, fetchVideoRetention, ALL_TIME_START_DATE } from '../lib/analytics';
 import { requireChannel } from '../lib/config';
 import { getVersion } from '../lib/version';
 
@@ -798,25 +798,20 @@ async function handleToolCall(name: string, args: any) {
     }
 
     case 'youtube_get_search_terms': {
-      const parsedId = parseVideoId(args.videoId);
-      const limit = args.limit || 50;
-
-      const analyticsResponse = await youtubeAnalytics.reports.query({
-        ids: 'channel==MINE',
-        startDate: '2000-01-01',
+      // Shared data layer (lib/analytics.ts, #102). MCP keeps its all-time
+      // default (the CLI command defaults to the last 30 days).
+      const result = await fetchSearchTerms({
+        videoId: parseVideoId(args.videoId),
+        startDate: ALL_TIME_START_DATE,
         endDate: toLocalYmd(new Date()),
-        metrics: 'views',
-        dimensions: 'insightTrafficSourceDetail',
-        filters: `video==${parsedId};insightTrafficSourceType==YT_SEARCH`,
-        maxResults: limit,
-        sort: '-views',
+        limit: args.limit || 50,
       });
 
       return {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(analyticsResponse.data, null, 2),
+            text: JSON.stringify(result, null, 2),
           },
         ],
       };
@@ -946,46 +941,34 @@ async function handleToolCall(name: string, args: any) {
     }
 
     case 'youtube_get_traffic_sources': {
-      const parsedId = parseVideoId(args.videoId);
-
-      const analyticsResponse = await youtubeAnalytics.reports.query({
-        ids: 'channel==MINE',
-        startDate: '2000-01-01',
+      // Shared data layer (lib/analytics.ts, #102). MCP keeps its all-time
+      // default (the CLI command defaults to the last 30 days).
+      const result = await fetchTrafficSources({
+        videoId: parseVideoId(args.videoId),
+        startDate: ALL_TIME_START_DATE,
         endDate: toLocalYmd(new Date()),
-        metrics: 'views',
-        dimensions: 'insightTrafficSourceType',
-        filters: `video==${parsedId}`,
-        sort: '-views',
       });
 
       return {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(analyticsResponse.data, null, 2),
+            text: JSON.stringify(result, null, 2),
           },
         ],
       };
     }
 
     case 'youtube_get_video_retention': {
-      const parsedId = parseVideoId(args.videoId);
-
-      const analyticsResponse = await youtubeAnalytics.reports.query({
-        ids: 'channel==MINE',
-        startDate: '2000-01-01',
-        endDate: toLocalYmd(new Date()),
-        metrics: 'audienceWatchRatio,relativeRetentionPerformance',
-        dimensions: 'elapsedVideoTimeRatio',
-        filters: `video==${parsedId}`,
-        sort: 'elapsedVideoTimeRatio',
-      });
+      // Shared data layer (lib/analytics.ts, #102): single lifetime query
+      // from the upload date; result now includes title/duration context.
+      const result = await fetchVideoRetention({ videoId: parseVideoId(args.videoId) });
 
       return {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(analyticsResponse.data, null, 2),
+            text: JSON.stringify(result, null, 2),
           },
         ],
       };

@@ -183,3 +183,157 @@ export async function fetchVideoAnalytics(params: VideoAnalyticsParams): Promise
     rows: allRows,
   };
 }
+
+// ─── Per-video report queries (traffic sources, search terms, retention) ─────
+
+/** YouTube's founding date — the effective "all-time" start for Analytics queries. */
+export const ALL_TIME_START_DATE = '2005-02-14';
+
+/** Rows + headers as the Analytics API returns them, plus display context. */
+export interface VideoReportResult {
+  videoId: string;
+  title: string;
+  dateRange: { startDate: string; endDate: string };
+  columnHeaders: { name?: string | null }[];
+  rows: unknown[][];
+}
+
+interface VideoSnippetInfo {
+  title: string;
+  publishedAt: string;
+  duration: string;
+}
+
+/** Shared lookup: title/publishedAt/duration for display and date defaulting. */
+async function lookupVideoSnippet(videoId: string): Promise<VideoSnippetInfo> {
+  const auth = await getAuthenticatedClient();
+  const youtube = google.youtube({ version: 'v3', auth });
+  const response = await youtube.videos.list({
+    part: ['snippet', 'contentDetails'],
+    id: [videoId],
+  });
+
+  if (!response.data.items || response.data.items.length === 0) {
+    throw new Error(`No video found with ID: ${videoId}`);
+  }
+
+  const item = response.data.items[0];
+  const publishedAt = item.snippet?.publishedAt;
+  if (!publishedAt) {
+    throw new Error('Video publish date is missing');
+  }
+  return {
+    title: item.snippet?.title || 'Untitled',
+    publishedAt,
+    duration: item.contentDetails?.duration || '',
+  };
+}
+
+/**
+ * Traffic-source breakdown for one video (insightTrafficSourceType).
+ * Date range is caller-supplied on purpose: the CLI defaults to the last 30
+ * days, the MCP tool to all-time — consolidating here must not silently
+ * change either surface's documented behavior.
+ */
+export async function fetchTrafficSources(params: {
+  videoId: string;
+  startDate: string;
+  endDate: string;
+}): Promise<VideoReportResult> {
+  const { title } = await lookupVideoSnippet(params.videoId);
+  const auth = await getAuthenticatedClient();
+  const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
+
+  const response = await withRateLimitRetry(() => youtubeAnalytics.reports.query({
+    ids: 'channel==MINE',
+    startDate: params.startDate,
+    endDate: params.endDate,
+    metrics: 'views',
+    dimensions: 'insightTrafficSourceType',
+    filters: `video==${params.videoId}`,
+    sort: '-views',
+  }), { label: 'reports.query(traffic sources)' });
+
+  return {
+    videoId: params.videoId,
+    title,
+    dateRange: { startDate: params.startDate, endDate: params.endDate },
+    columnHeaders: response.data.columnHeaders || [],
+    rows: response.data.rows || [],
+  };
+}
+
+/**
+ * YouTube-search terms that led viewers to one video
+ * (insightTrafficSourceDetail filtered to YT_SEARCH). Same caller-supplied
+ * date-range contract as fetchTrafficSources.
+ */
+export async function fetchSearchTerms(params: {
+  videoId: string;
+  startDate: string;
+  endDate: string;
+  limit: number;
+}): Promise<VideoReportResult> {
+  const { title } = await lookupVideoSnippet(params.videoId);
+  const auth = await getAuthenticatedClient();
+  const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
+
+  const response = await withRateLimitRetry(() => youtubeAnalytics.reports.query({
+    ids: 'channel==MINE',
+    startDate: params.startDate,
+    endDate: params.endDate,
+    metrics: 'views',
+    dimensions: 'insightTrafficSourceDetail',
+    filters: `video==${params.videoId};insightTrafficSourceType==YT_SEARCH`,
+    sort: '-views',
+    maxResults: params.limit,
+  }), { label: 'reports.query(search terms)' });
+
+  return {
+    videoId: params.videoId,
+    title,
+    dateRange: { startDate: params.startDate, endDate: params.endDate },
+    columnHeaders: response.data.columnHeaders || [],
+    rows: response.data.rows || [],
+  };
+}
+
+export interface VideoRetentionResult extends VideoReportResult {
+  duration: string;
+}
+
+/**
+ * Lifetime audience-retention curve (elapsedVideoTimeRatio) in a single
+ * query from the upload date. Deliberately NOT chunked into 90-day windows:
+ * ratio-dimension reports return one complete 100-point curve per query, so
+ * chunking + concatenation would interleave duplicate ratio points whenever
+ * more than one chunk has data (live-verified 2026-07-13: a lifetime query
+ * returns exactly 100 unique ratio points, 0.01 → 1).
+ */
+export async function fetchVideoRetention(params: { videoId: string }): Promise<VideoRetentionResult> {
+  const { title, publishedAt, duration } = await lookupVideoSnippet(params.videoId);
+  const auth = await getAuthenticatedClient();
+  const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
+
+  const startDate = publishedAt.split('T')[0];
+  const endDate = toLocalYmd(new Date());
+
+  const response = await withRateLimitRetry(() => youtubeAnalytics.reports.query({
+    ids: 'channel==MINE',
+    startDate,
+    endDate,
+    metrics: 'audienceWatchRatio,relativeRetentionPerformance',
+    dimensions: 'elapsedVideoTimeRatio',
+    filters: `video==${params.videoId}`,
+    sort: 'elapsedVideoTimeRatio',
+  }), { label: 'reports.query(retention)' });
+
+  return {
+    videoId: params.videoId,
+    title,
+    duration,
+    dateRange: { startDate, endDate },
+    columnHeaders: response.data.columnHeaders || [],
+    rows: response.data.rows || [],
+  };
+}
