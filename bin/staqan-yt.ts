@@ -31,6 +31,7 @@ import listCommentsCommand = require('../commands/list-comments');
 import getChannelCommand = require('../commands/get-channel');
 import listCaptionsCommand = require('../commands/list-captions');
 import getCaptionCommand = require('../commands/get-caption');
+import putCaptionCommand = require('../commands/put-caption');
 import getChannelAnalyticsCommand = require('../commands/get-channel-analytics');
 import getChannelSearchTermsCommand = require('../commands/get-channel-search-terms');
 import listReportTypesCommand = require('../commands/list-report-types');
@@ -449,6 +450,19 @@ program
   .option('--format <format>', 'Caption format: srt, vtt, sbv, scc, ttml, json (default: json)', 'json')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('get-caption', getCaptionCommand));
+
+// Upload a new caption track (PUT - fails if same language+name track exists)
+program
+  .command('put-caption')
+  .description('Upload a new caption track to a video (fails if same language+name track exists)')
+  .requiredOption('--video-id <id>', 'Video ID (must be on your channel)')
+  .requiredOption('--language <lang>', 'Caption language (BCP-47 code, e.g. "ja", "en")')
+  .requiredOption('--file <path>', 'Caption file: srt, vtt, sbv, scc, or ttml')
+  .option('--name <name>', 'Track name shown in the player (default: empty)')
+  .option('--draft', 'Upload as draft (not visible to viewers)')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(withHelpWrapper('put-caption', putCaptionCommand));
 
 // Channel search terms command — top keywords from YouTube Search traffic
 program

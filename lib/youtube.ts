@@ -1,5 +1,5 @@
 import { google, youtube_v3 } from 'googleapis';
-import { promises as fs } from 'fs';
+import { promises as fs, createReadStream } from 'fs';
 import path from 'path';
 import { getAuthenticatedClient } from './auth';
 import { normalizeLanguage, getLanguageName } from './language';
@@ -931,6 +931,54 @@ async function downloadCaption(captionId: string, format: CaptionFormat = 'json'
   return content;
 }
 
+export interface UploadedCaption {
+  id: string;
+  videoId: string;
+  language: string;
+  name: string;
+  isDraft: boolean;
+}
+
+/**
+ * Upload a new caption track for a video (captions.insert).
+ * The API rejects the upload if a track with the same language+name already
+ * exists on the video — matching the put-* "create, fail if exists" contract.
+ * Requires ownership of the video (youtube.force-ssl scope).
+ */
+async function uploadCaption(
+  videoId: string,
+  language: string,
+  filePath: string,
+  options: { name?: string; draft?: boolean } = {}
+): Promise<UploadedCaption> {
+  debug(`Uploading caption for video ${videoId} (${language}) from ${filePath}`);
+  const youtube = await getYouTubeClient();
+
+  const response = await youtube.captions.insert({
+    part: ['snippet'],
+    requestBody: {
+      snippet: {
+        videoId,
+        language,
+        name: options.name ?? '',
+        isDraft: options.draft ?? false,
+      },
+    },
+    media: {
+      body: createReadStream(filePath),
+    },
+  });
+
+  const snippet = response.data.snippet;
+  return {
+    id: response.data.id!,
+    videoId: snippet?.videoId || videoId,
+    language: snippet?.language || language,
+    name: snippet?.name ?? '',
+    isDraft: snippet?.isDraft ?? false,
+  };
+}
+
 export {
   getYouTubeClient,
   getChannelId,
@@ -950,4 +998,5 @@ export {
   listVideoComments,
   listCaptions,
   downloadCaption,
+  uploadCaption,
 };

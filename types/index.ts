@@ -311,6 +311,13 @@ export interface GetCaptionOptions extends OutputOption, VerboseOption, CaptionI
   format?: CaptionFormat;
 }
 
+export interface PutCaptionOptions extends OutputOption, VerboseOption, VideoIdOption {
+  language: string;
+  file: string;
+  name?: string;
+  draft?: boolean;
+}
+
 // Channel analytics command options
 export interface ChannelAnalyticsOptions extends ChannelOption, OutputOption, VerboseOption {
   report?: 'demographics' | 'devices' | 'geography' | 'traffic-sources' | 'subscription-status';

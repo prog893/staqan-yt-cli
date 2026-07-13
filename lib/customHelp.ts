@@ -57,6 +57,7 @@ const COMMAND_GROUPS: Record<string, string[]> = {
     'list-comments',
     'list-captions',
     'get-caption',
+    'put-caption',
   ],
 };
 

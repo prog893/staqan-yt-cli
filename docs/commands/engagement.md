@@ -220,6 +220,39 @@ staqan-yt get-caption --caption-id <caption-id> --format json | \
 
 ---
 
+
+## put-caption
+
+Upload a new caption track to a video on your channel.
+
+### Usage
+
+```bash
+staqan-yt put-caption --video-id <videoId> --language <lang> --file <path>
+```
+
+### Options
+
+- `--video-id <id>` - Video ID (must be on your authenticated channel) (required)
+- `--language <lang>` - Caption language as a BCP-47 code, e.g. `ja`, `en`, `ko` (required)
+- `--file <path>` - Caption file: srt, vtt, sbv, scc, or ttml (required)
+- `--name <name>` - Track name shown in the player (default: empty)
+- `--draft` - Upload as a draft (not visible to viewers until published in YouTube Studio)
+- `--output <format>` - Output format: json, table, text, pretty, csv (default: pretty). Machine formats emit the created track (`id`, `videoId`, `language`, `name`, `isDraft`)
+- `-v, --verbose` - Enable verbose output with debug information
+
+### Examples
+
+```bash
+# Upload Japanese subtitles
+staqan-yt put-caption --video-id dQw4w9WgXcQ --language ja --file ./subs/ja.srt
+
+# Upload as a draft for review in Studio, get the caption ID for scripting
+staqan-yt put-caption --video-id dQw4w9WgXcQ --language en --file en.vtt --draft --output json
+```
+
+> **PUT semantics:** like `put-video-localization`, this creates a new track and the API rejects the upload if a track with the same language and name already exists. Use `list-captions` to check what exists first.
+
 ## Common Patterns
 
 ### Analyze Comment Sentiment
