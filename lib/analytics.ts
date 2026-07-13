@@ -9,7 +9,7 @@
  * --dimensions support when #120 shipped it in the CLI).
  */
 
-import { google } from 'googleapis';
+import { google, youtube_v3 } from 'googleapis';
 import { getAuthenticatedClient } from './auth';
 import { chunkDateRange, debug, toLocalYmd, validateDateRange, withRateLimitRetry } from './utils';
 
@@ -217,9 +217,7 @@ interface VideoSnippetInfo {
 }
 
 /** Shared lookup: title/publishedAt/duration for display and date defaulting. */
-async function lookupVideoSnippet(videoId: string): Promise<VideoSnippetInfo> {
-  const auth = await getAuthenticatedClient();
-  const youtube = google.youtube({ version: 'v3', auth });
+async function lookupVideoSnippet(youtube: youtube_v3.Youtube, videoId: string): Promise<VideoSnippetInfo> {
   const response = await youtube.videos.list({
     part: ['snippet', 'contentDetails'],
     id: [videoId],
@@ -253,9 +251,11 @@ export async function fetchTrafficSources(params: {
   endDate: string;
 }): Promise<VideoReportResult> {
   assertVideoId(params.videoId);
-  const { title } = await lookupVideoSnippet(params.videoId);
+  validateDateRange(params.startDate, params.endDate);
   const auth = await getAuthenticatedClient();
+  const youtube = google.youtube({ version: 'v3', auth });
   const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
+  const { title } = await lookupVideoSnippet(youtube, params.videoId);
 
   const response = await withRateLimitRetry(() => youtubeAnalytics.reports.query({
     ids: 'channel==MINE',
@@ -288,9 +288,11 @@ export async function fetchSearchTerms(params: {
   limit: number;
 }): Promise<VideoReportResult> {
   assertVideoId(params.videoId);
-  const { title } = await lookupVideoSnippet(params.videoId);
+  validateDateRange(params.startDate, params.endDate);
   const auth = await getAuthenticatedClient();
+  const youtube = google.youtube({ version: 'v3', auth });
   const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
+  const { title } = await lookupVideoSnippet(youtube, params.videoId);
 
   const response = await withRateLimitRetry(() => youtubeAnalytics.reports.query({
     ids: 'channel==MINE',
@@ -326,9 +328,10 @@ export interface VideoRetentionResult extends VideoReportResult {
  */
 export async function fetchVideoRetention(params: { videoId: string }): Promise<VideoRetentionResult> {
   assertVideoId(params.videoId);
-  const { title, publishedAt, duration } = await lookupVideoSnippet(params.videoId);
   const auth = await getAuthenticatedClient();
+  const youtube = google.youtube({ version: 'v3', auth });
   const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
+  const { title, publishedAt, duration } = await lookupVideoSnippet(youtube, params.videoId);
 
   const startDate = publishedAt.split('T')[0];
   const endDate = toLocalYmd(new Date());
