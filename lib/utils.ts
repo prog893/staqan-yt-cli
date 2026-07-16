@@ -333,6 +333,13 @@ function toLocalYmd(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Local-timezone YYYY-MM-DD for `n` days before today (CLI date-range defaults). */
+function daysAgoYmd(n: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - n);
+  return toLocalYmd(date);
+}
+
 function validateDateOption(flag: string, value: string): void {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     throw new Error(`${flag} must be in YYYY-MM-DD format (got: ${value})`);
@@ -722,6 +729,7 @@ export {
   withRateLimitRetry,
   parsePositiveInt,
   toLocalYmd,
+  daysAgoYmd,
   validateDateOption,
   validateDateRange,
   validatePrivacyFilter,

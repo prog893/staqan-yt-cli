@@ -1,7 +1,6 @@
 import chalk from 'chalk';
-import { getAuthenticatedClient } from '../lib/auth';
-import { google } from 'googleapis';
-import { parseVideoId, debug, convertToCSV, chunkDateRange, withRateLimitRetry, parseDuration, formatTimestamp, initCommand, withSpinner, toLocalYmd } from '../lib/utils';
+import { parseVideoId, debug, convertToCSV, parseDuration, formatTimestamp, initCommand, withSpinner } from '../lib/utils';
+import { fetchVideoRetention } from '../lib/analytics';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { RetentionOptions } from '../types';
@@ -19,69 +18,13 @@ async function getRetentionCommand(options: RetentionOptions): Promise<void> {
     const parsedId = parseVideoId(videoId);
     debug('Parsed video ID', parsedId);
 
-    const auth = await getAuthenticatedClient();
-    const youtube = google.youtube({ version: 'v3', auth });
-    const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
-
-    // Get video info for title, publish date, and duration
-    const videoResponse = await youtube.videos.list({
-      part: ['snippet', 'contentDetails'],
-      id: [parsedId],
-    });
-
-    if (!videoResponse.data.items || videoResponse.data.items.length === 0) {
-      throw new Error(`No video found with ID: ${parsedId}`);
-    }
-
-    const video = videoResponse.data.items[0];
-    const title = video.snippet?.title || 'Untitled';
-    const publishedAt = video.snippet?.publishedAt;
-    const duration = video.contentDetails?.duration || '';
-
-    if (!publishedAt) {
-      throw new Error('Video publish date is missing');
-    }
-
-    // Calculate date range (default: full historical data)
-    const endDate = toLocalYmd(new Date());
-    const startDate = publishedAt.split('T')[0];
-
-    debug(`Date range: ${startDate} to ${endDate}`);
-
-    // Chunk date range into 90-day periods
-    const dateChunks = chunkDateRange(startDate, endDate);
-    debug(`Split into ${dateChunks.length} chunk(s) of 90 days`);
-
-    // Fetch retention data for each chunk
-    const allRows: unknown[][] = [];
-    let columnHeaders: { name?: string | null }[] = [];
-
-    for (let i = 0; i < dateChunks.length; i++) {
-      const chunk = dateChunks[i];
-      spinner.text = `Fetching chunk ${i + 1}/${dateChunks.length} (${chunk.start} to ${chunk.end})...`;
-
-      const retentionResponse = await withRateLimitRetry(async () => {
-        return await youtubeAnalytics.reports.query({
-          ids: 'channel==MINE',
-          startDate: chunk.start,
-          endDate: chunk.end,
-          metrics: 'audienceWatchRatio,relativeRetentionPerformance',
-          dimensions: 'elapsedVideoTimeRatio',
-          filters: `video==${parsedId}`,
-          sort: 'elapsedVideoTimeRatio',
-        });
-      }, { label: 'reports.query(retention)' });
-
-      // Save headers from first response
-      if (i === 0 && retentionResponse.data.columnHeaders) {
-        columnHeaders = retentionResponse.data.columnHeaders;
-      }
-
-      // Aggregate rows
-      if (retentionResponse.data.rows && retentionResponse.data.rows.length > 0) {
-        allRows.push(...retentionResponse.data.rows);
-      }
-    }
+    // Single lifetime query — ratio-dimension reports return one complete
+    // 100-point curve per query; the previous 90-day chunking could
+    // interleave duplicate ratio points whenever more than one chunk had
+    // data (see lib/analytics.ts, #102).
+    const result = await fetchVideoRetention({ videoId: parsedId });
+    const { title, duration, dateRange, columnHeaders, rows: allRows } = result;
+    const { startDate, endDate } = dateRange;
 
     spinner.succeed(`Retrieved ${allRows.length} retention data point(s)`);
 
