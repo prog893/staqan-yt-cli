@@ -965,12 +965,17 @@ async function assertCaptionProcessed(
   }
   const reason = snippet?.failureReason || 'unknown reason';
   if (cleanup) {
+    let removed = true;
     await youtube.captions.delete({ id: captionId }).catch(err => {
+      removed = false;
       debug(`Cleanup of failed caption track ${captionId} failed:`, (err as Error).message);
     });
     throw new Error(
       `Caption upload was accepted but processing failed (${reason}). ` +
-      'The file content is not a supported subtitle format. The failed track was removed.'
+      'The file content is not a supported subtitle format. ' +
+      (removed
+        ? 'The failed track was removed.'
+        : `The failed track ${captionId} could not be removed automatically — delete it in YouTube Studio.`)
     );
   }
   throw new Error(
