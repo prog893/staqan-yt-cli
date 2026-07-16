@@ -964,6 +964,12 @@ async function assertCaptionProcessed(
     return status;
   }
   const reason = snippet?.failureReason || 'unknown reason';
+  // The API documents two failure reasons: unknownFormat (bad file content)
+  // and processingFailed (YouTube-side error) — only blame the file for the former.
+  const explanation =
+    snippet?.failureReason === 'unknownFormat'
+      ? 'The file content is not a supported subtitle format.'
+      : 'YouTube could not process the file — the content may still be valid; retrying may succeed.';
   if (cleanup) {
     let removed = true;
     await youtube.captions.delete({ id: captionId }).catch(err => {
@@ -971,16 +977,15 @@ async function assertCaptionProcessed(
       debug(`Cleanup of failed caption track ${captionId} failed:`, (err as Error).message);
     });
     throw new Error(
-      `Caption upload was accepted but processing failed (${reason}). ` +
-      'The file content is not a supported subtitle format. ' +
+      `Caption upload was accepted but processing failed (${reason}). ${explanation} ` +
       (removed
         ? 'The failed track was removed.'
         : `The failed track ${captionId} could not be removed automatically — delete it in YouTube Studio.`)
     );
   }
   throw new Error(
-    `Caption content replacement failed processing (${reason}). ` +
-    `The existing track ${captionId} is now in a failed state — re-run with a valid subtitle file to fix it.`
+    `Caption content replacement failed processing (${reason}). ${explanation} ` +
+    `The existing track ${captionId} is now in a failed state — re-run the upload to fix it.`
   );
 }
 
