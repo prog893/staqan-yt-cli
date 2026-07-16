@@ -24,6 +24,7 @@ import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
 import { parseVideoId, initCommand, toLocalYmd, validateDateOption } from '../lib/utils';
 import { fetchVideoAnalytics, fetchTrafficSources, fetchSearchTerms, fetchVideoRetention, fetchChannelAnalytics, fetchChannelSearchTerms, ALL_TIME_START_DATE } from '../lib/analytics';
+import { fetchReportTypes, fetchReportJobs, fetchReportData } from '../lib/reports';
 import { requireChannel } from '../lib/config';
 import { getVersion } from '../lib/version';
 
@@ -440,13 +441,7 @@ const TOOLS: Tool[] = [
     description: 'List all available YouTube Reporting API report types (e.g., thumbnail CTR, demographics, traffic sources)',
     inputSchema: {
       type: 'object',
-      properties: {
-        output: {
-          type: 'string',
-          description: 'Output format: json, table, or text',
-          enum: ['json', 'table', 'text'],
-        },
-      },
+      properties: {},
       required: [],
     },
   },
@@ -459,11 +454,6 @@ const TOOLS: Tool[] = [
         type: {
           type: 'string',
           description: 'Filter by report type ID (e.g., channel_reach_basic_a1)',
-        },
-        output: {
-          type: 'string',
-          description: 'Output format: json, table, or text',
-          enum: ['json', 'table', 'text'],
         },
       },
       required: [],
@@ -490,11 +480,6 @@ const TOOLS: Tool[] = [
         endDate: {
           type: 'string',
           description: 'End date in YYYY-MM-DD format',
-        },
-        output: {
-          type: 'string',
-          description: 'Output format: json, csv, text, table, or pretty',
-          enum: ['json', 'csv', 'text', 'table', 'pretty'],
         },
       },
       required: ['type'],
@@ -1048,103 +1033,63 @@ async function handleToolCall(name: string, args: any) {
     }
 
     case 'youtube_list_report_types': {
-      const listReportTypesCommand = require('./list-report-types');
-      const originalConsoleLog = console.log;
-      const originalConsoleError = console.error;
-
-      try {
-        const logs: string[] = [];
-        console.log = (...args: any[]) => logs.push(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '));
-        console.error = (...args: any[]) => logs.push(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '));
-
-        await listReportTypesCommand({ output: args.output || 'table', verbose: false });
-
-        console.log = originalConsoleLog;
-        console.error = originalConsoleError;
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: logs.join('\n'),
-            },
-          ],
-        };
-      } catch (err) {
-        console.log = originalConsoleLog;
-        console.error = originalConsoleError;
-        throw err;
-      }
+      // Shared data layer (lib/reports.ts, #102 phase 4) — no more console
+      // monkey-patching to scrape the command's formatted output.
+      const reportTypes = await fetchReportTypes();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ reportTypes }, null, 2),
+          },
+        ],
+      };
     }
 
     case 'youtube_list_report_jobs': {
-      const listReportJobsCommand = require('./list-report-jobs');
-      const originalConsoleLog = console.log;
-      const originalConsoleError = console.error;
-
-      try {
-        const logs: string[] = [];
-        console.log = (...args: any[]) => logs.push(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '));
-        console.error = (...args: any[]) => logs.push(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '));
-
-        await listReportJobsCommand({ type: args.type, output: args.output || 'table', verbose: false });
-
-        console.log = originalConsoleLog;
-        console.error = originalConsoleError;
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: logs.join('\n'),
-            },
-          ],
-        };
-      } catch (err) {
-        console.log = originalConsoleLog;
-        console.error = originalConsoleError;
-        throw err;
-      }
+      // Shared data layer (lib/reports.ts, #102 phase 4).
+      const result = await fetchReportJobs({ type: args.type });
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
     }
 
     case 'youtube_get_report_data': {
-      const getReportDataCommand = require('./get-report-data');
-      const originalConsoleLog = console.log;
-      const originalConsoleError = console.error;
+      // Shared data layer (lib/reports.ts, #102 phase 4) — same cache-merging
+      // pipeline as the get-report-data CLI command. The result carries the
+      // status ('job-created' | 'no-reports-yet' | 'ok'), rows, and range
+      // metadata instead of scraped CLI output.
+      if (args.startDate) validateDateOption('startDate', args.startDate);
+      if (args.endDate) validateDateOption('endDate', args.endDate);
 
-      try {
-        const logs: string[] = [];
-        console.log = (...args: any[]) => logs.push(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '));
-        console.error = (...args: any[]) => logs.push(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '));
+      const result = await fetchReportData({
+        type: args.type,
+        videoId: args.videoId,
+        startDate: args.startDate,
+        endDate: args.endDate,
+      });
 
-        await getReportDataCommand({
-          type: args.type,
-          videoId: args.videoId,
-          startDate: args.startDate,
-          endDate: args.endDate,
-          output: args.output || 'json',
-          verbose: false,
-        });
-
-        console.log = originalConsoleLog;
-        console.error = originalConsoleError;
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: logs.join('\n'),
-            },
-          ],
-        };
-      } catch (err) {
-        console.log = originalConsoleLog;
-        console.error = originalConsoleError;
-        throw err;
-      }
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
     }
 
     case 'youtube_fetch_reports': {
+      // Deliberately still invokes the command with captured console output:
+      // fetch-reports is interactive-heavy (per-report progress, verify mode)
+      // and #132/#139 made command reuse survivable in-process. Decided in
+      // the 2026-07-13 phase plan on #102 — extract only if it grows an
+      // MCP-specific consumer that needs structured data.
       const fetchReportsCommand = require('./fetch-reports');
       const originalConsoleLog = console.log;
       const originalConsoleError = console.error;

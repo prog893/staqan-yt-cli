@@ -1,9 +1,8 @@
-import { google } from 'googleapis';
 import chalk from 'chalk';
-import { getAuthenticatedClient } from '../lib/auth';
-import { info, debug, initCommand, formatTimestampWithTimezone, withSpinner } from '../lib/utils';
+import { info, initCommand, formatTimestampWithTimezone, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv, formatText } from '../lib/formatters';
+import { fetchReportJobs } from '../lib/reports';
 
 interface ListReportJobsOptions {
   type?: string;
@@ -19,122 +18,51 @@ async function listReportJobsCommand(options: ListReportJobsOptions): Promise<vo
   initCommand(options);
 
   await withSpinner('Fetching reporting jobs...', 'Failed to fetch reporting jobs', async (spinner) => {
-    const auth = await getAuthenticatedClient();
-    const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
-
-    const jobsResponse = await youtubeReporting.jobs.list({
-      onBehalfOfContentOwner: undefined,
+    // Shared data layer (lib/reports.ts, #102) — same code path as the MCP tool.
+    const { totalJobs, jobs } = await fetchReportJobs({
+      type: options.type,
+      onProgress: (message) => {
+        spinner.text = message;
+        spinner.render();
+      },
     });
 
-    let jobs = jobsResponse.data.jobs || [];
-
-    if (jobs.length === 0) {
+    if (totalJobs === 0) {
       spinner.info('No reporting jobs found for this channel.');
       info('Jobs are created automatically when you run get-report-data for the first time.');
       return;
     }
 
-    // Filter by report type if specified
-    if (options.type) {
-      jobs = jobs.filter(job => job.reportTypeId === options.type);
-      if (jobs.length === 0) {
-        spinner.warn(`No jobs found for report type: ${options.type}`);
-        info(`Run 'list-report-types' to see available report types.`);
-        return;
-      }
+    if (jobs.length === 0) {
+      spinner.warn(`No jobs found for report type: ${options.type}`);
+      info(`Run 'list-report-types' to see available report types.`);
+      return;
     }
 
-    // Don't succeed yet - we need to fetch report details for each job
-    // Collect job data for all formats
     const now = new Date();
-    const jobsData: Array<{
-      jobId: string;
-      reportTypeId: string;
-      name: string;
-      created: string;
-      daysSinceCreation: number;
-      status: string;
-      reportsCount: number;
-      latestReport: string;
-      oldestReport: string;
-      expiringReportsCount: number;
-      expirationWarnings: string[];
-      expirationCriticals: string[];
-    }> = [];
 
-    // For each job, fetch report details
-    for (let i = 0; i < jobs.length; i++) {
-      const job = jobs[i];
-      spinner.text = `Fetching job ${i + 1}/${jobs.length}`;
-      spinner.render();
+    // Flatten the structured lib result into the display strings the
+    // json/csv/text/table formats have always emitted.
+    const formatWindow = (w: { startTime: string; endTime: string } | null) => w
+      ? `${formatTimestampWithTimezone(w.startTime).local} to ${formatTimestampWithTimezone(w.endTime).local}`
+      : 'N/A';
 
-      const jobCreated = new Date(job.createTime || '');
-      const daysSinceCreation = Math.floor((now.getTime() - jobCreated.getTime()) / (1000 * 60 * 60 * 24));
-
-      let reportsCount = 0;
-      let latestReport = 'N/A';
-      let oldestReport = 'N/A';
-      let expiringReportsCount = 0;
-      const warnings: string[] = [];
-      const criticals: string[] = [];
-
-      // Fetch reports for this job
-      try {
-        const reportsResponse = await youtubeReporting.jobs.reports.list({
-          jobId: job.id!,
-          onBehalfOfContentOwner: undefined,
-        });
-
-        const reports = reportsResponse.data.reports || [];
-        reportsCount = reports.length;
-
-        if (reports.length > 0) {
-          const latestStart = formatTimestampWithTimezone(reports[0].startTime || '').local;
-          const latestEnd = formatTimestampWithTimezone(reports[0].endTime || '').local;
-          const oldestStart = formatTimestampWithTimezone(reports[reports.length - 1].startTime || '').local;
-          const oldestEnd = formatTimestampWithTimezone(reports[reports.length - 1].endTime || '').local;
-
-          latestReport = `${latestStart} to ${latestEnd}`;
-          oldestReport = `${oldestStart} to ${oldestEnd}`;
-
-          // Calculate expiration warnings
-          for (const report of reports) {
-            const reportCreated = new Date(report.createTime || '');
-            const isHistorical = reportCreated.getTime() - jobCreated.getTime() < 4 * 24 * 60 * 60 * 1000;
-            const expirationDays = isHistorical ? 30 : 60;
-            const expiresAt = new Date(reportCreated.getTime() + expirationDays * 24 * 60 * 60 * 1000);
-            const daysUntilExpiration = Math.ceil((expiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
-
-            if (daysUntilExpiration <= 3) {
-              criticals.push(`🚨 CRITICAL: ${report.startTime} to ${report.endTime} (expires ${expiresAt.toISOString().split('T')[0]}, ${daysUntilExpiration} days)`);
-            } else if (daysUntilExpiration <= 7) {
-              warnings.push(`⚠️  Expiring soon: ${report.startTime} to ${report.endTime} (expires ${expiresAt.toISOString().split('T')[0]}, ${daysUntilExpiration} days)`);
-            }
-
-            if (daysUntilExpiration <= 7) {
-              expiringReportsCount++;
-            }
-          }
-        }
-      } catch (err) {
-        debug(`Failed to fetch reports for job ${job.id}: ${err}`);
-      }
-
-      jobsData.push({
-        jobId: job.id || '',
-        reportTypeId: job.reportTypeId || '',
-        name: job.name || '',
-        created: job.createTime || '',
-        daysSinceCreation,
-        status: 'Active',
-        reportsCount,
-        latestReport,
-        oldestReport,
-        expiringReportsCount,
-        expirationWarnings: warnings,
-        expirationCriticals: criticals,
-      });
-    }
+    const jobsData = jobs.map(job => ({
+      jobId: job.jobId,
+      reportTypeId: job.reportTypeId,
+      name: job.name,
+      created: job.created,
+      daysSinceCreation: job.daysSinceCreation,
+      status: job.status,
+      reportsCount: job.reportsCount,
+      latestReport: formatWindow(job.latestReport),
+      oldestReport: formatWindow(job.oldestReport),
+      expiringReportsCount: job.expiringReportsCount,
+      expirationWarnings: job.expirationWarnings.map(w =>
+        `⚠️  Expiring soon: ${w.startTime} to ${w.endTime} (expires ${w.expiresAt}, ${w.daysUntilExpiration} days)`),
+      expirationCriticals: job.expirationCriticals.map(c =>
+        `🚨 CRITICAL: ${c.startTime} to ${c.endTime} (expires ${c.expiresAt}, ${c.daysUntilExpiration} days)`),
+    }));
 
     spinner.succeed(`Found ${jobs.length} job(s)`);
     console.log('');
