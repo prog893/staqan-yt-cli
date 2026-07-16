@@ -22,8 +22,8 @@ import {
 } from '../lib/youtube';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, initCommand, toLocalYmd, validateDateOption, validateDateRange, parseDuration } from '../lib/utils';
-import { fetchVideoAnalytics, fetchTrafficSources, fetchSearchTerms, fetchVideoRetention, ALL_TIME_START_DATE } from '../lib/analytics';
+import { parseVideoId, initCommand, toLocalYmd, validateDateOption } from '../lib/utils';
+import { fetchVideoAnalytics, fetchTrafficSources, fetchSearchTerms, fetchVideoRetention, fetchChannelAnalytics, fetchChannelSearchTerms, ALL_TIME_START_DATE } from '../lib/analytics';
 import { requireChannel } from '../lib/config';
 import { getVersion } from '../lib/version';
 
@@ -540,7 +540,6 @@ const TOOLS: Tool[] = [
 async function handleToolCall(name: string, args: any) {
   const auth = await getAuthenticatedClient();
   const youtube = google.youtube({ version: 'v3', auth });
-  const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
 
   switch (name) {
     case 'youtube_get_video': {
@@ -673,76 +672,22 @@ async function handleToolCall(name: string, args: any) {
       };
     }
     case 'youtube_get_channel_analytics': {
-      const auth = await getAuthenticatedClient();
-      const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
-      const youtube = google.youtube({ version: 'v3', auth });
-
-      // Resolve channel ID
-      const channelId = await requireChannel(args.channelHandle);
-
-      const parsedChannel = channelId.startsWith('@')
-        ? { type: 'handle', value: channelId }
-        : { type: 'id', value: channelId };
-
-      let actualChannelId = parsedChannel.value;
-
-      // Resolve handle to ID if needed
-      if (parsedChannel.type === 'handle') {
-        const channelResponse = await youtube.channels.list({
-          part: ['id'],
-          forHandle: parsedChannel.value.replace('@', ''),
-        });
-
-        if (channelResponse.data.items && channelResponse.data.items.length > 0) {
-          actualChannelId = channelResponse.data.items[0].id!;
-        }
-      }
-
+      // Shared data layer (lib/analytics.ts, #102). Consolidation also fixed
+      // two drifts: unresolved channels now fail loudly (#123) and the
+      // report + dimensions/metrics conflict is rejected (#70).
       if (args.startDate) validateDateOption('startDate', args.startDate);
       if (args.endDate) validateDateOption('endDate', args.endDate);
 
-      // Determine date range (default: last 30 days)
-      const endDate = args.endDate || toLocalYmd(new Date());
-      const startDate = args.startDate ||
-        toLocalYmd(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
-      validateDateRange(startDate, endDate);
-
-      // Determine dimensions and metrics
-      let dimensions: string;
-      let metrics: string;
-
-      if (args.report) {
-        const REPORT_TYPES: Record<string, { dimensions: string; metrics: string }> = {
-          demographics: { dimensions: 'ageGroup,gender', metrics: 'views,estimatedMinutesWatched' },
-          devices: { dimensions: 'deviceType,operatingSystem', metrics: 'views,estimatedMinutesWatched' },
-          geography: { dimensions: 'country', metrics: 'views,estimatedMinutesWatched' },
-          'traffic-sources': { dimensions: 'insightTrafficSourceType', metrics: 'views,estimatedMinutesWatched' },
-          'subscription-status': { dimensions: 'subscribedStatus', metrics: 'views,estimatedMinutesWatched' },
-        };
-        const reportConfig = REPORT_TYPES[args.report];
-        if (!reportConfig) {
-          throw new Error(`Unknown report type: ${args.report}`);
-        }
-        dimensions = reportConfig.dimensions;
-        metrics = reportConfig.metrics;
-      } else if (args.dimensions && args.metrics) {
-        dimensions = args.dimensions;
-        metrics = args.metrics;
-      } else {
-        throw new Error('Must specify either --report type or both --dimensions and --metrics');
-      }
-
-      // Fetch analytics
-      const response = await youtubeAnalytics.reports.query({
-        ids: `channel==${actualChannelId}`,
-        startDate,
-        endDate,
-        dimensions,
-        metrics,
-        sort: '-views',
+      const result = await fetchChannelAnalytics({
+        channel: await requireChannel(args.channelHandle),
+        startDate: args.startDate,
+        endDate: args.endDate,
+        report: args.report,
+        dimensions: args.dimensions,
+        metrics: args.metrics,
       });
 
-      if (!response.data.rows || response.data.rows.length === 0) {
+      if (result.rows.length === 0) {
         return {
           content: [
             {
@@ -753,20 +698,11 @@ async function handleToolCall(name: string, args: any) {
         };
       }
 
-      const columnHeaders = response.data.columnHeaders || [];
-      const rows = response.data.rows || [];
-
       return {
         content: [
           {
             type: 'text',
-            text: JSON.stringify({
-              channelId: actualChannelId,
-              reportType: args.report || 'custom',
-              dateRange: { startDate, endDate },
-              columnHeaders: columnHeaders.map(h => h.name),
-              rows,
-            }, null, 2),
+            text: JSON.stringify(result, null, 2),
           },
         ],
       };
@@ -818,123 +754,24 @@ async function handleToolCall(name: string, args: any) {
     }
 
     case 'youtube_get_channel_search_terms': {
-      // Resolve channel
-      const channelArg = await requireChannel(args.channelHandle);
-
-      // Resolve handle → uploads playlist ID
-      let uploadsPlaylistId = '';
-      if (channelArg.startsWith('@')) {
-        const channelResponse = await youtube.channels.list({
-          part: ['contentDetails'],
-          forHandle: channelArg.replace('@', ''),
-        });
-        uploadsPlaylistId = channelResponse.data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads || '';
-      } else {
-        const channelResponse = await youtube.channels.list({
-          part: ['contentDetails'],
-          id: [channelArg],
-        });
-        uploadsPlaylistId = channelResponse.data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads || '';
-      }
-
-      if (!uploadsPlaylistId) {
-        throw new Error(`Could not find uploads playlist for channel: ${channelArg}`);
-      }
-
-      // Collect up to 500 video IDs from the uploads playlist
-      const videoIds: string[] = [];
-      let nextPageToken: string | undefined;
-      do {
-        const playlistResponse = await youtube.playlistItems.list({
-          part: ['contentDetails'],
-          playlistId: uploadsPlaylistId,
-          maxResults: 50,
-          pageToken: nextPageToken,
-        });
-        for (const item of playlistResponse.data.items || []) {
-          const vid = item.contentDetails?.videoId;
-          if (vid) videoIds.push(vid);
-        }
-        nextPageToken = playlistResponse.data.nextPageToken || undefined;
-      } while (nextPageToken && videoIds.length < 500);
-
-      if (videoIds.length === 0) {
-        throw new Error('No videos found for this channel.');
-      }
-
+      // Shared data layer (lib/analytics.ts, #102) — carries the #88/#90
+      // client-side Shorts duration filter exactly once.
       if (args.startDate) validateDateOption('startDate', args.startDate);
       if (args.endDate) validateDateOption('endDate', args.endDate);
 
-      const endDate = args.endDate || toLocalYmd(new Date());
-      const startDate = args.startDate || '2005-02-14';
-      validateDateRange(startDate, endDate);
-      const limit = Math.min(args.limit || 25, 25);
-
-      // --content-type is filtered CLIENT-SIDE by duration. The YouTube
-      // Analytics API rejects `creatorContentType` as a filter for the
-      // `insightTrafficSourceDetail` + `YT_SEARCH` report with
-      // `Invalid value (...) given in field parameters.filters`, even for the
-      // correct enum values. So we pre-trim the `video==` list to Shorts
-      // (<60s) or long-form (>=60s). See #88.
-      const validContentTypes = ['all', 'video', 'shorts'];
-      const contentType = args.contentType ?? 'all';
-      if (!validContentTypes.includes(contentType)) {
-        throw new Error(`Invalid contentType "${contentType}". Valid values: ${validContentTypes.join(', ')}`);
-      }
-      if (contentType !== 'all') {
-        const wantShorts = contentType === 'shorts';
-        const durationById = new Map<string, number>();
-        for (let i = 0; i < videoIds.length; i += 50) {
-          const chunk = videoIds.slice(i, i + 50);
-          const videosResponse = await youtube.videos.list({
-            part: ['contentDetails'],
-            id: chunk,
-          });
-          for (const item of videosResponse.data.items || []) {
-            if (item.id && item.contentDetails?.duration) {
-              durationById.set(item.id, parseDuration(item.contentDetails.duration));
-            }
-          }
-        }
-        const filtered = videoIds.filter((id) => {
-          const secs = durationById.get(id);
-          if (secs === undefined) return false;
-          return wantShorts ? secs < 60 : secs >= 60;
-        });
-        if (filtered.length === 0) {
-          throw new Error(
-            `No ${wantShorts ? 'Shorts' : 'long-form videos'} found for this channel.`
-          );
-        }
-        videoIds.length = 0;
-        videoIds.push(...filtered);
-      }
-
-      const videoFilter = `video==${videoIds.join(',')}`;
-      const sourceFilter = 'insightTrafficSourceType==YT_SEARCH';
-      const filters = `${videoFilter};${sourceFilter}`;
-
-      const analyticsResponse = await youtubeAnalytics.reports.query({
-        ids: 'channel==MINE',
-        startDate,
-        endDate,
-        metrics: 'views,estimatedMinutesWatched',
-        dimensions: 'insightTrafficSourceDetail',
-        filters,
-        sort: '-views',
-        maxResults: limit,
+      const result = await fetchChannelSearchTerms({
+        channel: await requireChannel(args.channelHandle),
+        startDate: args.startDate,
+        endDate: args.endDate,
+        limit: args.limit,
+        contentType: args.contentType,
       });
 
       return {
         content: [
           {
             type: 'text',
-            text: JSON.stringify({
-              channelHandle: channelArg,
-              videosAnalyzed: videoIds.length,
-              dateRange: { startDate, endDate },
-              ...analyticsResponse.data,
-            }, null, 2),
+            text: JSON.stringify(result, null, 2),
           },
         ],
       };
