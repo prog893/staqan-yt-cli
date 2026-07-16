@@ -6,7 +6,7 @@ import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
 import { normalizeLanguage, getLanguageName } from '../lib/language';
 import { getOutputFormat } from '../lib/config';
 import { formatData } from '../lib/formatters';
-import { PutCaptionOptions } from '../types';
+import { PutCaptionOptions, CAPTION_UPLOAD_EXTENSIONS } from '../types';
 
 async function putCaptionCommand(options: PutCaptionOptions): Promise<void> {
   initCommand(options);
@@ -37,7 +37,19 @@ async function putCaptionCommand(options: PutCaptionOptions): Promise<void> {
   } catch (err) {
     throw new Error(
       `Cannot read caption file: ${filePath}\n${(err as Error).message}\n` +
-      'Supported formats: srt, vtt, sbv, scc, ttml'
+      `Supported formats: ${CAPTION_UPLOAD_EXTENSIONS.join(', ')}`
+    );
+  }
+
+  // Reject unsupported file types client-side. The API accepts ANY upload
+  // and only fails during later processing (status=failed /
+  // failureReason=unknownFormat — live-verified with a .txt), which would
+  // waste quota and leave a zombie track.
+  const ext = path.extname(filePath).toLowerCase();
+  if (!(CAPTION_UPLOAD_EXTENSIONS as readonly string[]).includes(ext)) {
+    throw new Error(
+      `Unsupported caption file type: ${ext || '(no extension)'}\n` +
+      `Supported formats: ${CAPTION_UPLOAD_EXTENSIONS.join(', ')}`
     );
   }
 

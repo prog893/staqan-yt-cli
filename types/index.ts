@@ -290,6 +290,11 @@ export type CaptionTrackKind = 'standard' | 'ASR' | 'forced';
 export const CAPTION_FORMATS = ['srt', 'vtt', 'sbv', 'scc', 'ttml', 'json'] as const;
 export type CaptionFormat = typeof CAPTION_FORMATS[number];
 
+// File extensions accepted for caption uploads (put-caption). The API
+// accepts any bytes and only fails during processing, so uploads are
+// gated client-side to these subtitle formats YouTube documents.
+export const CAPTION_UPLOAD_EXTENSIONS = ['.srt', '.sbv', '.vtt', '.ttml', '.dfxp', '.scc'] as const;
+
 export interface CaptionInfo {
   id: string;
   videoId: string;
