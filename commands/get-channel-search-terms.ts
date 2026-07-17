@@ -1,35 +1,14 @@
 import chalk from 'chalk';
-import { getAuthenticatedClient } from '../lib/auth';
-import { google } from 'googleapis';
-import { parseChannelHandle, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, validateDateOption, validateDateRange, parseDuration, runOrExit } from '../lib/utils';
+import { parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
+import {
+  fetchChannelSearchTerms,
+  validateContentType,
+  ALL_TIME_START_DATE,
+  CHANNEL_SEARCH_TERMS_MAX_VIDEOS,
+} from '../lib/analytics';
 import { ChannelSearchTermsOptions } from '../types';
-
-// Metrics for insightTrafficSourceDetail with insightTrafficSourceType==YT_SEARCH.
-// videoThumbnailImpressions/CTR are only valid for discovery-type sources and
-// cause a 400 when combined with YT_SEARCH. Keep only the two safe ones.
-const ANALYTICS_METRICS = [
-  'views',
-  'estimatedMinutesWatched',
-].join(',');
-
-// This report type enforces a hard limit of 25 results
-const MAX_RESULTS_LIMIT = 25;
-
-// Maximum video IDs per Analytics API call (documented limit)
-const MAX_VIDEO_IDS = 500;
-
-// YouTube founding date — used as the effective "lifetime" start
-const YOUTUBE_START_DATE = '2005-02-14';
-
-// YouTube's documented Shorts threshold. Note: Shorts can be up to 60s of
-// vertical video; videos at exactly 60s are accepted as Shorts, but we use
-// `>= 60s` for the long-form bucket to match YouTube Studio's own bucketing.
-const SHORTS_DURATION_LIMIT_SECONDS = 60;
-
-// videos.list accepts at most 50 IDs per call
-const VIDEOS_LIST_CHUNK_SIZE = 50;
 
 async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions): Promise<void> {
   initCommand(options);
@@ -39,184 +18,35 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
   runOrExit(() => { if (options.endDate) validateDateOption('--end-date', options.endDate); });
   runOrExit(() => { if (options.startDate && options.endDate) validateDateRange(options.startDate, options.endDate); });
 
-  // Validate --content-type against the allowlist. The type is already
-  // narrowed to 'all' | 'video' | 'shorts' in types/index.ts, but commander.js
+  // Validate --content-type against the allowlist before spending any API
+  // quota. The type is already narrowed in types/index.ts, but commander.js
   // passes arbitrary strings through at runtime, so an unknown value would
-  // silently fall through to the 'all' branch below.
-  const validContentTypes = ['all', 'video', 'shorts'];
-  if (options.contentType !== undefined && !validContentTypes.includes(options.contentType)) {
-    throw new Error(`Invalid --content-type "${options.contentType}". Valid values: ${validContentTypes.join(', ')}`);
-  }
+  // otherwise silently fall through to the 'all' branch.
+  runOrExit(() => validateContentType(options.contentType));
 
   await withSpinner('Resolving channel...', 'Failed to fetch channel search terms', async (spinner) => {
     // Resolve channel from arg or config default
-    const channelArg = await requireChannel(options.channel);
-    debug(`Using channel: ${channelArg}`);
+    const channel = await requireChannel(options.channel);
+    debug(`Using channel: ${channel}`);
 
-    const parsedChannel = parseChannelHandle(channelArg);
-    debug('Parsed channel', parsedChannel);
-
-    const auth = await getAuthenticatedClient();
-    const youtube = google.youtube({ version: 'v3', auth });
-    const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
-
-    // Resolve handle → channel ID, uploads playlist ID, and title
-    let channelId = parsedChannel.value;
-    let channelTitle = '';
-    let uploadsPlaylistId = '';
-
-    const channelParts = ['id', 'snippet', 'contentDetails'];
-
-    if (parsedChannel.type === 'handle') {
-      debug('Looking up channel by handle:', parsedChannel.value);
-      const channelResponse = await youtube.channels.list({
-        part: channelParts,
-        forHandle: parsedChannel.value.replace('@', ''),
-      });
-
-      if (!channelResponse.data.items || channelResponse.data.items.length === 0) {
-        throw new Error(`Channel not found: ${channelArg}`);
-      }
-
-      channelId = channelResponse.data.items[0].id!;
-      channelTitle = channelResponse.data.items[0].snippet?.title || '';
-      uploadsPlaylistId = channelResponse.data.items[0].contentDetails?.relatedPlaylists?.uploads || '';
-    } else {
-      const channelResponse = await youtube.channels.list({
-        part: channelParts,
-        id: [parsedChannel.value],
-      });
-      if (!channelResponse.data.items || channelResponse.data.items.length === 0) {
-        // Previously this silently proceeded with the unresolved input as the
-        // channel ID, producing an opaque Analytics failure downstream (#123).
-        throw new Error(`Channel not found: ${channelArg}`);
-      }
-      channelTitle = channelResponse.data.items[0].snippet?.title || '';
-      uploadsPlaylistId = channelResponse.data.items[0].contentDetails?.relatedPlaylists?.uploads || '';
-    }
-
-    debug('Resolved channel ID:', channelId);
-    debug('Channel title:', channelTitle);
-    debug('Uploads playlist ID:', uploadsPlaylistId);
-
-    if (!uploadsPlaylistId) {
-      throw new Error('Unable to find the uploads playlist for this channel.');
-    }
-
-    // Fetch video IDs from the uploads playlist.
-    // The Analytics API requires video==id1,id2,... in the filter —
-    // there is no channel-wide aggregate endpoint in the public API.
-    // We collect up to MAX_VIDEO_IDS (500) IDs, which is the per-call limit.
-    spinner.text = `Fetching video list from ${channelTitle || channelId}...`;
-
-    const videoIds: string[] = [];
-    let nextPageToken: string | undefined;
-
-    do {
-      const playlistResponse = await youtube.playlistItems.list({
-        part: ['contentDetails'],
-        playlistId: uploadsPlaylistId,
-        maxResults: 50,
-        pageToken: nextPageToken,
-      });
-
-      for (const item of playlistResponse.data.items || []) {
-        const vid = item.contentDetails?.videoId;
-        if (vid) videoIds.push(vid);
-      }
-
-      nextPageToken = playlistResponse.data.nextPageToken || undefined;
-    } while (nextPageToken && videoIds.length < MAX_VIDEO_IDS);
-
-    debug(`Collected ${videoIds.length} video IDs`);
-
-    if (videoIds.length === 0) {
-      throw new Error('No videos found for this channel.');
-    }
-
-    // --content-type filtering is done CLIENT-SIDE by duration, because the
-    // YouTube Analytics API does not accept `creatorContentType` as a filter
-    // for the `insightTrafficSourceDetail` + `YT_SEARCH` report. We verified
-    // live that it returns `Invalid value (...) given in field parameters.filters`
-    // even with the correct enum values (VIDEO_ON_DEMAND / SHORTS). The only
-    // way to scope search traffic by content type for this report is to
-    // pre-filter the `video==` list to just Shorts (duration < 60s) or just
-    // long-form videos (duration >= 60s). See #88.
-    const contentType = options.contentType ?? 'all';
-    if (contentType !== 'all') {
-      const wantShorts = contentType === 'shorts';
-      spinner.text = `Fetching video durations (${wantShorts ? 'Shorts' : 'long-form'} filter)...`;
-
-      const durationById = new Map<string, number>();
-      for (let i = 0; i < videoIds.length; i += VIDEOS_LIST_CHUNK_SIZE) {
-        const chunk = videoIds.slice(i, i + VIDEOS_LIST_CHUNK_SIZE);
-        const videosResponse = await youtube.videos.list({
-          part: ['contentDetails'],
-          id: chunk,
-        });
-        for (const item of videosResponse.data.items || []) {
-          if (item.id && item.contentDetails?.duration) {
-            durationById.set(item.id, parseDuration(item.contentDetails.duration));
-          }
-        }
-      }
-
-      const filtered = videoIds.filter((id) => {
-        const secs = durationById.get(id);
-        if (secs === undefined) return false; // unknown duration → exclude
-        return wantShorts ? secs < SHORTS_DURATION_LIMIT_SECONDS : secs >= SHORTS_DURATION_LIMIT_SECONDS;
-      });
-
-      debug(`Content-type filter (${contentType}): ${videoIds.length} → ${filtered.length} videos`);
-
-      if (filtered.length === 0) {
-        throw new Error(
-          `No ${wantShorts ? 'Shorts' : 'long-form videos'} found for this channel. ` +
-          `Try a different --content-type value or omit the flag for all videos.`
-        );
-      }
-
-      // Mutate in place: subsequent filter assembly uses the trimmed list.
-      videoIds.length = 0;
-      videoIds.push(...filtered);
-    }
-
-    const videoFilter = `video==${videoIds.join(',')}`;
-    const sourceFilter = 'insightTrafficSourceType==YT_SEARCH';
-    const filters = `${videoFilter};${sourceFilter}`;
-
-    const endDate = options.endDate || toLocalYmd(new Date());
-    const startDate = options.startDate || YOUTUBE_START_DATE;
-    const isLifetime = startDate === YOUTUBE_START_DATE;
-    // validateDateRange throws on bad ranges; withSpinner's catch handles it
-    // (fail + error + exit) — no manual try/catch needed here.
-    validateDateRange(startDate, endDate);
-    // API enforces maxResults ≤ 25 for this report type
-    const limit = Math.min(rawLimit, MAX_RESULTS_LIMIT);
-
-    debug('Video count in filter:', videoIds.length);
-    debug('Filters (truncated):', filters.substring(0, 120) + '...');
-    debug(`Date range: ${startDate} to ${endDate}`);
-
-    spinner.text = `Fetching channel search terms (${isLifetime ? 'lifetime' : `${startDate} → ${endDate}`})...`;
-
-    const analyticsResponse = await youtubeAnalytics.reports.query({
-      ids: 'channel==MINE',
-      startDate,
-      endDate,
-      metrics: ANALYTICS_METRICS,
-      dimensions: 'insightTrafficSourceDetail',
-      filters,
-      sort: '-views',
-      maxResults: limit,
+    // Shared data layer (lib/analytics.ts, #102) — same code path as the
+    // MCP tool; the #88/#90 client-side Shorts duration filter lives there.
+    const result = await fetchChannelSearchTerms({
+      channel,
+      startDate: options.startDate,
+      endDate: options.endDate,
+      limit: rawLimit,
+      contentType: options.contentType,
+      onProgress: (message) => { spinner.text = message; },
     });
 
     spinner.succeed('Search terms data retrieved');
     console.log('');
 
     const outputFormat = await getOutputFormat(options.output);
-    const columnHeaders = analyticsResponse.data.columnHeaders || [];
-    const rows = analyticsResponse.data.rows || [];
+    const { channelId, channelTitle, videosAnalyzed, columnHeaders, rows } = result;
+    const { startDate, endDate } = result.dateRange;
+    const isLifetime = startDate === ALL_TIME_START_DATE;
 
     debug(`Retrieved ${rows.length} row(s)`);
 
@@ -243,9 +73,9 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
       options.contentType === 'shorts' ? 'Shorts only' :
       'All content';
 
-    const videoCountNote = videoIds.length >= MAX_VIDEO_IDS
-      ? ` (first ${MAX_VIDEO_IDS} videos)`
-      : ` (${videoIds.length} videos)`;
+    const videoCountNote = videosAnalyzed >= CHANNEL_SEARCH_TERMS_MAX_VIDEOS
+      ? ` (first ${CHANNEL_SEARCH_TERMS_MAX_VIDEOS} videos)`
+      : ` (${videosAnalyzed} videos)`;
 
     switch (outputFormat) {
       case 'json':
@@ -254,7 +84,7 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
           channelTitle,
           contentType: contentTypeLabel,
           period: isLifetime ? 'lifetime' : 'custom',
-          videosAnalyzed: videoIds.length,
+          videosAnalyzed,
           dateRange: { startDate, endDate },
           columnHeaders: columnHeaders.map(h => h.name),
           rows,
@@ -291,7 +121,7 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
         console.log(chalk.gray('Period:         ') + chalk.white(isLifetime ? 'Lifetime' : `${startDate} → ${endDate}`));
         console.log(chalk.gray('Content type:   ') + chalk.white(contentTypeLabel));
         console.log(chalk.gray('Traffic source: ') + chalk.white('YouTube Search'));
-        console.log(chalk.gray('Videos covered: ') + chalk.white(`${videoIds.length}${videoIds.length >= MAX_VIDEO_IDS ? ' (capped at 500)' : ''}`));
+        console.log(chalk.gray('Videos covered: ') + chalk.white(`${videosAnalyzed}${videosAnalyzed >= CHANNEL_SEARCH_TERMS_MAX_VIDEOS ? ' (capped at 500)' : ''}`));
         console.log('');
 
         if (rows.length === 0) {
