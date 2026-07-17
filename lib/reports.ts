@@ -1,13 +1,19 @@
 /**
- * Shared report-download primitives used by both `fetch-reports` and
- * `get-report-data`. Centralizing these here eliminates the duplicated
- * HTTPS-download + CSV-parse code that previously lived in both commands
- * (issue #101).
+ * YouTube Reporting API data layer.
+ *
+ * Download primitives shared by `fetch-reports` and `get-report-data`
+ * (issue #101), plus the report-types/jobs/report-data query functions
+ * consumed by both the CLI commands and the MCP tools (issue #102 phase 4 —
+ * before this, commands/mcp.ts invoked the commands and monkey-patched
+ * console.log/error to capture their formatted output).
  *
  * Public surface:
  *   - safeTmpReportPath(reportId)            — sanitize a report ID for /tmp
  *   - downloadOnce(url, token, dest)         — single HTTPS GET, no retry
  *   - downloadReport(report, auth, opts?)    — retry-wrapped download + CSV parse
+ *   - fetchReportTypes()                     — list available report types
+ *   - fetchReportJobs(params)                — list jobs + per-job report status
+ *   - fetchReportData(params)                — cached+fresh report rows for a type
  */
 
 import { promises as fs } from 'fs';
@@ -16,8 +22,22 @@ import { unlink } from 'fs/promises';
 import { pipeline } from 'stream/promises';
 import https from 'https';
 import path from 'path';
-import { debug, progress } from './utils';
-import { parseCsvAndExtractRange } from './cache';
+import { google, youtubereporting_v1 } from 'googleapis';
+import { getAuthenticatedClient } from './auth';
+import { debug, progress, validateDateRange, withRateLimitRetry } from './utils';
+import {
+  analyzeCacheCoverage,
+  ensureCacheDir,
+  findCachedReports,
+  loadReportMetadata,
+  parseCsvAndExtractRange,
+  readCachedReport,
+  saveReportToCache,
+} from './cache';
+import { getConfigValue } from './config';
+import { getChannelId } from './youtube';
+import { acquireLock, getLockPath } from './lock';
+import { CacheIndexEntry } from '../types';
 
 /**
  * A minimal slice of `youtube.reports.jobs.list` report shape — both call
@@ -265,5 +285,625 @@ export async function downloadReport(
     data: parsed.data,
     minDate: parsed.minDate,
     maxDate: parsed.maxDate,
+  };
+}
+
+// ─── Reporting API queries (report types, jobs, report data) — #102 phase 4 ──
+
+export interface ReportTypeInfo {
+  id: string;
+  name: string;
+}
+
+/** List available YouTube Reporting API report types. */
+export async function fetchReportTypes(): Promise<ReportTypeInfo[]> {
+  const auth = await getAuthenticatedClient();
+  const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
+
+  // All list endpoints here are paginated — reading only the first page can
+  // silently miss entries (CodeRabbit on #152).
+  const reportTypes: ReportTypeInfo[] = [];
+  let pageToken: string | undefined;
+  do {
+    const response = await withRateLimitRetry(
+      () => youtubeReporting.reportTypes.list({ onBehalfOfContentOwner: undefined, pageToken }),
+      { label: 'reportTypes.list' }
+    );
+    for (const rt of response.data.reportTypes || []) {
+      reportTypes.push({ id: rt.id || '', name: rt.name || '' });
+    }
+    pageToken = response.data.nextPageToken || undefined;
+  } while (pageToken);
+
+  return reportTypes;
+}
+
+/**
+ * All pages of `jobs.list`. First-page-only reads could miss a job and make
+ * fetchReportData create a duplicate for a type that already has one.
+ */
+async function listAllJobs(youtubeReporting: youtubereporting_v1.Youtubereporting): Promise<youtubereporting_v1.Schema$Job[]> {
+  const jobs: youtubereporting_v1.Schema$Job[] = [];
+  let pageToken: string | undefined;
+  do {
+    const response = await withRateLimitRetry(
+      () => youtubeReporting.jobs.list({ onBehalfOfContentOwner: undefined, pageToken }),
+      { label: 'jobs.list' }
+    );
+    jobs.push(...(response.data.jobs || []));
+    pageToken = response.data.nextPageToken || undefined;
+  } while (pageToken);
+  return jobs;
+}
+
+export interface ReportJobInfo {
+  jobId: string;
+  reportTypeId: string;
+  name: string;
+  created: string;
+  daysSinceCreation: number;
+  /** 'Active', or 'Unknown (report listing failed)' when reports couldn't be listed. */
+  status: string;
+  /** Set when jobs.reports.list failed for this job — reportsCount 0 is then unreliable. */
+  reportsListError?: string;
+  reportsCount: number;
+  /** ISO start/end of the newest report, or null when the job has none yet. */
+  latestReport: { startTime: string; endTime: string } | null;
+  /** ISO start/end of the oldest report, or null when the job has none yet. */
+  oldestReport: { startTime: string; endTime: string } | null;
+  expiringReportsCount: number;
+  expirationWarnings: { startTime: string; endTime: string; expiresAt: string; daysUntilExpiration: number }[];
+  expirationCriticals: { startTime: string; endTime: string; expiresAt: string; daysUntilExpiration: number }[];
+}
+
+export interface ReportJobsResult {
+  /** Job count before the type filter — lets callers tell "no jobs at all" from "filter matched none". */
+  totalJobs: number;
+  jobs: ReportJobInfo[];
+}
+
+/**
+ * List Reporting API jobs with per-job report counts and expiration analysis.
+ * Reports created within ~4 days of the job are historical backfills and
+ * expire after 30 days; regular reports expire after 60.
+ */
+export async function fetchReportJobs(params: {
+  /** Filter by report type ID. */
+  type?: string;
+  onProgress?: (message: string) => void;
+} = {}): Promise<ReportJobsResult> {
+  const auth = await getAuthenticatedClient();
+  const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
+
+  const allJobs = await listAllJobs(youtubeReporting);
+  const jobs = params.type ? allJobs.filter(job => job.reportTypeId === params.type) : allJobs;
+
+  const now = new Date();
+  const jobsData: ReportJobInfo[] = [];
+
+  for (let i = 0; i < jobs.length; i++) {
+    const job = jobs[i];
+    params.onProgress?.(`Fetching job ${i + 1}/${jobs.length}`);
+
+    const jobCreated = new Date(job.createTime || '');
+    const daysSinceCreation = Math.floor((now.getTime() - jobCreated.getTime()) / (1000 * 60 * 60 * 24));
+
+    let reportsCount = 0;
+    let latestReport: ReportJobInfo['latestReport'] = null;
+    let oldestReport: ReportJobInfo['oldestReport'] = null;
+    let expiringReportsCount = 0;
+    let reportsListError: string | undefined;
+    const warnings: ReportJobInfo['expirationWarnings'] = [];
+    const criticals: ReportJobInfo['expirationCriticals'] = [];
+
+    try {
+      const reports: youtubereporting_v1.Schema$Report[] = [];
+      let reportsPageToken: string | undefined;
+      do {
+        const reportsResponse = await withRateLimitRetry(
+          () => youtubeReporting.jobs.reports.list({
+            jobId: job.id!,
+            onBehalfOfContentOwner: undefined,
+            pageToken: reportsPageToken,
+          }),
+          { label: `jobs.reports.list(${job.reportTypeId})` }
+        );
+        reports.push(...(reportsResponse.data.reports || []));
+        reportsPageToken = reportsResponse.data.nextPageToken || undefined;
+      } while (reportsPageToken);
+      reportsCount = reports.length;
+
+      if (reports.length > 0) {
+        latestReport = {
+          startTime: reports[0].startTime || '',
+          endTime: reports[0].endTime || '',
+        };
+        oldestReport = {
+          startTime: reports[reports.length - 1].startTime || '',
+          endTime: reports[reports.length - 1].endTime || '',
+        };
+
+        for (const report of reports) {
+          const reportCreated = new Date(report.createTime || '');
+          const isHistorical = reportCreated.getTime() - jobCreated.getTime() < 4 * 24 * 60 * 60 * 1000;
+          const expirationDays = isHistorical ? 30 : 60;
+          const expiresAt = new Date(reportCreated.getTime() + expirationDays * 24 * 60 * 60 * 1000);
+          const daysUntilExpiration = Math.ceil((expiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+
+          const entry = {
+            startTime: report.startTime || '',
+            endTime: report.endTime || '',
+            expiresAt: expiresAt.toISOString().split('T')[0],
+            daysUntilExpiration,
+          };
+          if (daysUntilExpiration <= 3) {
+            criticals.push(entry);
+          } else if (daysUntilExpiration <= 7) {
+            warnings.push(entry);
+          }
+
+          if (daysUntilExpiration <= 7) {
+            expiringReportsCount++;
+          }
+        }
+      }
+    } catch (err) {
+      // Keep listing the remaining jobs, but don't present this one as a
+      // healthy zero-report job — record the failure (CodeRabbit on #152).
+      reportsListError = (err as Error).message;
+      debug(`Failed to fetch reports for job ${job.id}: ${err}`);
+    }
+
+    jobsData.push({
+      jobId: job.id || '',
+      reportTypeId: job.reportTypeId || '',
+      name: job.name || '',
+      created: job.createTime || '',
+      daysSinceCreation,
+      status: reportsListError ? 'Unknown (report listing failed)' : 'Active',
+      reportsListError,
+      reportsCount,
+      latestReport,
+      oldestReport,
+      expiringReportsCount,
+      expirationWarnings: warnings,
+      expirationCriticals: criticals,
+    });
+  }
+
+  return { totalJobs: allJobs.length, jobs: jobsData };
+}
+
+export interface ReportDataParams {
+  /** Report type ID (e.g. channel_reach_basic_a1). */
+  type: string;
+  /** Channel handle/ID; falls back to `default.channel` config. */
+  channel?: string;
+  /** Filter rows by video ID; throws (listing available IDs) when nothing matches. */
+  videoId?: string;
+  /** YYYY-MM-DD; defaults to the oldest available data. */
+  startDate?: string;
+  /** YYYY-MM-DD; defaults to the newest available data. */
+  endDate?: string;
+  /** Progress hook — commands wire this to the spinner; MCP omits it. */
+  onProgress?: (message: string) => void;
+}
+
+/** A report fetched fresh from the API in this run (for expiration display). */
+export interface FetchedReportInfo {
+  id: string;
+  startTime: string;
+  endTime: string;
+  createTime: string;
+}
+
+export type ReportDataResult =
+  /** No job existed — one was created; data arrives after the 48h window. */
+  | {
+      status: 'job-created';
+      jobId: string;
+      jobCreateTime: string;
+      readyAt: string;
+    }
+  /** Job exists but has produced no reports yet (within the 48h window). */
+  | {
+      status: 'no-reports-yet';
+      jobId: string;
+      jobCreateTime: string;
+      readyAt: string;
+    }
+  | {
+      status: 'ok';
+      jobId: string;
+      jobCreateTime: string;
+      rows: Record<string, string>[];
+      requestedRange: { startDate: string; endDate: string };
+      /** Requested range clamped to what the API + local cache can cover. */
+      adjustedRange: { startDate: string; endDate: string };
+      availableRange: { startDate: string; endDate: string };
+      cachedReports: CacheIndexEntry[];
+      fetchedReports: FetchedReportInfo[];
+    };
+
+/**
+ * Fetch Reporting API rows for a report type, merging the local cache with
+ * fresh downloads (issue #101 pipeline). Finds or creates the reporting job,
+ * clamps the requested date range to available data (API + cache), loads
+ * covered ranges from cache, downloads only the missing reports, caches them
+ * (skipping the write when the lock is busy), and deduplicates rows by
+ * (date, video_id).
+ */
+export async function fetchReportData(params: ReportDataParams): Promise<ReportDataResult> {
+  // Resolve channel handle → canonical channel ID for cache namespacing
+  const channelHandle = params.channel || await getConfigValue('default.channel');
+  if (!channelHandle) {
+    throw new Error('No channel specified. Set a default channel:\n  staqan-yt config set default.channel @yourchannel\nor pass --channel @yourchannel');
+  }
+
+  params.onProgress?.(`Resolving channel ID for ${channelHandle}...`);
+  const channelId = await getChannelId(channelHandle);
+  debug(`Using channel ID: ${channelId}`);
+
+  // Ensure cache directory exists before attempting lock
+  try {
+    await ensureCacheDir(channelId);
+  } catch (err) {
+    throw new Error(`Failed to create cache directory: ${(err as Error).message}`);
+  }
+
+  const auth = await getAuthenticatedClient();
+  const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
+
+  // Step 1: Find or create reporting job
+  const jobs = await listAllJobs(youtubeReporting);
+  const matchingJob = jobs.find((job) => job.reportTypeId === params.type);
+
+  if (!matchingJob) {
+    params.onProgress?.(`Creating new reporting job for type: ${params.type}...`);
+
+    const createResponse = await withRateLimitRetry(
+      () => youtubeReporting.jobs.create({
+        requestBody: {
+          reportTypeId: params.type,
+          name: `${params.type} Report Job`,
+        },
+      }),
+      { label: `jobs.create(${params.type})` }
+    );
+
+    const jobCreateTime = createResponse.data.createTime || '';
+    const readyAt = new Date(new Date(jobCreateTime).getTime() + 48 * 60 * 60 * 1000);
+    return {
+      status: 'job-created',
+      jobId: createResponse.data.id!,
+      jobCreateTime,
+      readyAt: readyAt.toISOString(),
+    };
+  }
+
+  const jobId = matchingJob.id!;
+  const jobCreateTime = matchingJob.createTime || '';
+  debug(`Found existing job: ${jobId}`);
+
+  // Step 2: Check if reports are available
+  params.onProgress?.('Fetching available reports...');
+
+  const allFetchedReports: FetchedReportInfo[] = [];
+  const reportsById = new Map<string, { downloadUrl?: string | null }>();
+  let reportsPageToken: string | undefined;
+  do {
+    const reportsResponse = await withRateLimitRetry(
+      () => youtubeReporting.jobs.reports.list({
+        jobId,
+        onBehalfOfContentOwner: undefined,
+        pageToken: reportsPageToken,
+      }),
+      { label: `jobs.reports.list(${params.type})` }
+    );
+    for (const report of reportsResponse.data.reports || []) {
+      allFetchedReports.push({
+        id: report.id || '',
+        startTime: report.startTime || '',
+        endTime: report.endTime || '',
+        createTime: report.createTime || '',
+      });
+      reportsById.set(report.id || '', { downloadUrl: report.downloadUrl });
+    }
+    reportsPageToken = reportsResponse.data.nextPageToken || undefined;
+  } while (reportsPageToken);
+
+  // YouTube can reissue a report for the same window with a newer createTime
+  // (e.g. corrected data). Keep only the newest per window so two versions of
+  // the same window never both contribute rows (CodeRabbit on #152).
+  const newestByWindow = new Map<string, FetchedReportInfo>();
+  for (const report of allFetchedReports) {
+    const key = `${report.startTime}|${report.endTime}`;
+    const prev = newestByWindow.get(key);
+    if (!prev || report.createTime > prev.createTime) {
+      newestByWindow.set(key, report);
+    }
+  }
+  let reports = [...newestByWindow.values()];
+
+  if (reports.length === 0) {
+    // Job exists but no reports yet (within 48h window)
+    const readyAt = new Date(new Date(jobCreateTime).getTime() + 48 * 60 * 60 * 1000);
+    return {
+      status: 'no-reports-yet',
+      jobId,
+      jobCreateTime,
+      readyAt: readyAt.toISOString(),
+    };
+  }
+
+  // Step 3: Validate date range (API returns timestamps, compare date portions
+  // only). Computed over all reports rather than relying on response order.
+  const minDate = reports.reduce((min, r) => {
+    const d = r.startTime.split('T')[0];
+    return d < min ? d : min;
+  }, '9999-99-99');
+  const maxDate = reports.reduce((max, r) => {
+    const d = r.endTime.split('T')[0];
+    return d > max ? d : max;
+  }, '');
+
+  const requestedStart = params.startDate || minDate;
+  const requestedEnd = params.endDate || maxDate;
+
+  if (!minDate || !maxDate || !requestedStart || !requestedEnd) {
+    throw new Error('Unable to determine date range');
+  }
+
+  try {
+    validateDateRange(requestedStart, requestedEnd);
+  } catch (e) {
+    throw new Error(`${(e as Error).message}\nProvided: start-date=${requestedStart}, end-date=${requestedEnd}`);
+  }
+
+  // Adjust date range to available data if needed.
+  // Consider both API range and local cache — cache may contain data that
+  // has expired from the API, or may be the only source if API returns nothing.
+  // Use actual CSV data dates (from metadata) rather than API report windows
+  // which span 2 calendar days and would overstate coverage.
+  const cacheEntries = await findCachedReports(channelId, params.type, requestedStart, requestedEnd);
+  let effectiveMinDate = minDate;
+  let effectiveMaxDate = maxDate;
+  if (cacheEntries.length > 0) {
+    const cacheDates = await Promise.all(
+      cacheEntries.map(async (e) => {
+        const meta = await loadReportMetadata(channelId, e.reportId, params.type);
+        if (meta?.startTimeActual) {
+          const s = meta.startTimeActual;
+          return {
+            min: `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`,
+            max: meta.endTimeActual
+              ? `${meta.endTimeActual.slice(0, 4)}-${meta.endTimeActual.slice(4, 6)}-${meta.endTimeActual.slice(6, 8)}`
+              : `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`,
+          };
+        }
+        return { min: e.startTime.split('T')[0], max: e.endTime.split('T')[0] };
+      })
+    );
+    const cacheEarliest = cacheDates.reduce((min, d) => d.min < min ? d.min : min, '9999-99-99');
+    const cacheLatest = cacheDates.reduce((max, d) => d.max > max ? d.max : max, '');
+    if (cacheEarliest < effectiveMinDate) effectiveMinDate = cacheEarliest;
+    if (cacheLatest > effectiveMaxDate) effectiveMaxDate = cacheLatest;
+  }
+
+  const adjustedStart = requestedStart < effectiveMinDate ? effectiveMinDate : requestedStart;
+  const adjustedEnd = requestedEnd > effectiveMaxDate ? effectiveMaxDate : requestedEnd;
+
+  // Validate that adjusted range has overlap (i.e., requested range is not entirely before/after available data)
+  if (adjustedStart > adjustedEnd) {
+    throw new Error(
+      'Requested date range has no overlap with available data\n' +
+      `Requested: ${requestedStart} to ${requestedEnd}\n` +
+      `Available: ${effectiveMinDate} to ${effectiveMaxDate}`
+    );
+  }
+
+  // Step 4: Filter reports by date range (compare date portions only)
+  // These are API reports — used for fetching data not yet in cache.
+  reports = reports.filter((report) => {
+    const reportStart = report.startTime.split('T')[0];
+    const reportEnd = report.endTime.split('T')[0];
+    return reportStart <= adjustedEnd && reportEnd >= adjustedStart;
+  });
+
+  // It's okay if no API reports match — data may still be available from cache
+  // (e.g. expired from API but present in local archive).
+  if (reports.length === 0 && cacheEntries.length === 0) {
+    throw new Error('No reports match the specified date range.');
+  }
+
+  // Step 5: Analyze cache coverage
+  params.onProgress?.('Analyzing cache coverage...');
+  const coverage = await analyzeCacheCoverage(channelId, params.type, adjustedStart, adjustedEnd);
+  debug('Cache coverage:', coverage);
+
+  // Step 6: Load cached data
+  const cachedData: Record<string, string>[] = [];
+  const cachedReports: CacheIndexEntry[] = [];
+
+  for (const range of coverage.fullyCovered) {
+    const [start, end] = range.split('/');
+    const cached = await findCachedReports(channelId, params.type, start, end);
+
+    for (const cachedReport of cached) {
+      const reportData = await readCachedReport(channelId, cachedReport.reportId, params.type);
+      if (reportData) {
+        cachedData.push(...reportData.data);
+        cachedReports.push(cachedReport);
+        debug(`Loaded from cache: ${cachedReport.reportId}`);
+      }
+    }
+  }
+
+  if (cachedReports.length > 0) {
+    params.onProgress?.(`Loaded ${cachedReports.length} report(s) from cache`);
+  }
+
+  // Step 7: Fetch missing data
+  const reportsToFetch: FetchedReportInfo[] = [];
+
+  // Build list of missing date ranges
+  const missingRanges = [
+    ...coverage.partiallyCovered.map(p => p.missing),
+    ...coverage.notCovered.map(r => {
+      const [start, end] = r.split('/');
+      return { start, end };
+    }),
+  ];
+
+  // Filter reports to only fetch those covering missing ranges. Compare date
+  // portions: the report bounds are full timestamps while the range bounds
+  // are YYYY-MM-DD, and lexical comparison on an equal-day boundary would
+  // skip a report covering a single-day gap (CodeRabbit on #152).
+  for (const report of reports) {
+    const reportStart = report.startTime.split('T')[0];
+    const reportEnd = report.endTime.split('T')[0];
+    const coversMissing = missingRanges.some(range => {
+      return reportStart <= range.end && reportEnd >= range.start;
+    });
+
+    if (coversMissing) {
+      reportsToFetch.push(report);
+    }
+  }
+
+  const tmpDir = '/tmp';
+
+  // NOTE: the write lock is acquired and released per-iteration around the
+  // cache write, NOT held across the whole download loop. `downloadReport`
+  // can retry/backoff for minutes on HTTP 429 or transient network errors,
+  // and holding the lock that long would block concurrent `fetch-reports` /
+  // `get-report-data` runs from the same channel. The lock guards the cache
+  // index write only.
+
+  const jobCreated = new Date(jobCreateTime);
+  const fetchedData: Record<string, string>[] = [];
+  // Actual data windows (YYYYMMDD row dates) of the fresh downloads — used to
+  // drop overlapping cached rows below.
+  const fetchedWindows: { min: string; max: string }[] = [];
+
+  for (let i = 0; i < reportsToFetch.length; i++) {
+    const report = reportsToFetch[i];
+    // Use the shared sanitizer so a malicious report.id can't escape
+    // `tmpDir` (path-traversal hardening). Append pid + timestamp to keep
+    // the path unique per process — the reports lock is scoped to just the
+    // cache write, so two concurrent runs on the same channel would
+    // otherwise clobber each other's temp CSV (CodeRabbit round 2).
+    const tmpPath = safeReportPath(tmpDir, `${report.id || 'report'}-${process.pid}-${Date.now()}`);
+
+    params.onProgress?.(`Downloading report ${i + 1}/${reportsToFetch.length}...`);
+
+    const downloadUrl = reportsById.get(report.id)?.downloadUrl;
+    const { csvData, headers, data, minDate: dataMinDate, maxDate: dataMaxDate } =
+      await downloadReport({ ...report, downloadUrl }, auth, { tmpPath });
+
+    // Calculate expiration date
+    const reportCreated = new Date(report.createTime);
+    const isHistorical = reportCreated.getTime() - jobCreated.getTime() < 4 * 24 * 60 * 60 * 1000;
+    const expirationDays = isHistorical ? 30 : 60;
+    const expiresAt = new Date(reportCreated.getTime() + expirationDays * 24 * 60 * 60 * 1000);
+
+    // Acquire the write lock just long enough to update the cache index.
+    // If the lock is busy, skip the cache write (the run still returns data)
+    // rather than queueing behind a possibly-slow download backoff.
+    let writeRelease: (() => Promise<void>) | null = null;
+    try {
+      writeRelease = await acquireLock(getLockPath('reports', channelId), { timeout: 1000 });
+    } catch {
+      // progress() routes to stderr: stdout carries the machine-readable
+      // data output and interleaving would break downstream parsing.
+      progress(`Info: cache lock busy, skipping cache write for ${report.id}`);
+    }
+
+    if (writeRelease) {
+      // Save to cache (non-fatal: warn on failure so API data is still returned)
+      try {
+        await saveReportToCache(channelId, report.id, params.type, csvData, {
+          reportId: report.id,
+          reportTypeId: params.type,
+          channelId,
+          jobId,
+          startTime: report.startTime,
+          endTime: report.endTime,
+          startTimeActual: dataMinDate,
+          endTimeActual: dataMaxDate,
+          downloadedAt: new Date().toISOString(),
+          expiresAt: expiresAt.toISOString(),
+          downloadUrl: downloadUrl || '',
+          columns: headers,
+          isComplete: true,
+          fileSize: csvData.length,
+          row_count: data.length,
+        });
+      } catch (cacheErr) {
+        progress(`Warning: cache save failed for ${report.id}: ${(cacheErr as Error).message} — data will be re-fetched on next run`);
+      } finally {
+        await writeRelease();
+      }
+    }
+
+    fetchedData.push(...data);
+    if (dataMinDate && dataMaxDate) {
+      fetchedWindows.push({ min: dataMinDate, max: dataMaxDate });
+    }
+
+    debug(`Downloaded: ${report.startTime} to ${report.endTime}`);
+  }
+
+  // Merge cached + fresh rows. Fresh downloads win where their actual data
+  // window overlaps cached rows (a reissued report can carry corrected
+  // values), then byte-identical duplicate rows are dropped. The previous
+  // dedup keyed on (date, video_id) alone, which collapsed distinct rows in
+  // report types with more dimensions — demographics, traffic sources, etc.
+  // (CodeRabbit on #152, critical).
+  const cachedSurviving = cachedData.filter(row =>
+    !row.date || !fetchedWindows.some(w => row.date >= w.min && row.date <= w.max)
+  );
+  let allData = [...cachedSurviving, ...fetchedData];
+  const seenRows = new Set<string>();
+  allData = allData.filter(row => {
+    const key = JSON.stringify(row);
+    if (seenRows.has(key)) return false;
+    seenRows.add(key);
+    return true;
+  });
+
+  // Clamp to the adjusted range: report files span whole windows, so rows
+  // just outside the requested range would otherwise leak into a result that
+  // claims a narrower dateRange (CodeRabbit on #152). Row dates are YYYYMMDD.
+  const startKey = adjustedStart.replace(/-/g, '');
+  const endKey = adjustedEnd.replace(/-/g, '');
+  allData = allData.filter(row => !row.date || (row.date >= startKey && row.date <= endKey));
+
+  // Step 8: Filter by video ID if specified
+  let rows = allData;
+  if (params.videoId) {
+    rows = allData.filter(row => row.video_id === params.videoId);
+
+    if (rows.length === 0) {
+      const uniqueVideoIds = [...new Set(allData.map(row => row.video_id))];
+      const shown = uniqueVideoIds.slice(0, 10).map(vid => `  ${vid}`).join('\n');
+      const more = uniqueVideoIds.length > 10 ? `\n  ... and ${uniqueVideoIds.length - 10} more` : '';
+      throw new Error(
+        `No data found for video ID: ${params.videoId}\n` +
+        `Available video IDs in this date range:\n${shown}${more}`
+      );
+    }
+  }
+
+  return {
+    status: 'ok',
+    jobId,
+    jobCreateTime,
+    rows,
+    requestedRange: { startDate: requestedStart, endDate: requestedEnd },
+    adjustedRange: { startDate: adjustedStart, endDate: adjustedEnd },
+    availableRange: { startDate: effectiveMinDate, endDate: effectiveMaxDate },
+    cachedReports,
+    fetchedReports: reportsToFetch,
   };
 }
