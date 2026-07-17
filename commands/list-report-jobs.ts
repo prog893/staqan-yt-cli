@@ -42,10 +42,14 @@ async function listReportJobsCommand(options: ListReportJobsOptions): Promise<vo
     const now = new Date();
 
     // Flatten the structured lib result into the display strings the
-    // json/csv/text/table formats have always emitted.
-    const formatWindow = (w: { startTime: string; endTime: string } | null) => w
-      ? `${formatTimestampWithTimezone(w.startTime).local} to ${formatTimestampWithTimezone(w.endTime).local}`
-      : 'N/A';
+    // json/csv/text/table formats have always emitted. The timezone label
+    // comes from the formatter — the values are local, not UTC.
+    const formatWindow = (w: { startTime: string; endTime: string } | null) => {
+      if (!w) return 'N/A';
+      const start = formatTimestampWithTimezone(w.startTime);
+      const end = formatTimestampWithTimezone(w.endTime);
+      return `${start.local} to ${end.local} (${start.timezone})`;
+    };
 
     const jobsData = jobs.map(job => ({
       jobId: job.jobId,
@@ -95,13 +99,16 @@ async function listReportJobsCommand(options: ListReportJobsOptions): Promise<vo
           console.log(chalk.cyan(`Job ID:`) + ' ' + chalk.yellow(job.jobId));
           console.log(chalk.gray('Report Type:') + ' ' + job.reportTypeId);
           console.log(chalk.gray('Name:') + ' ' + job.name);
-          console.log(chalk.gray('Created:') + ' ' + formatTimestampWithTimezone(job.created).local + chalk.gray(' (UTC)'));
+          {
+            const created = formatTimestampWithTimezone(job.created);
+            console.log(chalk.gray('Created:') + ' ' + created.local + chalk.gray(` (${created.timezone})`));
+          }
           console.log(chalk.gray('Status:') + ' ' + chalk.green(`${job.status} (${job.daysSinceCreation} days ago)`));
           console.log(chalk.gray('Reports:') + ' ' + chalk.yellow(job.reportsCount.toString()));
 
           if (job.reportsCount > 0) {
-            console.log(chalk.gray('  Latest:') + ' ' + job.latestReport + chalk.gray(' (UTC)'));
-            console.log(chalk.gray('  Oldest:') + ' ' + job.oldestReport + chalk.gray(' (UTC)'));
+            console.log(chalk.gray('  Latest:') + ' ' + job.latestReport);
+            console.log(chalk.gray('  Oldest:') + ' ' + job.oldestReport);
 
             // Show detailed expiration warnings
             if (job.expirationCriticals.length > 0) {
