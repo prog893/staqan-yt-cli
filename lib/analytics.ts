@@ -361,27 +361,37 @@ export async function fetchVideoRetention(params: { videoId: string }): Promise<
 /**
  * Predefined report types for channel analytics, shared by the CLI command
  * and the MCP tool (the two copies were identical before consolidation).
+ *
+ * demographics uses viewerPercentage — the only metric the Analytics API
+ * accepts for ageGroup/gender reports (live-verified 2026-07-17: the old
+ * views,estimatedMinutesWatched pair was rejected with "not supported",
+ * so the report type never worked on either surface).
  */
-export const CHANNEL_REPORT_TYPES: Record<string, { dimensions: string; metrics: string }> = {
+export const CHANNEL_REPORT_TYPES: Record<string, { dimensions: string; metrics: string; sort: string }> = {
   demographics: {
     dimensions: 'ageGroup,gender',
-    metrics: 'views,estimatedMinutesWatched',
+    metrics: 'viewerPercentage',
+    sort: '-viewerPercentage',
   },
   devices: {
     dimensions: 'deviceType,operatingSystem',
     metrics: 'views,estimatedMinutesWatched',
+    sort: '-views',
   },
   geography: {
     dimensions: 'country',
     metrics: 'views,estimatedMinutesWatched',
+    sort: '-views',
   },
   'traffic-sources': {
     dimensions: 'insightTrafficSourceType',
     metrics: 'views,estimatedMinutesWatched',
+    sort: '-views',
   },
   'subscription-status': {
     dimensions: 'subscribedStatus',
     metrics: 'views,estimatedMinutesWatched',
+    sort: '-views',
   },
 };
 
@@ -460,6 +470,7 @@ export async function fetchChannelAnalytics(params: ChannelAnalyticsParams): Pro
   let dimensions: string;
   let metrics: string;
   let reportName: string;
+  let sort: string | undefined;
 
   if (params.report) {
     const reportConfig = CHANNEL_REPORT_TYPES[params.report];
@@ -468,10 +479,14 @@ export async function fetchChannelAnalytics(params: ChannelAnalyticsParams): Pro
     }
     dimensions = reportConfig.dimensions;
     metrics = reportConfig.metrics;
+    sort = reportConfig.sort;
     reportName = params.report;
   } else if (params.dimensions && params.metrics) {
     dimensions = params.dimensions;
     metrics = params.metrics;
+    // The API rejects a sort field that isn't in metrics/dimensions, so only
+    // sort custom queries that actually select views.
+    sort = params.metrics.split(',').map(m => m.trim()).includes('views') ? '-views' : undefined;
     reportName = 'custom';
   } else {
     throw new Error(
@@ -510,7 +525,7 @@ export async function fetchChannelAnalytics(params: ChannelAnalyticsParams): Pro
     endDate,
     dimensions,
     metrics,
-    sort: '-views',
+    sort,
   }), { label: 'reports.query(channel analytics)' });
 
   return {
@@ -640,6 +655,13 @@ const SEARCH_TERMS_METRICS = 'views,estimatedMinutesWatched';
  * is walked (up to CHANNEL_SEARCH_TERMS_MAX_VIDEOS IDs, the per-call filter
  * limit) and passed as an explicit `video==` filter, optionally trimmed to
  * Shorts/long-form client-side (#88/#90).
+ *
+ * Deliberately a single query, not chunked: this is a top-N report
+ * (maxResults ≤ 25) and merging truncated per-chunk top-25 lists would
+ * produce incorrect rankings. All-time queries with the full uploads list
+ * are live-verified to succeed; if a much larger channel ever trips an API
+ * size limit, it fails loudly and the fix is a deliberate date-range cap,
+ * not silent chunking.
  */
 export async function fetchChannelSearchTerms(params: ChannelSearchTermsParams): Promise<ChannelSearchTermsResult> {
   const contentType = validateContentType(params.contentType);
@@ -692,8 +714,11 @@ export async function fetchChannelSearchTerms(params: ChannelSearchTermsParams):
   debug(`Date range: ${startDate} to ${endDate}`);
 
   params.onProgress?.('Fetching channel search terms...');
+  // Query the resolved channel (not MINE) so a mismatch between the requested
+  // channel and the authenticated one fails loudly instead of silently
+  // returning empty rows for the unowned video IDs (CodeRabbit on #151).
   const response = await withRateLimitRetry(() => youtubeAnalytics.reports.query({
-    ids: 'channel==MINE',
+    ids: `channel==${channelId}`,
     startDate,
     endDate,
     metrics: SEARCH_TERMS_METRICS,
