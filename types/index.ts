@@ -285,7 +285,7 @@ export interface ChannelInfo {
 }
 
 // Caption-related types
-export type CaptionTrackKind = 'standard' | 'ASR' | 'forced';
+export type CaptionTrackKind = 'manual' | 'automatic';
 
 export const CAPTION_FORMATS = ['srt', 'vtt', 'sbv', 'scc', 'ttml', 'json'] as const;
 export type CaptionFormat = typeof CAPTION_FORMATS[number];
