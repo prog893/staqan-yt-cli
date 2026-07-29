@@ -34,7 +34,8 @@ import {
   readCachedReport,
   saveReportToCache,
 } from './cache';
-import { getChannelId, getAuthenticatedChannelId } from './youtube';
+import { getAuthenticatedChannelId, assertChannelMatchesAuthenticated } from './youtube';
+import { getConfigValue } from './config';
 import { acquireLock, getLockPath } from './lock';
 import { CacheIndexEntry } from '../types';
 
@@ -539,23 +540,15 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
   // so the cache has to be keyed by the same channel or we silently write
   // the authed account's data under another channel's path (issue #153).
   //
-  // `params.channel` is accepted only for validation: today it can only name
-  // the authed channel (no multi-account auth-swap yet, see #153), so we
-  // resolve it and fail loudly on mismatch. That surfaces stale
-  // `default.channel` config or a wrong `--channel` instead of letting the
-  // bug recur.
+  // `params.channel` (and the `default.channel` config fallback) is accepted
+  // only for validation: today it can only name the authed channel (no
+  // multi-account auth-swap yet, see #153), so we validate any supplied
+  // value against the authed channel and fail loudly on mismatch. That
+  // surfaces stale `default.channel` config or a wrong `--channel` instead
+  // of letting the bug recur.
   const channelId = await getAuthenticatedChannelId();
-  if (params.channel) {
-    const requestedChannelId = await getChannelId(params.channel);
-    if (requestedChannelId !== channelId) {
-      throw new Error(
-        `Reporting data is always scoped to the authenticated channel.\n` +
-        `You requested channel "${params.channel}" (ID ${requestedChannelId}), ` +
-        `but you are authenticated as channel ID ${channelId}.\n` +
-        `Re-authenticate as the requested channel, or remove default.channel / omit --channel.`
-      );
-    }
-  }
+  const requestedChannel = params.channel || await getConfigValue('default.channel');
+  await assertChannelMatchesAuthenticated(requestedChannel, channelId);
   debug(`Using authenticated channel ID for cache namespace: ${channelId}`);
 
   // Ensure cache directory exists before attempting lock

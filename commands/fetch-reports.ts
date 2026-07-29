@@ -8,7 +8,7 @@ import {
   loadReportMetadata,
   ensureCacheDir,
 } from '../lib/cache';
-import { getChannelId, getAuthenticatedChannelId } from '../lib/youtube';
+import { getAuthenticatedChannelId, assertChannelMatchesAuthenticated } from '../lib/youtube';
 import { getConfigValue, getLockTimeout } from '../lib/config';
 import { acquireLock, getLockPath } from '../lib/lock';
 import { downloadReport } from '../lib/reports';
@@ -46,22 +46,12 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
     // it can only name the authed channel (no multi-account auth-swap yet,
     // see #153), so we resolve it and fail loudly on mismatch. That surfaces
     // stale `default.channel` config or a wrong `--channel` instead of
-    // letting the bug recur.
+    // letting the bug recur. The shared helper keeps the message identical
+    // across fetchReportData and fetch-reports.
     spinner.text = 'Resolving authenticated channel...';
     const channelId = await getAuthenticatedChannelId();
-
     const requestedChannel = options.channel || await getConfigValue('default.channel');
-    if (requestedChannel) {
-      const requestedChannelId = await getChannelId(requestedChannel);
-      if (requestedChannelId !== channelId) {
-        throw new Error(
-          `Reporting data is always scoped to the authenticated channel.\n` +
-          `You requested channel "${requestedChannel}" (ID ${requestedChannelId}), ` +
-          `but you are authenticated as channel ID ${channelId}.\n` +
-          `Re-authenticate as the requested channel, or remove default.channel / omit --channel.`
-        );
-      }
-    }
+    await assertChannelMatchesAuthenticated(requestedChannel, channelId);
     debug(`Using authenticated channel ID for cache namespace: ${channelId}`);
 
     // Ensure cache directory exists before touching the lock

@@ -85,13 +85,15 @@ async function getYouTubeClient(): Promise<youtube_v3.Youtube> {
 
 // ─── Channels ─────────────────────────────────────────────────────────────────
 
-// Per-process memoization for the authenticated channel ID. The Reporting API
+// In-flight memoization for the authenticated channel ID. The Reporting API
 // always returns data for whoever's authenticated — there is no channel
 // parameter and `onBehalfOfContentOwner` is always undefined in this CLI — so
 // this is the authoritative cache-namespace key for any reporting data the
-// user can access. One OAuth context per process means a single lookup
-// suffices (issue #153).
-let authenticatedChannelIdCache: string | null = null;
+// user can access. We cache the Promise (not just the resolved value) so
+// concurrent callers before the first resolve share one channels.list
+// request (CodeRabbit round 1 on #157, low-value perf nit). On failure the
+// promise is cleared so a later caller can retry the lookup.
+let authenticatedChannelIdPromise: Promise<string> | null = null;
 
 /**
  * Resolve the channel ID of the currently authenticated YouTube account.
@@ -108,26 +110,59 @@ let authenticatedChannelIdCache: string | null = null;
  * than to silently mislabel cache files.
  */
 export async function getAuthenticatedChannelId(): Promise<string> {
-  if (authenticatedChannelIdCache) {
-    return authenticatedChannelIdCache;
+  if (!authenticatedChannelIdPromise) {
+    authenticatedChannelIdPromise = (async () => {
+      debug('Resolving authenticated channel ID via channels.list({ mine: true })');
+      const youtube = await getYouTubeClient();
+      const response = await youtube.channels.list({
+        part: ['id'],
+        mine: true,
+      });
+      const id = response.data.items?.[0]?.id;
+      if (!id) {
+        throw new Error(
+          'Could not resolve the authenticated YouTube channel. ' +
+          'Your OAuth credentials do not appear to be associated with a YouTube channel. ' +
+          'Run `staqan-yt auth` to re-authenticate.'
+        );
+      }
+      debug(`Authenticated channel ID: ${id}`);
+      return id;
+    })().catch((err) => {
+      // Allow a later caller to retry the lookup instead of being stuck on
+      // a permanently-rejected promise.
+      authenticatedChannelIdPromise = null;
+      throw err;
+    });
   }
-  debug('Resolving authenticated channel ID via channels.list({ mine: true })');
-  const youtube = await getYouTubeClient();
-  const response = await youtube.channels.list({
-    part: ['id'],
-    mine: true,
-  });
-  const id = response.data.items?.[0]?.id;
-  if (!id) {
+  return authenticatedChannelIdPromise;
+}
+
+/**
+ * Validate that a user-supplied channel reference (handle or UC... ID)
+ * resolves to the same channel as the authenticated account. Reporting API
+ * flows use this so a stale `default.channel` config or a wrong `--channel`
+ * fails loudly instead of silently writing the authed account's data under
+ * another channel's cache path (issue #153).
+ *
+ * `requestedChannel` may be a `@handle`, a `UC...` ID, or a legacy username
+ * — `getChannelId` normalizes all of them. Resolves silently when the input
+ * is empty/undefined (no validation requested).
+ */
+export async function assertChannelMatchesAuthenticated(
+  requestedChannel: string | undefined,
+  authenticatedChannelId: string,
+): Promise<void> {
+  if (!requestedChannel) return;
+  const requestedChannelId = await getChannelId(requestedChannel);
+  if (requestedChannelId !== authenticatedChannelId) {
     throw new Error(
-      'Could not resolve the authenticated YouTube channel. ' +
-      'Your OAuth credentials do not appear to be associated with a YouTube channel. ' +
-      'Run `staqan-yt auth` to re-authenticate.'
+      `Reporting data is always scoped to the authenticated channel.\n` +
+      `You requested channel "${requestedChannel}" (ID ${requestedChannelId}), ` +
+      `but you are authenticated as channel ID ${authenticatedChannelId}.\n` +
+      `Re-authenticate as the requested channel, or remove default.channel / omit --channel.`
     );
   }
-  authenticatedChannelIdCache = id;
-  debug(`Authenticated channel ID: ${id}`);
-  return id;
 }
 
 /**
