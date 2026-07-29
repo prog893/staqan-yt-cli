@@ -85,6 +85,51 @@ async function getYouTubeClient(): Promise<youtube_v3.Youtube> {
 
 // ─── Channels ─────────────────────────────────────────────────────────────────
 
+// Per-process memoization for the authenticated channel ID. The Reporting API
+// always returns data for whoever's authenticated — there is no channel
+// parameter and `onBehalfOfContentOwner` is always undefined in this CLI — so
+// this is the authoritative cache-namespace key for any reporting data the
+// user can access. One OAuth context per process means a single lookup
+// suffices (issue #153).
+let authenticatedChannelIdCache: string | null = null;
+
+/**
+ * Resolve the channel ID of the currently authenticated YouTube account.
+ *
+ * `channels.list({ mine: true })` returns the channel that owns the OAuth
+ * token. Memoized per-process — re-fetching in the same run is a waste of
+ * the 1 quota unit the lookup costs. Used by the Reporting API flows
+ * (lib/reports.ts, commands/fetch-reports.ts) as the cache-namespace root,
+ * because Reporting API jobs/jobs.reports/downloads always operate on the
+ * authenticated channel regardless of any `--channel` flag.
+ *
+ * Throws if the credentials have no associated channel (e.g. brand account
+ * with no YouTube channel, or a misconfigured token). Better to fail loud
+ * than to silently mislabel cache files.
+ */
+export async function getAuthenticatedChannelId(): Promise<string> {
+  if (authenticatedChannelIdCache) {
+    return authenticatedChannelIdCache;
+  }
+  debug('Resolving authenticated channel ID via channels.list({ mine: true })');
+  const youtube = await getYouTubeClient();
+  const response = await youtube.channels.list({
+    part: ['id'],
+    mine: true,
+  });
+  const id = response.data.items?.[0]?.id;
+  if (!id) {
+    throw new Error(
+      'Could not resolve the authenticated YouTube channel. ' +
+      'Your OAuth credentials do not appear to be associated with a YouTube channel. ' +
+      'Run `staqan-yt auth` to re-authenticate.'
+    );
+  }
+  authenticatedChannelIdCache = id;
+  debug(`Authenticated channel ID: ${id}`);
+  return id;
+}
+
 /**
  * Get channel ID from handle or username.
  * Short-circuits if input is already a channel ID (UC + 22 chars).

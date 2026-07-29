@@ -34,8 +34,7 @@ import {
   readCachedReport,
   saveReportToCache,
 } from './cache';
-import { getConfigValue } from './config';
-import { getChannelId } from './youtube';
+import { getChannelId, getAuthenticatedChannelId } from './youtube';
 import { acquireLock, getLockPath } from './lock';
 import { CacheIndexEntry } from '../types';
 
@@ -534,15 +533,30 @@ export type ReportDataResult =
  * (date, video_id).
  */
 export async function fetchReportData(params: ReportDataParams): Promise<ReportDataResult> {
-  // Resolve channel handle → canonical channel ID for cache namespacing
-  const channelHandle = params.channel || await getConfigValue('default.channel');
-  if (!channelHandle) {
-    throw new Error('No channel specified. Set a default channel:\n  staqan-yt config set default.channel @yourchannel\nor pass --channel @yourchannel');
+  // Resolve the cache namespace from the AUTHENTICATED channel. The Reporting
+  // API always returns data for whoever's authenticated — there's no channel
+  // parameter and `onBehalfOfContentOwner` is always undefined in this CLI —
+  // so the cache has to be keyed by the same channel or we silently write
+  // the authed account's data under another channel's path (issue #153).
+  //
+  // `params.channel` is accepted only for validation: today it can only name
+  // the authed channel (no multi-account auth-swap yet, see #153), so we
+  // resolve it and fail loudly on mismatch. That surfaces stale
+  // `default.channel` config or a wrong `--channel` instead of letting the
+  // bug recur.
+  const channelId = await getAuthenticatedChannelId();
+  if (params.channel) {
+    const requestedChannelId = await getChannelId(params.channel);
+    if (requestedChannelId !== channelId) {
+      throw new Error(
+        `Reporting data is always scoped to the authenticated channel.\n` +
+        `You requested channel "${params.channel}" (ID ${requestedChannelId}), ` +
+        `but you are authenticated as channel ID ${channelId}.\n` +
+        `Re-authenticate as the requested channel, or remove default.channel / omit --channel.`
+      );
+    }
   }
-
-  params.onProgress?.(`Resolving channel ID for ${channelHandle}...`);
-  const channelId = await getChannelId(channelHandle);
-  debug(`Using channel ID: ${channelId}`);
+  debug(`Using authenticated channel ID for cache namespace: ${channelId}`);
 
   // Ensure cache directory exists before attempting lock
   try {
