@@ -1,9 +1,8 @@
-import { google } from 'googleapis';
 import chalk from 'chalk';
-import { getAuthenticatedClient } from '../lib/auth';
 import { initCommand, withSpinner } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
+import { fetchReportTypes, ReportTypeInfo } from '../lib/reports';
 
 interface ReportTypesOptions {
   output?: 'json' | 'table' | 'text' | 'csv' | 'pretty';
@@ -17,14 +16,8 @@ async function listReportTypesCommand(options: ReportTypesOptions): Promise<void
   initCommand(options);
 
   await withSpinner('Fetching available report types...', 'Failed to fetch report types', async (spinner) => {
-    const auth = await getAuthenticatedClient();
-    const youtubeReporting = google.youtubereporting({ version: 'v1', auth });
-
-    const response = await youtubeReporting.reportTypes.list({
-      onBehalfOfContentOwner: undefined,
-    });
-
-    const reportTypes = response.data.reportTypes || [];
+    // Shared data layer (lib/reports.ts, #102) — same code path as the MCP tool.
+    const reportTypes = await fetchReportTypes();
 
     if (reportTypes.length === 0) {
       spinner.info('No report types found for this channel.');
@@ -35,8 +28,8 @@ async function listReportTypesCommand(options: ReportTypesOptions): Promise<void
     console.log('');
 
     // Group report types by category
-    const grouped = reportTypes.reduce((acc: Record<string, typeof reportTypes>, rt: typeof reportTypes[0]) => {
-      const category = rt.id?.split('_')[0] || 'other';
+    const grouped = reportTypes.reduce((acc: Record<string, ReportTypeInfo[]>, rt) => {
+      const category = rt.id.split('_')[0] || 'other';
       if (!acc[category]) {
         acc[category] = [];
       }
@@ -54,14 +47,11 @@ async function listReportTypesCommand(options: ReportTypesOptions): Promise<void
         break;
 
       case 'csv':
-        console.log(formatCsv(reportTypes.map(rt => ({
-          id: rt.id || '',
-          name: rt.name || '',
-        }))));
+        console.log(formatCsv(reportTypes));
         break;
 
       case 'text':
-        Object.entries(grouped).forEach(([category, types]: [string, typeof reportTypes]) => {
+        Object.entries(grouped).forEach(([category, types]) => {
           console.log(`\n${category.toUpperCase()}:`);
           types.forEach(rt => {
             console.log(`  ${rt.id}`);
@@ -72,18 +62,15 @@ async function listReportTypesCommand(options: ReportTypesOptions): Promise<void
         break;
 
       case 'table':
-        console.log(formatTable(reportTypes.map(rt => ({
-          id: rt.id || '',
-          name: rt.name || '',
-        }))));
+        console.log(formatTable(reportTypes));
         break;
 
       case 'pretty':
       default:
         // Pretty format with colors
         reportTypes.forEach(rt => {
-          console.log(chalk.cyan(rt.id || ''));
-          console.log(chalk.gray('  Name:') + ' ' + (rt.name || ''));
+          console.log(chalk.cyan(rt.id));
+          console.log(chalk.gray('  Name:') + ' ' + rt.name);
           console.log('');
         });
         break;

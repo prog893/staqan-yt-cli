@@ -30,30 +30,38 @@ async function ensureConfigDir(): Promise<void> {
 }
 
 /**
- * Extract channel ID from various input formats
+ * Classify channel input (handle, ID, or URL) as a handle or a channel ID.
+ * Throws on legacy /c/ and /user/ URLs — their path segment is neither a
+ * handle nor a channel ID, so no downstream lookup could succeed (issue #123).
  */
 function parseChannelHandle(input: string): ChannelHandle {
-  // Remove @ if present
   if (input.startsWith('@')) {
     return { type: 'handle', value: input };
   }
 
-  // Extract from URL
-  const urlPatterns = [
-    /youtube\.com\/@([^\/\?]+)/,
-    /youtube\.com\/channel\/([^\/\?]+)/,
-    /youtube\.com\/c\/([^\/\?]+)/,
-    /youtube\.com\/user\/([^\/\?]+)/,
-  ];
-
-  for (const pattern of urlPatterns) {
-    const match = input.match(pattern);
-    if (match) {
-      return { type: 'id', value: match[1] };
-    }
+  // @-handle URLs are handles, not IDs. The previous code returned these as
+  // type 'id' (with the @ stripped), which sent a bare handle into
+  // channels.list({ id }) and produced silent empty results (issue #123).
+  const handleUrl = input.match(/youtube\.com\/@([^/?]+)/);
+  if (handleUrl) {
+    return { type: 'handle', value: `@${handleUrl[1]}` };
   }
 
-  // Assume it's a channel ID or handle
+  const channelUrl = input.match(/youtube\.com\/channel\/([^/?]+)/);
+  if (channelUrl) {
+    return { type: 'id', value: channelUrl[1] };
+  }
+
+  const legacyUrl = input.match(/youtube\.com\/(?:c|user)\/([^/?]+)/);
+  if (legacyUrl) {
+    throw new Error(
+      `Legacy channel URL not supported: ${input}\n` +
+      `The /c/ and /user/ path segments are not channel IDs. ` +
+      `Pass the channel's @handle or its UC… channel ID instead.`
+    );
+  }
+
+  // Assume it's a raw channel ID
   return { type: 'id', value: input };
 }
 
@@ -191,9 +199,11 @@ function info(message: string): void {
  * Prompt user for confirmation
  */
 async function confirm(message: string): Promise<boolean> {
+  // Prompt goes to stderr so machine-readable stdout (--output json/csv/…)
+  // stays clean when the caller pipes it.
   const readline = createInterface({
     input: process.stdin,
-    output: process.stdout,
+    output: process.stderr,
   });
 
   return new Promise((resolve) => {
@@ -307,13 +317,8 @@ function chunkDateRange(startDate: string, endDate: string): { start: string; en
 }
 
 /**
- * Validate --privacy flag values before any API calls.
- * Exits with an error message if any value is not public/private/unlisted.
- *
- * Accepts string[] (not PrivacyStatus[]) because Commander.js parses option
- * values as raw strings before this validation runs. The call site's option
- * type is PrivacyStatus[], but at runtime the values are unvalidated strings
- * until this function confirms them.
+ * Parse a numeric flag value, falling back to a default when absent.
+ * Throws if the value is not a positive integer.
  */
 function parsePositiveInt(flag: string, opt: string | undefined, defaultValue: number): number {
   const n = opt ? parseInt(opt, 10) : defaultValue;
@@ -326,6 +331,13 @@ function toLocalYmd(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+/** Local-timezone YYYY-MM-DD for `n` days before today (CLI date-range defaults). */
+function daysAgoYmd(n: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - n);
+  return toLocalYmd(date);
 }
 
 function validateDateOption(flag: string, value: string): void {
@@ -346,6 +358,15 @@ function validateDateRange(startDate: string, endDate: string): void {
   }
 }
 
+/**
+ * Validate --privacy flag values before any API calls.
+ * Throws if any value is not public/private/unlisted.
+ *
+ * Accepts string[] (not PrivacyStatus[]) because Commander.js parses option
+ * values as raw strings before this validation runs. The call site's option
+ * type is PrivacyStatus[], but at runtime the values are unvalidated strings
+ * until this function confirms them.
+ */
 function validatePrivacyFilter(privacy: string[] | undefined): void {
   if (!privacy || privacy.length === 0) return;
   const valid = ['public', 'private', 'unlisted'];
@@ -464,47 +485,20 @@ async function withSpinner<T>(
   failMessage: string,
   fn: (spinner: Ora) => Promise<T>
 ): Promise<T> {
-  // In quiet mode, create a silent spinner
-  if (isQuietEnabled) {
-    const silentSpinner = {
-      succeed: () => {}, // Do nothing
-      fail: () => {}, // Do nothing
-      info: () => {}, // Do nothing
-      warn: () => {}, // Do nothing
-      start: () => silentSpinner as unknown as Ora,
-      stop: () => {},
-      stopAndPersist: () => {},
-      clear: () => {},
-      render: () => {},
-      frame: () => '',
-      text: '',
-      indent: 0,
-      spinner: {},
-      color: 'cyan',
-      hideCursor: true,
-    } as unknown as Ora;
-
-    try {
-      return await fn(silentSpinner);
-    } catch (err) {
-      // Mirror the CLI top-level guard: if a nested helper already printed
-      // this message and marked it, don't print it again here. Prevents
-      // double-output for chains like runOrExit → withSpinner.
-      if (!isHelperFormattedError(err)) {
-        error((err as Error).message);
-      }
-      throw markFormatted(err as Error);
-    }
-  }
-
-  // Normal mode: use spinner
-  const spinner = ora(message).start();
+  // createSpinner returns a silent no-op spinner in quiet mode, so a single
+  // code path covers both modes (previously the silent-spinner literal was
+  // duplicated here).
+  const spinner = createSpinner(message).start();
   try {
     return await fn(spinner);
   } catch (err) {
     spinner.fail(failMessage);
-    console.log('');
-    // Same double-print guard as the silent-mode branch (CodeRabbit #121).
+    if (!isQuietEnabled) {
+      console.log('');
+    }
+    // Mirror the CLI top-level guard: if a nested helper already printed
+    // this message and marked it, don't print it again here. Prevents
+    // double-output for chains like runOrExit → withSpinner (CodeRabbit #121).
     if (!isHelperFormattedError(err)) {
       error((err as Error).message);
     }
@@ -559,7 +553,7 @@ function isRateLimitError(err: unknown): 'rpm' | 'daily' | null {
   for (const msg of messages) {
     const lower = msg.toLowerCase();
     if (lower.includes('per day')) return 'daily';
-    if (lower.includes('per minute') || lower.includes('per minute ')) return 'rpm';
+    if (lower.includes('per minute')) return 'rpm';
   }
   return null;
 }
@@ -594,38 +588,6 @@ function getRetryAfterMs(err: unknown): number | undefined {
     return Number.isFinite(n) && n >= 0 ? n * 1000 : undefined;
   }
   return undefined;
-}
-
-/**
- * Retry a function with exponential backoff
- */
-async function retryWithBackoff<T>(
-  fn: () => Promise<T>,
-  maxRetries = 3,
-  initialDelay = 1000
-): Promise<T> {
-  let lastError: Error | undefined;
-
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err as Error;
-
-      // Check if it's a quota error
-      const errorMessage = lastError.message || '';
-      if (errorMessage.includes('quota') || errorMessage.includes('429')) {
-        const delay = initialDelay * Math.pow(2, i);
-        progress(`Quota limit hit, retrying in ${delay / 1000}s...`);
-        await sleep(delay);
-      } else {
-        // Not a quota error, throw immediately
-        throw lastError;
-      }
-    }
-  }
-
-  throw lastError || new Error('Max retries exceeded');
 }
 
 /**
@@ -762,12 +724,12 @@ export {
   convertToCSV,
   chunkDateRange,
   sleep,
-  retryWithBackoff,
   isRateLimitError,
   getRetryAfterMs,
   withRateLimitRetry,
   parsePositiveInt,
   toLocalYmd,
+  daysAgoYmd,
   validateDateOption,
   validateDateRange,
   validatePrivacyFilter,

@@ -1,7 +1,6 @@
 import chalk from 'chalk';
-import { getAuthenticatedClient } from '../lib/auth';
-import { google } from 'googleapis';
-import { parseVideoId, error, debug, formatNumber, convertToCSV, chunkDateRange, retryWithBackoff, initCommand, withSpinner, toLocalYmd, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
+import { parseVideoId, debug, formatNumber, convertToCSV, initCommand, withSpinner, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
+import { fetchVideoAnalytics } from '../lib/analytics';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { AnalyticsOptions } from '../types';
@@ -12,94 +11,35 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
   // Extract video ID from options
   const videoId = options.videoId;
   if (!videoId) {
-    error('Required: --video-id');
-    process.exit(1);
+    throw new Error('Required: --video-id');
   }
 
   runOrExit(() => { if (options.startDate) validateDateOption('--start-date', options.startDate); });
   runOrExit(() => { if (options.endDate) validateDateOption('--end-date', options.endDate); });
   runOrExit(() => { if (options.startDate && options.endDate) validateDateRange(options.startDate, options.endDate); });
 
+  const outputFormat = await getOutputFormat(options.output);
+
   await withSpinner('Fetching video information...', 'Failed to fetch analytics', async (spinner) => {
     const parsedId = parseVideoId(videoId);
     debug('Parsed video ID', parsedId);
 
-    const auth = await getAuthenticatedClient();
-    const youtube = google.youtube({ version: 'v3', auth });
-    const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
-
-    // Get video info for title and publish date
-    const videoResponse = await youtube.videos.list({
-      part: ['snippet'],
-      id: [parsedId],
+    // Data layer (lib/analytics.ts, shared with the MCP server — #102):
+    // resolves the date range from the upload date, validates dimensions,
+    // chunks into 90-day windows, aggregates rows.
+    const result = await fetchVideoAnalytics({
+      videoId: parsedId,
+      startDate: options.startDate,
+      endDate: options.endDate,
+      metrics: options.metrics,
+      dimensions: options.dimensions,
+      onProgress: (message) => { spinner.text = message; },
     });
 
-    if (!videoResponse.data.items || videoResponse.data.items.length === 0) {
-      spinner.fail('Video not found');
-      error(`No video found with ID: ${parsedId}`);
-      process.exit(1);
-    }
-
-    const video = videoResponse.data.items[0];
-    const title = video.snippet?.title || 'Untitled';
-    const publishedAt = video.snippet?.publishedAt;
-
-    if (!publishedAt) {
-      spinner.fail('Could not determine video publish date');
-      error('Video publish date is missing');
-      process.exit(1);
-    }
-
-    // Calculate date range
-    // Default: full historical data from upload date to today
-    const endDate = options.endDate || toLocalYmd(new Date());
-    const startDate = options.startDate || publishedAt.split('T')[0];
-
-    // validateDateRange throws on bad ranges; withSpinner's catch handles it.
-    validateDateRange(startDate, endDate);
-    debug(`Date range: ${startDate} to ${endDate}`);
-
-    // Default metrics
-    const metrics = options.metrics || 'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares';
-
-    // Chunk date range into 90-day periods
-    const dateChunks = chunkDateRange(startDate, endDate);
-    debug(`Split into ${dateChunks.length} chunk(s) of 90 days`);
-
-    // Fetch analytics for each chunk
-    const allRows: unknown[][] = [];
-    let columnHeaders: { name?: string | null }[] = [];
-
-    for (let i = 0; i < dateChunks.length; i++) {
-      const chunk = dateChunks[i];
-      spinner.text = `Fetching chunk ${i + 1}/${dateChunks.length} (${chunk.start} to ${chunk.end})...`;
-
-      const analyticsResponse = await retryWithBackoff(async () => {
-        return await youtubeAnalytics.reports.query({
-          ids: 'channel==MINE',
-          startDate: chunk.start,
-          endDate: chunk.end,
-          metrics,
-          dimensions: 'video',
-          filters: `video==${parsedId}`,
-        });
-      });
-
-      // Save headers from first response
-      if (i === 0 && analyticsResponse.data.columnHeaders) {
-        columnHeaders = analyticsResponse.data.columnHeaders;
-      }
-
-      // Aggregate rows
-      if (analyticsResponse.data.rows && analyticsResponse.data.rows.length > 0) {
-        allRows.push(...analyticsResponse.data.rows);
-      }
-    }
+    const { title, dateRange, columnHeaders, rows: allRows } = result;
+    const { startDate, endDate } = dateRange;
 
     spinner.succeed(`Retrieved ${allRows.length} row(s) of analytics data`);
-
-    // Output results
-    const outputFormat = await getOutputFormat(options.output);
 
     // Prepare aggregated data for structured formats
     const aggregated: { [key: string]: number } = {};
@@ -142,7 +82,7 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
         }));
         break;
 
-      case 'table':
+      case 'table': {
         // Convert aggregated metrics to table format
         const tableData = Object.entries(aggregated).map(([name, value]) => ({
           metric: name,
@@ -150,6 +90,7 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
         }));
         console.log(formatTable(tableData));
         break;
+      }
 
       case 'text':
         // Tab-delimited output of aggregated metrics

@@ -1,5 +1,5 @@
 import { google, youtube_v3 } from 'googleapis';
-import { promises as fs } from 'fs';
+import { promises as fs, createReadStream } from 'fs';
 import path from 'path';
 import { getAuthenticatedClient } from './auth';
 import { normalizeLanguage, getLanguageName } from './language';
@@ -85,6 +85,86 @@ async function getYouTubeClient(): Promise<youtube_v3.Youtube> {
 
 // ─── Channels ─────────────────────────────────────────────────────────────────
 
+// In-flight memoization for the authenticated channel ID. The Reporting API
+// always returns data for whoever's authenticated — there is no channel
+// parameter and `onBehalfOfContentOwner` is always undefined in this CLI — so
+// this is the authoritative cache-namespace key for any reporting data the
+// user can access. We cache the Promise (not just the resolved value) so
+// concurrent callers before the first resolve share one channels.list
+// request (CodeRabbit round 1 on #157, low-value perf nit). On failure the
+// promise is cleared so a later caller can retry the lookup.
+let authenticatedChannelIdPromise: Promise<string> | null = null;
+
+/**
+ * Resolve the channel ID of the currently authenticated YouTube account.
+ *
+ * `channels.list({ mine: true })` returns the channel that owns the OAuth
+ * token. Memoized per-process — re-fetching in the same run is a waste of
+ * the 1 quota unit the lookup costs. Used by the Reporting API flows
+ * (lib/reports.ts, commands/fetch-reports.ts) as the cache-namespace root,
+ * because Reporting API jobs/jobs.reports/downloads always operate on the
+ * authenticated channel regardless of any `--channel` flag.
+ *
+ * Throws if the credentials have no associated channel (e.g. brand account
+ * with no YouTube channel, or a misconfigured token). Better to fail loud
+ * than to silently mislabel cache files.
+ */
+export async function getAuthenticatedChannelId(): Promise<string> {
+  if (!authenticatedChannelIdPromise) {
+    authenticatedChannelIdPromise = (async () => {
+      debug('Resolving authenticated channel ID via channels.list({ mine: true })');
+      const youtube = await getYouTubeClient();
+      const response = await youtube.channels.list({
+        part: ['id'],
+        mine: true,
+      });
+      const id = response.data.items?.[0]?.id;
+      if (!id) {
+        throw new Error(
+          'Could not resolve the authenticated YouTube channel. ' +
+          'Your OAuth credentials do not appear to be associated with a YouTube channel. ' +
+          'Run `staqan-yt auth` to re-authenticate.'
+        );
+      }
+      debug(`Authenticated channel ID: ${id}`);
+      return id;
+    })().catch((err) => {
+      // Allow a later caller to retry the lookup instead of being stuck on
+      // a permanently-rejected promise.
+      authenticatedChannelIdPromise = null;
+      throw err;
+    });
+  }
+  return authenticatedChannelIdPromise;
+}
+
+/**
+ * Validate that a user-supplied channel reference (handle or UC... ID)
+ * resolves to the same channel as the authenticated account. Reporting API
+ * flows use this so a stale `default.channel` config or a wrong `--channel`
+ * fails loudly instead of silently writing the authed account's data under
+ * another channel's cache path (issue #153).
+ *
+ * `requestedChannel` may be a `@handle`, a `UC...` ID, or a legacy username
+ * — `getChannelId` normalizes all of them. Resolves silently when the input
+ * is empty/undefined (no validation requested).
+ */
+export async function assertChannelMatchesAuthenticated(
+  requestedChannel: string | undefined,
+  authenticatedChannelId: string,
+): Promise<void> {
+  if (!requestedChannel) return;
+  const requestedChannelId = await getChannelId(requestedChannel);
+  if (requestedChannelId !== authenticatedChannelId) {
+    throw new Error(
+      `Reporting data is always scoped to the authenticated channel.\n` +
+      `You requested channel "${requestedChannel}" (ID ${requestedChannelId}), ` +
+      `but you are authenticated as channel ID ${authenticatedChannelId}.\n` +
+      `Re-authenticate as the requested channel, or remove default.channel / omit --channel.`
+    );
+  }
+}
+
 /**
  * Get channel ID from handle or username.
  * Short-circuits if input is already a channel ID (UC + 22 chars).
@@ -108,18 +188,18 @@ async function getChannelId(handleOrId: string): Promise<string> {
   const youtube = await getYouTubeClient();
   let channelId: string | null = null;
 
-  // If it starts with @, search by handle
+  // Exact handle lookup — channels.list costs 1 quota unit vs 100 for
+  // search.list, and unlike text search it can never match a similarly-named
+  // channel (a wrong search match would be persisted to the handle cache).
   if (handleOrId.startsWith('@')) {
-    debug('Searching by handle using search endpoint');
-    const searchResponse = await youtube.search.list({
-      part: ['snippet'],
-      q: handleOrId,
-      type: ['channel'],
-      maxResults: 1,
+    debug('Looking up channel by handle via channels.list forHandle');
+    const response = await youtube.channels.list({
+      part: ['id'],
+      forHandle: handleOrId.replace('@', ''),
     });
 
-    if (searchResponse.data.items && searchResponse.data.items.length > 0) {
-      channelId = searchResponse.data.items[0].snippet!.channelId!;
+    if (response.data.items && response.data.items.length > 0) {
+      channelId = response.data.items[0].id!;
       debug(`Found channel ID: ${channelId}`);
     }
   } else {
@@ -134,26 +214,25 @@ async function getChannelId(handleOrId: string): Promise<string> {
         channelId = response.data.items[0].id!;
       }
     } catch {
-      // Continue to search
+      // Continue to legacy username lookup
     }
 
-    // Fall back to username search
+    // Fall back to legacy YouTube username (youtube.com/user/<name>) —
+    // also an exact 1-unit lookup, unlike the search.list fallback it replaces
     if (!channelId) {
-      const searchResponse = await youtube.search.list({
-        part: ['snippet'],
-        q: handleOrId,
-        type: ['channel'],
-        maxResults: 1,
+      const response = await youtube.channels.list({
+        part: ['id'],
+        forUsername: handleOrId,
       });
 
-      if (searchResponse.data.items && searchResponse.data.items.length > 0) {
-        channelId = searchResponse.data.items[0].snippet!.channelId!;
+      if (response.data.items && response.data.items.length > 0) {
+        channelId = response.data.items[0].id!;
       }
     }
   }
 
   if (!channelId) {
-    throw new Error(`Channel not found: ${handleOrId}`);
+    throw new Error(`Channel not found: ${handleOrId}. Pass an @handle or a UC… channel ID.`);
   }
 
   // Persist to FS cache so future calls skip the API
@@ -868,6 +947,33 @@ async function listVideoComments(videoId: string, maxResults = 20, order: 'relev
 // ─── Captions ─────────────────────────────────────────────────────────────────
 
 /**
+ * Map a YouTube caption resource to the CLI caption model
+ */
+function mapCaptionItem(item: youtube_v3.Schema$Caption): CaptionInfo {
+  const snippet = item.snippet!;
+  const rawTrackKind = snippet.trackKind?.toLowerCase();
+  // YouTube returns `standard` for user-uploaded tracks and `ASR` for
+  // auto-generated ones; `forced` is a YouTube-managed fallback track
+  // and counts as automatic in the user-facing model. Anything else
+  // defaults to `manual` because `standard` is the documented default.
+  const trackKind: CaptionInfo['trackKind'] =
+    rawTrackKind === 'asr' || rawTrackKind === 'forced' ? 'automatic' : 'manual';
+
+  return {
+    id: item.id!,
+    videoId: snippet.videoId!,
+    language: snippet.language || 'unknown',
+    languageName: snippet.language || 'unknown',
+    trackKind,
+    isClosedCaptions: false,
+    isLarge: false,
+    isEasyReader: false,
+    isAutoGenerated: trackKind === 'automatic',
+    isDraft: false,
+  };
+}
+
+/**
  * List all captions for a video
  * @param videoId - YouTube video ID
  * @returns Array of caption info
@@ -884,23 +990,7 @@ async function listCaptions(videoId: string): Promise<CaptionInfo[]> {
   const items = response.data.items || [];
   debug(`Retrieved ${items.length} caption track(s)`);
 
-  return items.map((item: youtube_v3.Schema$Caption) => {
-    const snippet = item.snippet!;
-    return {
-      id: item.id!,
-      videoId: snippet.videoId!,
-      language: snippet.language || 'unknown',
-      languageName: snippet.language || 'unknown',
-      trackKind: (snippet.trackKind === 'ASR' || snippet.trackKind === 'forced' || snippet.trackKind === 'standard')
-        ? snippet.trackKind
-        : 'standard',
-      isClosedCaptions: false,
-      isLarge: false,
-      isEasyReader: false,
-      isAutoGenerated: snippet.audioTrackType === 'unknown' || snippet.trackKind === 'ASR',
-      isDraft: false,
-    };
-  });
+  return items.map(mapCaptionItem);
 }
 
 /**
@@ -932,6 +1022,158 @@ async function downloadCaption(captionId: string, format: CaptionFormat = 'json'
   return content;
 }
 
+export interface UploadedCaption {
+  id: string;
+  videoId: string;
+  language: string;
+  name: string;
+  isDraft: boolean;
+  /** True when --force replaced an existing track's content instead of creating one. */
+  replaced: boolean;
+  /** Processing status from the API: 'serving' | 'syncing' | 'failed'. */
+  status: string;
+}
+
+/**
+ * Verify the API accepted the caption content. captions.insert/update accept
+ * ANY file and only report unparseable content afterwards via
+ * snippet.status === 'failed' (live-verified 2026-07-13: a .txt upload
+ * succeeds, then the track sits at status=failed / failureReason=unknownFormat).
+ * Throws so callers fail loudly instead of leaving a zombie track the user
+ * only discovers in YouTube Studio. `cleanup` deletes the just-created track
+ * first (insert path only — never delete a pre-existing track on the update
+ * path, its content is already replaced either way).
+ */
+async function assertCaptionProcessed(
+  youtube: youtube_v3.Youtube,
+  captionId: string,
+  snippet: youtube_v3.Schema$CaptionSnippet | undefined,
+  cleanup: boolean
+): Promise<string> {
+  const status = snippet?.status ?? 'serving';
+  if (status !== 'failed') {
+    return status;
+  }
+  const reason = snippet?.failureReason || 'unknown reason';
+  // The API documents two failure reasons: unknownFormat (bad file content)
+  // and processingFailed (YouTube-side error) — only blame the file for the former.
+  const explanation =
+    snippet?.failureReason === 'unknownFormat'
+      ? 'The file content is not a supported subtitle format.'
+      : 'YouTube could not process the file — the content may still be valid; retrying may succeed.';
+  if (cleanup) {
+    let removed = true;
+    await youtube.captions.delete({ id: captionId }).catch(err => {
+      removed = false;
+      debug(`Cleanup of failed caption track ${captionId} failed:`, (err as Error).message);
+    });
+    throw new Error(
+      `Caption upload was accepted but processing failed (${reason}). ${explanation} ` +
+      (removed
+        ? 'The failed track was removed.'
+        : `The failed track ${captionId} could not be removed automatically — delete it in YouTube Studio.`)
+    );
+  }
+  throw new Error(
+    `Caption content replacement failed processing (${reason}). ${explanation} ` +
+    `The existing track ${captionId} is now in a failed state — re-run the upload to fix it.`
+  );
+}
+
+/**
+ * Upload a caption track for a video.
+ *
+ * Default (put-* contract): captions.insert — the API rejects the upload if
+ * a track with the same language+name already exists. With `force: true`,
+ * an existing matching track is looked up first and its content replaced
+ * via captions.update instead (the only way the API offers to overwrite
+ * subtitles). Requires ownership of the video (youtube.force-ssl scope).
+ */
+async function uploadCaption(
+  videoId: string,
+  language: string,
+  filePath: string,
+  options: { name?: string; draft?: boolean; force?: boolean } = {}
+): Promise<UploadedCaption> {
+  debug(`Uploading caption for video ${videoId} (${language}) from ${filePath}`);
+  const youtube = await getYouTubeClient();
+  const trackName = options.name ?? '';
+
+  if (options.force) {
+    const list = await youtube.captions.list({ part: ['snippet'], videoId });
+    const existing = (list.data.items || []).find(
+      item => item.snippet?.language === language && (item.snippet?.name ?? '') === trackName
+    );
+
+    if (existing?.id) {
+      debug(`--force: replacing existing caption track ${existing.id}`);
+      // Retain the stream so it can be destroyed if the API call fails —
+      // otherwise the file descriptor leaks until GC (matters for the
+      // long-running MCP server case).
+      const media = createReadStream(filePath);
+      try {
+        const response = await youtube.captions.update({
+          part: ['snippet'],
+          requestBody: {
+            id: existing.id,
+            snippet: { isDraft: options.draft ?? false },
+          },
+          media: { body: media },
+        });
+
+        const snippet = response.data.snippet;
+        const status = await assertCaptionProcessed(
+          youtube, response.data.id || existing.id, snippet ?? undefined, false
+        );
+        return {
+          id: response.data.id || existing.id,
+          videoId,
+          language: snippet?.language || language,
+          name: snippet?.name ?? trackName,
+          isDraft: snippet?.isDraft ?? false,
+          replaced: true,
+          status,
+        };
+      } catch (err) {
+        media.destroy();
+        throw err;
+      }
+    }
+    debug('--force: no matching track found, falling through to insert');
+  }
+
+  const media = createReadStream(filePath);
+  try {
+    const response = await youtube.captions.insert({
+      part: ['snippet'],
+      requestBody: {
+        snippet: {
+          videoId,
+          language,
+          name: trackName,
+          isDraft: options.draft ?? false,
+        },
+      },
+      media: { body: media },
+    });
+
+    const snippet = response.data.snippet;
+    const status = await assertCaptionProcessed(youtube, response.data.id!, snippet ?? undefined, true);
+    return {
+      id: response.data.id!,
+      videoId: snippet?.videoId || videoId,
+      language: snippet?.language || language,
+      name: snippet?.name ?? '',
+      isDraft: snippet?.isDraft ?? false,
+      replaced: false,
+      status,
+    };
+  } catch (err) {
+    media.destroy();
+    throw err;
+  }
+}
+
 export {
   getYouTubeClient,
   getChannelId,
@@ -949,6 +1191,8 @@ export {
   getPlaylistsById,
   listChannelPlaylists,
   listVideoComments,
+  mapCaptionItem,
   listCaptions,
   downloadCaption,
+  uploadCaption,
 };

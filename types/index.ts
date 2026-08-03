@@ -158,7 +158,7 @@ export interface ChannelOption {
   channel?: string;
 }
 
-export interface UpdateVideoOptions extends VerboseOption {
+export interface UpdateVideoOptions extends VerboseOption, OutputOption {
   title?: string;
   description?: string;
   dryRun?: boolean;
@@ -170,13 +170,13 @@ export interface LocalizationOptions extends VerboseOption, OutputOption, VideoI
   languages?: string;
 }
 
-export interface PutLocalizationOptions extends VerboseOption, VideoIdOption {
+export interface PutLocalizationOptions extends VerboseOption, OutputOption, VideoIdOption {
   language: string;
   title: string;
   description: string;
 }
 
-export interface UpdateLocalizationOptions extends VerboseOption, VideoIdOption {
+export interface UpdateLocalizationOptions extends VerboseOption, OutputOption, VideoIdOption {
   language: string;
   title?: string;
   description?: string;
@@ -187,6 +187,7 @@ export interface AnalyticsOptions extends OutputOption, VerboseOption, VideoIdOp
   startDate?: string;
   endDate?: string;
   metrics?: string;
+  dimensions?: string;
 }
 
 export interface SearchTermsOptions extends OutputOption, VerboseOption, VideoIdOption {
@@ -200,7 +201,7 @@ export interface RetentionOptions extends OutputOption, VerboseOption, VideoIdOp
 // Tags command options
 export interface GetTagsOptions extends OutputOption, VerboseOption, VideoIdOption {}
 
-export interface UpdateTagsOptions extends VerboseOption, VideoIdOption {
+export interface UpdateTagsOptions extends VerboseOption, OutputOption, VideoIdOption {
   replace?: string;
   add?: string;
   remove?: string;
@@ -284,10 +285,15 @@ export interface ChannelInfo {
 }
 
 // Caption-related types
-export type CaptionTrackKind = 'standard' | 'ASR' | 'forced';
+export type CaptionTrackKind = 'manual' | 'automatic';
 
 export const CAPTION_FORMATS = ['srt', 'vtt', 'sbv', 'scc', 'ttml', 'json'] as const;
 export type CaptionFormat = typeof CAPTION_FORMATS[number];
+
+// File extensions accepted for caption uploads (put-caption). The API
+// accepts any bytes and only fails during processing, so uploads are
+// gated client-side to these subtitle formats YouTube documents.
+export const CAPTION_UPLOAD_EXTENSIONS = ['.srt', '.sbv', '.vtt', '.ttml', '.dfxp', '.scc'] as const;
 
 export interface CaptionInfo {
   id: string;
@@ -308,6 +314,14 @@ export interface ListCaptionsOptions extends OutputOption, VerboseOption, VideoI
 export interface GetCaptionOptions extends OutputOption, VerboseOption, CaptionIdOption {
   download?: boolean;
   format?: CaptionFormat;
+}
+
+export interface PutCaptionOptions extends OutputOption, VerboseOption, VideoIdOption {
+  language: string;
+  file: string;
+  name?: string;
+  draft?: boolean;
+  force?: boolean;
 }
 
 // Channel analytics command options

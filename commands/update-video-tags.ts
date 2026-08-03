@@ -1,7 +1,9 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, confirm, success, error, warning, info, debug, initCommand, createSpinner } from '../lib/utils';
+import { parseVideoId, confirm, success, warning, info, debug, initCommand, createSpinner } from '../lib/utils';
+import { getOutputFormat } from '../lib/config';
+import { formatData } from '../lib/formatters';
 import { UpdateTagsOptions } from '../types';
 
 async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void> {
@@ -10,9 +12,13 @@ async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void>
   // Extract video ID from options
   const videoId = options.videoId;
   if (!videoId) {
-    error('Required: --video-id');
-    process.exit(1);
+    throw new Error('Required: --video-id');
   }
+
+  // Resolve output format before the try block and any API call: an invalid
+  // --output fails fast without spending quota or being re-wrapped by the
+  // catch below as "Failed to update tags" (CodeRabbit on #140).
+  const outputFormat = await getOutputFormat(options.output);
 
   try {
     const parsedId = parseVideoId(videoId);
@@ -20,16 +26,16 @@ async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void>
 
     // Validate that at least one update is provided
     if (!options.replace && !options.add && !options.remove) {
-      error('Please provide at least one of --replace, --add, or --remove');
-      process.exit(1);
+      throw new Error('Please provide at least one of --replace, --add, or --remove');
     }
 
     // --replace is rewrite mode; --add/--remove is incremental mode — cannot mix
     if (options.replace && (options.add || options.remove)) {
-      error('--replace cannot be combined with --add or --remove');
-      console.log(chalk.gray('  Rewrite mode:      --replace "foo,bar"'));
-      console.log(chalk.gray('  Incremental mode:  --add "foo" --remove "bar"'));
-      process.exit(1);
+      throw new Error(
+        '--replace cannot be combined with --add or --remove\n' +
+        '  Rewrite mode:      --replace "foo,bar"\n' +
+        '  Incremental mode:  --add "foo" --remove "bar"'
+      );
     }
 
     // Fetch current video info
@@ -43,9 +49,7 @@ async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void>
     });
 
     if (!response.data.items || response.data.items.length === 0) {
-      spinner.fail('Video not found');
-      error(`No video found with ID: ${parsedId}`);
-      process.exit(1);
+      throw new Error(`No video found with ID: ${parsedId}`);
     }
 
     const video = response.data.items[0];
@@ -53,7 +57,6 @@ async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void>
     const title = video.snippet?.title || 'Untitled';
 
     spinner.succeed('Current tags retrieved');
-    console.log('');
 
     // Calculate new tags
     let newTags: string[] = [];
@@ -82,50 +85,57 @@ async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void>
       }
     }
 
-    // Show current state
-    console.log(chalk.bold.cyan(title));
-    console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
-    console.log('');
-
-    console.log(chalk.bold('Current tags:'));
-    if (currentTags.length === 0) {
-      console.log(chalk.gray('  (No tags)'));
-    } else {
-      currentTags.forEach(tag => {
-        console.log(`  ${tag}`);
-      });
-    }
-    console.log('');
-
-    // Show proposed changes
-    console.log(chalk.bold('New tags:'));
-    if (newTags.length === 0) {
-      console.log(chalk.gray('  (No tags)'));
-    } else {
-      newTags.forEach(tag => {
-        const isNew = !currentTags.includes(tag);
-        if (isNew) {
-          console.log(chalk.green(`  + ${tag}`));
-        } else {
-          console.log(`  ${tag}`);
-        }
-      });
-    }
-
-    // Show removed tags
     const removedTags = currentTags.filter(tag => !newTags.includes(tag));
-    if (removedTags.length > 0) {
-      console.log('');
-      console.log(chalk.bold('Removed tags:'));
-      removedTags.forEach(tag => {
-        console.log(chalk.red(`  - ${tag}`));
-      });
-    }
+    const addedTags = newTags.filter(tag => !currentTags.includes(tag));
 
-    console.log('');
+    // Human preview only in pretty mode — machine formats keep stdout as
+    // pure data (spinner/success/info/confirm all write to stderr).
+    if (outputFormat === 'pretty') {
+      console.log('');
+      console.log(chalk.bold.cyan(title));
+      console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
+      console.log('');
+
+      console.log(chalk.bold('Current tags:'));
+      if (currentTags.length === 0) {
+        console.log(chalk.gray('  (No tags)'));
+      } else {
+        currentTags.forEach(tag => {
+          console.log(`  ${tag}`);
+        });
+      }
+      console.log('');
+
+      console.log(chalk.bold('New tags:'));
+      if (newTags.length === 0) {
+        console.log(chalk.gray('  (No tags)'));
+      } else {
+        newTags.forEach(tag => {
+          const isNew = !currentTags.includes(tag);
+          if (isNew) {
+            console.log(chalk.green(`  + ${tag}`));
+          } else {
+            console.log(`  ${tag}`);
+          }
+        });
+      }
+
+      if (removedTags.length > 0) {
+        console.log('');
+        console.log(chalk.bold('Removed tags:'));
+        removedTags.forEach(tag => {
+          console.log(chalk.red(`  - ${tag}`));
+        });
+      }
+
+      console.log('');
+    }
 
     // Dry run mode
     if (options.dryRun) {
+      if (outputFormat !== 'pretty') {
+        console.log(formatData([{ videoId: parsedId, title, previousTags: currentTags, newTags, addedTags, removedTags, dryRun: true }], outputFormat));
+      }
       info('Dry run mode - no changes will be applied');
       success('Preview complete');
       return;
@@ -156,23 +166,26 @@ async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void>
     });
 
     updateSpinner.succeed('Tags updated successfully');
-    console.log('');
+
+    if (outputFormat !== 'pretty') {
+      console.log(formatData([{ videoId: parsedId, title, previousTags: currentTags, newTags, addedTags, removedTags, dryRun: false }], outputFormat));
+    } else {
+      console.log('');
+    }
     success(`Video updated: https://youtube.com/watch?v=${parsedId}`);
   } catch (err) {
-    console.log('');
     const errorMessage = (err as Error).message;
+    // The throw propagates to withHelpWrapper for the exit(1) (issue #110).
     if (errorMessage.includes('invalid video keywords')) {
-      error('Cannot update video tags');
-      console.log('');
-      console.log(chalk.gray('This usually means one of two things:'));
-      console.log(chalk.gray('  1. You don\'t have permission to modify this video (not your channel)'));
-      console.log(chalk.gray('  2. Tags contain invalid characters or exceed length limits'));
-      console.log('');
-      console.log(chalk.gray('Tip: Tags use comma-separated format: --add "tokyo bar,craft beer,nightlife"'));
-    } else {
-      error(`Failed to update tags: ${errorMessage}`);
+      throw new Error(
+        'Cannot update video tags\n' +
+        'This usually means one of two things:\n' +
+        "  1. You don't have permission to modify this video (not your channel)\n" +
+        '  2. Tags contain invalid characters or exceed length limits\n' +
+        'Tip: Tags use comma-separated format: --add "tokyo bar,craft beer,nightlife"'
+      );
     }
-    process.exit(1);
+    throw new Error(`Failed to update tags: ${errorMessage}`);
   }
 }
 

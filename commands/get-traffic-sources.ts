@@ -1,7 +1,6 @@
 import chalk from 'chalk';
-import { getAuthenticatedClient } from '../lib/auth';
-import { google } from 'googleapis';
-import { parseVideoId, error, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd } from '../lib/utils';
+import { parseVideoId, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, daysAgoYmd } from '../lib/utils';
+import { fetchTrafficSources } from '../lib/analytics';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { TrafficSourcesOptions } from '../types';
@@ -12,61 +11,27 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
   // Extract video ID from options
   const videoId = options.videoId;
   if (!videoId) {
-    error('Required: --video-id');
-    process.exit(1);
+    throw new Error('Required: --video-id');
   }
 
   await withSpinner('Fetching traffic sources...', 'Failed to fetch traffic sources', async (spinner) => {
     const parsedId = parseVideoId(videoId);
     debug('Parsed video ID', parsedId);
 
-    const auth = await getAuthenticatedClient();
-    const youtube = google.youtube({ version: 'v3', auth });
-    const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
-
-    // Get video info for title
-    const videoResponse = await youtube.videos.list({
-      part: ['snippet'],
-      id: [parsedId],
-    });
-
-    if (!videoResponse.data.items || videoResponse.data.items.length === 0) {
-      spinner.fail('Video not found');
-      error(`No video found with ID: ${parsedId}`);
-      process.exit(1);
-    }
-
-    const title = videoResponse.data.items[0].snippet?.title || 'Untitled';
-
-    // Date range: last 30 days
+    // CLI default: last 30 days (the MCP tool defaults to all-time — the
+    // shared lib takes an explicit range so neither surface's documented
+    // behavior changes; see lib/analytics.ts #102).
     const endDate = toLocalYmd(new Date());
-    const startDate = (() => {
-      const date = new Date();
-      date.setDate(date.getDate() - 30);
-      return toLocalYmd(date);
-    })();
-
+    const startDate = daysAgoYmd(30);
     debug(`Date range: ${startDate} to ${endDate}`);
 
-    // Fetch traffic sources data
-    const analyticsResponse = await youtubeAnalytics.reports.query({
-      ids: 'channel==MINE',
-      startDate,
-      endDate,
-      metrics: 'views',
-      dimensions: 'insightTrafficSourceType',
-      filters: `video==${parsedId}`,
-      sort: '-views',
-    });
+    const result = await fetchTrafficSources({ videoId: parsedId, startDate, endDate });
+    const { title, columnHeaders, rows } = result;
 
     spinner.succeed('Traffic sources data retrieved');
     console.log('');
 
     const outputFormat = await getOutputFormat(options.output);
-
-    // Prepare data
-    const rows = analyticsResponse.data.rows || [];
-    const columnHeaders = analyticsResponse.data.columnHeaders || [];
 
     // Traffic source labels
     const sourceLabels: { [key: string]: string } = {
@@ -103,7 +68,7 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
 
     switch (outputFormat) {
       case 'csv':
-        if (columnHeaders && rows) {
+        if (columnHeaders.length > 0 && rows.length > 0) {
           console.log(convertToCSV(columnHeaders, rows));
         } else {
           console.log(formatCsv(trafficData));

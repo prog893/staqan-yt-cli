@@ -3,13 +3,33 @@
  */
 
 import chalk from 'chalk';
-import { PrivacyStatus } from '../types';
+import { PrivacyStatus, OutputFormat } from '../types';
 
 /**
  * Format data as JSON
  */
 export function formatJson(data: unknown): string {
   return JSON.stringify(data, null, 2);
+}
+
+/**
+ * Dispatch to the matching machine formatter. 'pretty' is excluded on
+ * purpose: pretty output is command-specific and handled by each command's
+ * own rendering, while the four machine formats share generic renderers.
+ */
+export function formatData(data: unknown, format: Exclude<OutputFormat, 'pretty'>): string {
+  switch (format) {
+    case 'json': return formatJson(data);
+    case 'table': return formatTable(data);
+    case 'csv': return formatCsv(data);
+    case 'text': return formatText(data);
+    default: {
+      // Exhaustiveness guard: a new OutputFormat member fails compilation
+      // here instead of silently falling through.
+      const unreachable: never = format;
+      throw new Error(`Unhandled output format: ${unreachable}`);
+    }
+  }
 }
 
 /**

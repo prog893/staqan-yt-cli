@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { searchVideos } from '../lib/youtube';
-import { formatDate, error, parsePositiveInt, debug, initCommand, withSpinner, runOrExit } from '../lib/utils';
+import { formatDate, parsePositiveInt, debug, initCommand, withSpinner, runOrExit } from '../lib/utils';
 import { getConfigValue, getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { SearchVideosOptions, QueryOption } from '../types';
@@ -10,8 +10,7 @@ async function searchVideosCommand(options: SearchVideosOptions & QueryOption): 
 
   const query = options.query;
   if (!query) {
-    error('Required: --query');
-    process.exit(1);
+    throw new Error('Required: --query');
   }
 
   // Determine search mode
@@ -20,13 +19,13 @@ async function searchVideosCommand(options: SearchVideosOptions & QueryOption): 
 
   // Validation: can't use both --global and --channel
   if (isGlobal && explicitChannel) {
-    error('Cannot use both --global and --channel flags together');
-    console.log('');
-    console.log(chalk.yellow('Use either:'));
-    console.log('  - staqan-yt search-videos --query "<query>" --global');
-    console.log('  - staqan-yt search-videos --query "<query>" --channel @handle');
-    console.log('  - staqan-yt search-videos --query "<query>" (uses config default.channel)');
-    process.exit(1);
+    throw new Error(
+      'Cannot use both --global and --channel flags together\n' +
+      'Use either:\n' +
+      '  - staqan-yt search-videos --query "<query>" --global\n' +
+      '  - staqan-yt search-videos --query "<query>" --channel @handle\n' +
+      '  - staqan-yt search-videos --query "<query>" (uses config default.channel)'
+    );
   }
 
   let searchMode: 'global' | 'channel';
@@ -43,18 +42,17 @@ async function searchVideosCommand(options: SearchVideosOptions & QueryOption): 
     // Try to load from config
     targetChannel = await getConfigValue('default.channel');
     if (!targetChannel) {
-      error('No channel specified');
-      console.log('');
-      console.log(chalk.yellow('Options:'));
-      console.log('  1. Use --global flag to search all of YouTube');
-      console.log('  2. Use --channel @handle to search a specific channel');
-      console.log('  3. Set a default channel: staqan-yt config set default.channel @yourChannel');
-      console.log('');
-      console.log(chalk.gray('Examples:'));
-      console.log(chalk.gray('  staqan-yt search-videos --query "tutorial" --global'));
-      console.log(chalk.gray('  staqan-yt search-videos --query "tutorial" --channel @mkbhd'));
-      console.log(chalk.gray('  staqan-yt config set default.channel @mkbhd'));
-      process.exit(1);
+      throw new Error(
+        'No channel specified\n' +
+        'Options:\n' +
+        '  1. Use --global flag to search all of YouTube\n' +
+        '  2. Use --channel @handle to search a specific channel\n' +
+        '  3. Set a default channel: staqan-yt config set default.channel @yourChannel\n' +
+        'Examples:\n' +
+        '  staqan-yt search-videos --query "tutorial" --global\n' +
+        '  staqan-yt search-videos --query "tutorial" --channel @mkbhd\n' +
+        '  staqan-yt config set default.channel @mkbhd'
+      );
     }
     searchMode = 'channel';
     debug(`Channel search mode with config default: ${targetChannel}`);

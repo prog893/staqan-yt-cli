@@ -1,7 +1,6 @@
 import chalk from 'chalk';
-import { getAuthenticatedClient } from '../lib/auth';
-import { google } from 'googleapis';
-import { parseVideoId, error, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, runOrExit } from '../lib/utils';
+import { parseVideoId, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, daysAgoYmd, runOrExit } from '../lib/utils';
+import { fetchSearchTerms } from '../lib/analytics';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { SearchTermsOptions } from '../types';
@@ -12,8 +11,7 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
   // Extract video ID from options
   const videoId = options.videoId;
   if (!videoId) {
-    error('Required: --video-id');
-    process.exit(1);
+    throw new Error('Required: --video-id');
   }
 
   const limit = runOrExit(() => parsePositiveInt('--limit', options.limit, 50));
@@ -22,53 +20,19 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
     const parsedId = parseVideoId(videoId);
     debug('Parsed video ID', parsedId);
 
-    const auth = await getAuthenticatedClient();
-    const youtube = google.youtube({ version: 'v3', auth });
-    const youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
-
-    // Get video info for title
-    const videoResponse = await youtube.videos.list({
-      part: ['snippet'],
-      id: [parsedId],
-    });
-
-    if (!videoResponse.data.items || videoResponse.data.items.length === 0) {
-      spinner.fail('Video not found');
-      error(`No video found with ID: ${parsedId}`);
-      process.exit(1);
-    }
-
-    const title = videoResponse.data.items[0].snippet?.title || 'Untitled';
-
-    // Date range: last 30 days
+    // CLI default: last 30 days (MCP defaults to all-time; the shared lib
+    // takes an explicit range — see lib/analytics.ts #102).
     const endDate = toLocalYmd(new Date());
-    const startDate = (() => {
-      const date = new Date();
-      date.setDate(date.getDate() - 30);
-      return toLocalYmd(date);
-    })();
-
+    const startDate = daysAgoYmd(30);
     debug(`Date range: ${startDate} to ${endDate}`);
 
-    // Fetch search terms data
-    const analyticsResponse = await youtubeAnalytics.reports.query({
-      ids: 'channel==MINE',
-      startDate,
-      endDate,
-      metrics: 'views',
-      dimensions: 'insightTrafficSourceDetail',
-      filters: `video==${parsedId};insightTrafficSourceType==YT_SEARCH`,
-      sort: '-views',
-      maxResults: limit,
-    });
+    const result = await fetchSearchTerms({ videoId: parsedId, startDate, endDate, limit });
+    const { title, rows } = result;
 
     spinner.succeed('Search terms data retrieved');
     console.log('');
 
     const outputFormat = await getOutputFormat(options.output);
-
-    // Prepare data for structured formats
-    const rows = analyticsResponse.data.rows || [];
     const searchTermsData = rows.map((row, index) => ({
       rank: index + 1,
       searchTerm: row[0] as string,
@@ -81,8 +45,8 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
           videoId: parsedId,
           title,
           dateRange: { startDate, endDate },
-          columnHeaders: analyticsResponse.data.columnHeaders,
-          rows: analyticsResponse.data.rows,
+          columnHeaders: result.columnHeaders,
+          rows,
         }));
         break;
 
@@ -98,8 +62,8 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
 
       case 'csv':
         // Use convertToCSV for consistency with analytics commands
-        if (analyticsResponse.data.columnHeaders && analyticsResponse.data.rows) {
-          console.log(convertToCSV(analyticsResponse.data.columnHeaders, analyticsResponse.data.rows));
+        if (result.columnHeaders.length > 0 && rows.length > 0) {
+          console.log(convertToCSV(result.columnHeaders, rows));
         } else {
           console.log(formatCsv(searchTermsData));
         }

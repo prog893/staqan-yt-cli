@@ -48,6 +48,7 @@ export function getCommands(): string[] {
     'get-thumbnail',
     'list-captions',
     'get-caption',
+    'put-caption',
     // Playlists
     'get-playlist',
     'get-playlists',
@@ -98,6 +99,7 @@ export function getRequiredFlags(command: string): string[] {
     'list-comments': ['--video-id'],
     'list-captions': ['--video-id'],
     'get-caption': ['--caption-id'],
+    'put-caption': ['--video-id', '--language', '--file'],
   };
 
   return requiredFlagMap[command] || [];
@@ -123,7 +125,7 @@ export function getCommandOptions(command: string): string[] {
     'get-video-localization': ['--language', ...outputOptions, ...verboseOption],
     'put-video-localization': ['--language', '--title', '--description', ...outputOptions, ...verboseOption],
     'update-video-localization': ['--language', '--title', '--description', ...outputOptions, ...verboseOption],
-    'get-video-analytics': ['--start-date', '--end-date', '--metrics', ...outputOptions, ...verboseOption],
+    'get-video-analytics': ['--start-date', '--end-date', '--metrics', '--dimensions', ...outputOptions, ...verboseOption],
     'get-search-terms': ['--limit', '-l', ...outputOptions, ...verboseOption],
     'get-traffic-sources': [...outputOptions, ...verboseOption],
     'get-video-retention': [...outputOptions, ...verboseOption],
@@ -138,6 +140,7 @@ export function getCommandOptions(command: string): string[] {
     'list-playlists': ['--channel', '--limit', '-l', '--privacy', ...outputOptions, ...verboseOption],
     'list-captions': [...outputOptions, ...verboseOption],
     'get-caption': ['--format', ...verboseOption],
+    'put-caption': ['--language', '--file', '--name', '--draft', '--force', '-f', ...outputOptions, ...verboseOption],
     'list-report-types': ['--output', 'json', 'table', 'text', ...verboseOption],
     'list-report-jobs': ['--type', '--output', 'json', 'table', 'text', ...verboseOption],
     'get-report-data': ['--type', '--video-id', '--start-date', '--end-date', '--output', 'json', 'csv', ...verboseOption],
@@ -296,6 +299,8 @@ _staqa_nyt_completion() {
       COMPREPLY=( \$(compgen -W "top new" -- "\${cur}") ); return ;;
     --format)
       COMPREPLY=( \$(compgen -W "srt vtt sbv scc ttml json" -- "\${cur}") ); return ;;
+    --dimensions)
+      COMPREPLY=( \$(compgen -W "video day month insightTrafficSourceType insightTrafficSourceDetail creatorContentType country province city deviceType operatingSystem insightPlaybackLocationType insightPlayerLocationType subscribedStatus" -- "\${cur}") ); return ;;
     staqan-yt)
       COMPREPLY=( \$(compgen -W "${commands}" -- "\${cur}") )
       return
@@ -318,8 +323,11 @@ _staqa_nyt_completion() {
     get-video-localization|put-video-localization|update-video-localization)
       COMPREPLY=( \$(compgen -W "--video-id --language --title --description --output --verbose" -- "\${cur}") )
       ;;
-    get-video-analytics|get-channel-analytics)
-      COMPREPLY=( \$(compgen -W "--video-id --start-date --end-date --metrics --report --dimensions --output --verbose" -- "\${cur}") )
+    get-video-analytics)
+      COMPREPLY=( \$(compgen -W "--video-id --start-date --end-date --metrics --dimensions --output --verbose" -- "\${cur}") )
+      ;;
+    get-channel-analytics)
+      COMPREPLY=( \$(compgen -W "--channel --report --start-date --end-date --dimensions --metrics --output --verbose" -- "\${cur}") )
       ;;
     get-search-terms|get-traffic-sources|get-video-retention|get-video-tags|list-captions)
       COMPREPLY=( \$(compgen -W "--video-id --output --verbose" -- "\${cur}") )
@@ -347,6 +355,9 @@ _staqa_nyt_completion() {
       ;;
     get-caption)
       COMPREPLY=( \$(compgen -W "--caption-id --format --verbose" -- "\${cur}") )
+      ;;
+    put-caption)
+      COMPREPLY=( \$(compgen -W "--video-id --language --file --name --draft --force --output --verbose" -- "\${cur}") )
       ;;
     get-channel)
       COMPREPLY=( \$(compgen -W "--channel --output --verbose" -- "\${cur}") )
@@ -435,6 +446,7 @@ function generateZshCompletion(): string {
     'list-playlists': 'List channel playlists',
     'list-captions': 'List caption tracks',
     'get-caption': 'Download caption content',
+    'put-caption': 'Upload a caption track',
     'list-report-types': 'List available report types',
     'list-report-jobs': 'List report jobs',
     'get-report-data': 'Get report data',
@@ -615,6 +627,7 @@ ${commandList}
         '--start-date[Start date (YYYY-MM-DD)]:date:' \\
         '--end-date[End date (YYYY-MM-DD)]:date:' \\
         '--metrics[Metrics to fetch]:metrics:' \\
+        '--dimensions[Analytics dimensions (comma-separated)]:dims:(video day month insightTrafficSourceType insightTrafficSourceDetail creatorContentType country province city deviceType operatingSystem insightPlaybackLocationType insightPlayerLocationType subscribedStatus)' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
@@ -775,6 +788,19 @@ ${commandList}
       _arguments \\
         '--caption-id[Caption ID]:id:( )' \\
         '--format[Caption format]:format:(srt vtt sbv scc ttml json)' \\
+        '--verbose[Enable verbose output]'
+      ;;
+    put-caption)
+      local words=(\$words[1] \$words[3,-1])
+      local CURRENT=\$((\$CURRENT - 1))
+      _arguments \\
+        '--video-id[Video ID]: :_staqan_yt_video_ids' \\
+        '--language[Caption language (BCP-47)]:lang:' \\
+        '--file[Caption file]:file:_files' \\
+        '--name[Track name]:name:' \\
+        '--draft[Upload as draft]' \\
+        '--force[Replace existing matching track]' \\
+        '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
     get-channel)

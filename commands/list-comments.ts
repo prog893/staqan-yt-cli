@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { listVideoComments } from '../lib/youtube';
-import { formatDate, error, parsePositiveInt, debug, parseVideoId, initCommand, withSpinner, runOrExit } from '../lib/utils';
+import { formatDate, parsePositiveInt, debug, parseVideoId, initCommand, withSpinner, runOrExit } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ListCommentsOptions } from '../types';
@@ -11,8 +11,7 @@ async function listCommentsCommand(options: ListCommentsOptions): Promise<void> 
   // Extract video ID from options
   const videoIdInput = options.videoId;
   if (!videoIdInput) {
-    error('Required: --video-id');
-    process.exit(1);
+    throw new Error('Required: --video-id');
   }
 
   // Parse video ID from URL or raw ID
@@ -20,15 +19,13 @@ async function listCommentsCommand(options: ListCommentsOptions): Promise<void> 
 
   // Validate video ID format (basic check)
   if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
-    error('Invalid video ID format. Video IDs should be 11 characters.');
-    process.exit(1);
+    throw new Error('Invalid video ID format. Video IDs should be 11 characters.');
   }
 
   // Determine sort order
   const validSorts = ['new', 'top'];
   if (options.sort !== undefined && !validSorts.includes(options.sort)) {
-    error(`Invalid --sort "${options.sort}". Valid values: new, top`);
-    process.exit(1);
+    throw new Error(`Invalid --sort "${options.sort}". Valid values: new, top`);
   }
   const sortOrder = options.sort === 'new' ? 'time' : 'relevance';
   const limit = runOrExit(() => parsePositiveInt('--limit', options.limit, 20));

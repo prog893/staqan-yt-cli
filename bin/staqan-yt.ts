@@ -2,8 +2,8 @@
 
 import { program, Command } from 'commander';
 import chalk from 'chalk';
-import * as path from 'path';
 import { GroupedHelp } from '../lib/customHelp';
+import { getVersion } from '../lib/version';
 import { setQuiet, setVerbose, error, isHelperFormattedError } from '../lib/utils';
 import authCommand = require('../commands/auth');
 import listVideosCommand = require('../commands/list-videos');
@@ -31,6 +31,7 @@ import listCommentsCommand = require('../commands/list-comments');
 import getChannelCommand = require('../commands/get-channel');
 import listCaptionsCommand = require('../commands/list-captions');
 import getCaptionCommand = require('../commands/get-caption');
+import putCaptionCommand = require('../commands/put-caption');
 import getChannelAnalyticsCommand = require('../commands/get-channel-analytics');
 import getChannelSearchTermsCommand = require('../commands/get-channel-search-terms');
 import listReportTypesCommand = require('../commands/list-report-types');
@@ -93,14 +94,7 @@ function withHelpWrapper(commandName: string, actionFn: (...args: any[]) => Prom
   };
 }
 
-// Get version - try to read from package.json, fallback to hardcoded version for compiled binaries
-let version = '2.0.11'; // Fallback version for compiled binaries
-try {
-  const packageJson = require(path.join(__dirname, '../../package.json'));
-  version = packageJson.version;
-} catch {
-  // Running as compiled binary - use hardcoded version
-}
+const version = getVersion();
 
 program
   .name('staqan-yt')
@@ -185,11 +179,11 @@ program
     program.help();
   });
 
-// Auth command
+// Auth command. No --output flag: the interactive OAuth flow produces no
+// data to format (the flag was advertised but never read — issue #124).
 program
   .command('auth')
   .description('Authenticate with YouTube API using OAuth 2.0')
-  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(authCommand);
 
@@ -311,6 +305,7 @@ program
   .option('--start-date <date>', 'Start date (YYYY-MM-DD), defaults to upload date')
   .option('--end-date <date>', 'End date (YYYY-MM-DD), defaults to today')
   .option('--metrics <metrics>', 'Comma-separated list of metrics to fetch')
+  .option('--dimensions <dims>', 'Comma-separated Analytics API dimensions (default: video)')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('get-video-analytics', getVideoAnalytics));
@@ -455,6 +450,20 @@ program
   .option('--format <format>', 'Caption format: srt, vtt, sbv, scc, ttml, json (default: json)', 'json')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('get-caption', getCaptionCommand));
+
+// Upload a new caption track (PUT - fails if same language+name track exists)
+program
+  .command('put-caption')
+  .description('Upload a new caption track to a video (fails if same language+name track exists)')
+  .requiredOption('--video-id <id>', 'Video ID (must be on your channel)')
+  .requiredOption('--language <lang>', 'Caption language (BCP-47 code, e.g. "ja", "en")')
+  .requiredOption('--file <path>', 'Caption file: srt, sbv, vtt, ttml, dfxp, or scc')
+  .option('--name <name>', 'Track name shown in the player (default: empty)')
+  .option('--draft', 'Upload as draft (not visible to viewers)')
+  .option('-f, --force', 'Replace the existing track content if one matches the language+name')
+  .option('--output <format>', 'Output format: json, table, text, pretty, csv')
+  .option('-v, --verbose', 'Enable verbose output with debug information')
+  .action(withHelpWrapper('put-caption', putCaptionCommand));
 
 // Channel search terms command — top keywords from YouTube Search traffic
 program

@@ -1,6 +1,5 @@
-import chalk from 'chalk';
 import { downloadCaption } from '../lib/youtube';
-import { error, debug, initCommand, createSpinner } from '../lib/utils';
+import { debug, initCommand, createSpinner } from '../lib/utils';
 import { GetCaptionOptions, CAPTION_FORMATS } from '../types';
 
 async function getCaptionCommand(options: GetCaptionOptions): Promise<void> {
@@ -9,13 +8,11 @@ async function getCaptionCommand(options: GetCaptionOptions): Promise<void> {
   // Extract caption ID from options
   const captionId = options.captionId;
   if (!captionId) {
-    error('Required: --caption-id');
-    process.exit(1);
+    throw new Error('Required: --caption-id');
   }
 
   if (options.format && !(CAPTION_FORMATS as readonly string[]).includes(options.format)) {
-    error(`Invalid format '${options.format}'. Valid: ${CAPTION_FORMATS.join(', ')}`);
-    process.exit(1);
+    throw new Error(`Invalid format '${options.format}'. Valid: ${CAPTION_FORMATS.join(', ')}`);
   }
 
   // Note: For caption metadata, use list-captions --video-id <videoId>
@@ -33,27 +30,24 @@ async function getCaptionCommand(options: GetCaptionOptions): Promise<void> {
     console.log(content);
   } catch (err) {
     spinner.fail('Failed to download caption');
-    console.log('');
     const errMessage = (err as Error).message;
+    const tip =
+      '\nTip: Use list-captions <videoId> to see available captions\n' +
+      '     Use get-video <videoId> to check video details';
 
-    // Provide helpful context for common API limitations
+    // Provide helpful context for common API limitations; the throw
+    // propagates to withHelpWrapper for the exit(1) (issue #110).
     if (errMessage.includes('permissions') || errMessage.includes('not sufficient')) {
-      error('Caption download not available — you can only download captions from your own videos');
-      console.log('');
-      console.log(chalk.yellow('YouTube API Limitation:'));
-      console.log(chalk.gray('The captions.download API only works for videos on your authenticated channel.'));
-      console.log(chalk.gray('Downloading captions from other channels\' videos is not permitted.'));
-      console.log('');
-      console.log(chalk.gray('To get the transcript of a video you don\'t own, use a third-party tool or'));
-      console.log(chalk.gray('the YouTube website\'s subtitle/transcript feature instead.'));
-    } else {
-      error(errMessage);
+      throw new Error(
+        'Caption download not available — you can only download captions from your own videos\n' +
+        'YouTube API Limitation:\n' +
+        'The captions.download API only works for videos on your authenticated channel.\n' +
+        "Downloading captions from other channels' videos is not permitted.\n" +
+        "To get the transcript of a video you don't own, use a third-party tool or\n" +
+        "the YouTube website's subtitle/transcript feature instead." + tip
+      );
     }
-
-    console.log('');
-    console.log(chalk.gray('Tip: Use ') + chalk.cyan('list-captions <videoId>') + chalk.gray(' to see available captions'));
-    console.log(chalk.gray('      Use ') + chalk.cyan('get-video <videoId>') + chalk.gray(' to check video details'));
-    process.exit(1);
+    throw new Error(errMessage + tip);
   }
 }
 

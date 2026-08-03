@@ -1,7 +1,9 @@
 import chalk from 'chalk';
 import { putVideoLocalization } from '../lib/youtube';
-import { parseVideoId, error, debug, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
 import { normalizeLanguage, getLanguageName } from '../lib/language';
+import { getOutputFormat } from '../lib/config';
+import { formatData } from '../lib/formatters';
 import { PutLocalizationOptions } from '../types';
 
 async function putVideoLocalizationCommand(options: PutLocalizationOptions): Promise<void> {
@@ -10,26 +12,22 @@ async function putVideoLocalizationCommand(options: PutLocalizationOptions): Pro
   // Extract video ID from options
   const videoId = options.videoId;
   if (!videoId) {
-    error('Required: --video-id');
-    process.exit(1);
+    throw new Error('Required: --video-id');
   }
 
   const { language, title, description } = options;
 
   // Validation: Required options
   if (!language) {
-    error('Error: --language is required');
-    process.exit(1);
+    throw new Error('Required: --language');
   }
 
   if (!title) {
-    error('Error: --title is required');
-    process.exit(1);
+    throw new Error('Required: --title');
   }
 
   if (!description) {
-    error('Error: --description is required');
-    process.exit(1);
+    throw new Error('Required: --description');
   }
 
   const langCode = normalizeLanguage(language);
@@ -38,6 +36,8 @@ async function putVideoLocalizationCommand(options: PutLocalizationOptions): Pro
   debug(`Title length: ${title.length} chars`);
   debug(`Description length: ${description.length} chars`);
 
+  const outputFormat = await getOutputFormat(options.output);
+
   await withSpinner(`Creating ${langName} localization...`, 'Failed to create localization', async (spinner) => {
     debug(`Video ID input: ${videoId}`);
     const parsedId = parseVideoId(videoId);
@@ -45,7 +45,21 @@ async function putVideoLocalizationCommand(options: PutLocalizationOptions): Pro
 
     await putVideoLocalization(parsedId, language, title, description);
 
+    // Spinner output goes to stderr, so machine formats stay pipeable.
     spinner.succeed(chalk.green(`Successfully created ${langName} (${langCode}) localization`));
+
+    if (outputFormat !== 'pretty') {
+      console.log(formatData([{
+        videoId: parsedId,
+        language: langCode,
+        languageName: langName,
+        title,
+        description,
+        action: 'created',
+      }], outputFormat));
+      return;
+    }
+
     console.log('');
     console.log(chalk.gray(`Video ID: ${parsedId}`));
     const titlePreview = title.length > 60 ? title.substring(0, 60) + '...' : title;

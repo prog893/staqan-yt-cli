@@ -150,7 +150,7 @@ staqan-yt get-report-data
 ### Options
 
 - `--type <id>` - Report type ID (e.g., `channel_reach_basic_a1`)
-- `-c, --channel <handle>` - Channel handle or ID (overrides config default)
+- `-c, --channel <handle>` - Channel handle or ID of the authenticated channel. Reporting data is always scoped to the authenticated account (no multi-account auth swap yet), so this is reserved for future use; supplying a value that doesn't match the authenticated channel fails loudly. If omitted, `default.channel` is checked the same way.
 - `--video-id <id>` - Filter by video ID
 - `--start-date <date>` - Start date (YYYY-MM-DD)
 - `--end-date <date>` - End date (YYYY-MM-DD)
@@ -232,10 +232,7 @@ staqan-yt get-report-data \
 
 Cache location: `~/.staqan-yt-cli/data/{channelId}/reports/`
 
-**Required:** Set a default channel or pass `--channel`:
-```bash
-staqan-yt config set default.channel @yourchannel
-```
+The cache is keyed by the authenticated channel ID, not by `--channel` / `default.channel` — Reporting API jobs, jobs.reports, and downloads always operate on the authenticated account regardless of any `--channel` flag, so the cache has to follow the same channel or it gets mislabeled. Passing `--channel` is optional and currently only validates against the authenticated channel.
 
 ### Data Freshness
 
@@ -257,7 +254,7 @@ staqan-yt fetch-reports
 
 ### Options
 
-- `-c, --channel <handle>` - Channel handle or ID (overrides config default)
+- `-c, --channel <handle>` - Channel handle or ID of the authenticated channel. Reporting data is always scoped to the authenticated account (no multi-account auth swap yet), so this is reserved for future use; supplying a value that doesn't match the authenticated channel fails loudly. If omitted, `default.channel` is checked the same way.
 - `-t, --type <id>` - Fetch specific report type
 - `-T, --types <ids>` - Fetch multiple report types (comma-separated)
 - `--start-date <date>` - Filter by start date (YYYY-MM-DD). Reports whose window **overlaps** the range are included — see [Date range filtering](#date-range-filtering).
