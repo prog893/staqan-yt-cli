@@ -8,7 +8,7 @@ import {
   loadReportMetadata,
   ensureCacheDir,
 } from '../lib/cache';
-import { getChannelId } from '../lib/youtube';
+import { getAuthenticatedChannelId, assertChannelMatchesAuthenticated } from '../lib/youtube';
 import { getConfigValue, getLockTimeout } from '../lib/config';
 import { acquireLock, getLockPath } from '../lib/lock';
 import { downloadReport } from '../lib/reports';
@@ -35,15 +35,24 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
   runOrExit(() => { if (options.startDate && options.endDate) validateDateRange(options.startDate, options.endDate); });
 
   await withSpinner('Initializing...', 'Failed to fetch reports', async (spinner) => {
-    // Resolve channel handle → canonical channel ID for cache namespacing
-    const channelHandle = options.channel || await getConfigValue('default.channel');
-    if (!channelHandle) {
-      throw new Error('No channel specified. Set a default channel:\n  staqan-yt config set default.channel @yourchannel\nor pass --channel @yourchannel');
-    }
-
-    spinner.text = `Resolving channel ID for ${channelHandle}...`;
-    const channelId = await getChannelId(channelHandle);
-    debug(`Using channel ID: ${channelId}`);
+    // Resolve the cache namespace from the AUTHENTICATED channel. The
+    // Reporting API always returns data for whoever's authenticated — there's
+    // no channel parameter and `onBehalfOfContentOwner` is always undefined in
+    // this CLI — so the cache has to be keyed by the same channel or we
+    // silently write the authed account's data under another channel's path
+    // (issue #153).
+    //
+    // `--channel` / `default.channel` is accepted only for validation: today
+    // it can only name the authed channel (no multi-account auth-swap yet,
+    // see #153), so we resolve it and fail loudly on mismatch. That surfaces
+    // stale `default.channel` config or a wrong `--channel` instead of
+    // letting the bug recur. The shared helper keeps the message identical
+    // across fetchReportData and fetch-reports.
+    spinner.text = 'Resolving authenticated channel...';
+    const channelId = await getAuthenticatedChannelId();
+    const requestedChannel = options.channel || await getConfigValue('default.channel');
+    await assertChannelMatchesAuthenticated(requestedChannel, channelId);
+    debug(`Using authenticated channel ID for cache namespace: ${channelId}`);
 
     // Ensure cache directory exists before touching the lock
     try {
@@ -298,7 +307,7 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
     if (options.verify) {
       spinner.text = 'Verifying cached files...';
 
-      const index = await loadCacheIndex(channelId, channelHandle);
+      const index = await loadCacheIndex(channelId);
       let verified = 0;
       let corrupted = 0;
 
