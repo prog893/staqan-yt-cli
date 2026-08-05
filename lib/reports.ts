@@ -29,7 +29,9 @@ import {
   analyzeCacheCoverage,
   ensureCacheDir,
   findCachedReports,
-  loadReportMetadata,
+  findDateGaps,
+  getActualDates,
+  normalizeDate,
   parseCsvAndExtractRange,
   readCachedReport,
   saveReportToCache,
@@ -38,6 +40,15 @@ import { getAuthenticatedChannelId, assertChannelMatchesAuthenticated } from './
 import { getConfigValue } from './config';
 import { acquireLock, getLockPath } from './lock';
 import { CacheIndexEntry } from '../types';
+
+/**
+ * Bounds for an unbounded local-archive scan. Used when the Reporting API
+ * lists no reports and the archive itself has to define what's available, so
+ * there is no API window to anchor a range to (issue #154). YouTube's
+ * Reporting API predates neither bound, so this is effectively "everything".
+ */
+const ARCHIVE_SCAN_START = '1970-01-01';
+const ARCHIVE_SCAN_END = '9999-12-31';
 
 /**
  * A minimal slice of `youtube.reports.jobs.list` report shape — both call
@@ -505,7 +516,11 @@ export type ReportDataResult =
       jobCreateTime: string;
       readyAt: string;
     }
-  /** Job exists but has produced no reports yet (within the 48h window). */
+  /**
+   * Job exists, the API has produced no reports yet, AND the local archive is
+   * empty. Only returned when neither source can supply data. An old job
+   * whose API reports have expired still serves from cache (issue #154).
+   */
   | {
       status: 'no-reports-yet';
       jobId: string;
@@ -520,7 +535,22 @@ export type ReportDataResult =
       requestedRange: { startDate: string; endDate: string };
       /** Requested range clamped to what the API + local cache can cover. */
       adjustedRange: { startDate: string; endDate: string };
+      /**
+       * Outer bounds of available data across the API and the local cache.
+       *
+       * These are bounds, NOT a guarantee of continuous coverage: when the two
+       * sources are disjoint (cache holds January, API holds June) the range
+       * spans both islands. Read `uncoveredRanges` to find the holes inside it
+       * (issue #155).
+       */
       availableRange: { startDate: string; endDate: string };
+      /**
+       * Sub-ranges of `adjustedRange` that no source could cover, derived from
+       * the actual data windows of the cached and freshly-downloaded reports.
+       * Empty when coverage is continuous. Both the CLI warning and MCP
+       * consumers read this, so gaps are reported from one source of truth.
+       */
+      uncoveredRanges: { startDate: string; endDate: string }[];
       cachedReports: CacheIndexEntry[];
       fetchedReports: FetchedReportInfo[];
     };
@@ -632,8 +662,19 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
   }
   let reports = [...newestByWindow.values()];
 
-  if (reports.length === 0) {
-    // Job exists but no reports yet (within 48h window)
+  // The API expires reports after 30-60 days, but `fetch-reports` keeps a
+  // local archive that outlives them. An empty API listing therefore does NOT
+  // mean "no data". Scan the archive before giving up, and only report
+  // no-reports-yet when neither source holds anything (issue #154).
+  //
+  // The scan is unbounded because at this point there is no API window to
+  // anchor a range to: the archive itself defines what is available.
+  const archivedReports = reports.length === 0
+    ? await findCachedReports(channelId, params.type, ARCHIVE_SCAN_START, ARCHIVE_SCAN_END)
+    : [];
+
+  if (reports.length === 0 && archivedReports.length === 0) {
+    // Genuinely nothing anywhere: the job is new and still inside its 48h window.
     const readyAt = new Date(new Date(jobCreateTime).getTime() + 48 * 60 * 60 * 1000);
     return {
       status: 'no-reports-yet',
@@ -643,16 +684,34 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
     };
   }
 
+  if (reports.length === 0) {
+    params.onProgress?.(
+      `No reports available from the API; serving ${archivedReports.length} archived report(s) from cache`
+    );
+    debug(`API returned no reports for ${params.type}; falling back to ${archivedReports.length} cached report(s)`);
+  }
+
   // Step 3: Validate date range (API returns timestamps, compare date portions
   // only). Computed over all reports rather than relying on response order.
-  const minDate = reports.reduce((min, r) => {
-    const d = r.startTime.split('T')[0];
-    return d < min ? d : min;
-  }, '9999-99-99');
-  const maxDate = reports.reduce((max, r) => {
-    const d = r.endTime.split('T')[0];
-    return d > max ? d : max;
-  }, '');
+  // With an expired-out API listing the bounds come from the archive instead.
+  let minDate: string;
+  let maxDate: string;
+  if (reports.length > 0) {
+    minDate = reports.reduce((min, r) => {
+      const d = r.startTime.split('T')[0];
+      return d < min ? d : min;
+    }, '9999-99-99');
+    maxDate = reports.reduce((max, r) => {
+      const d = r.endTime.split('T')[0];
+      return d > max ? d : max;
+    }, '');
+  } else {
+    const archivedDates = await Promise.all(
+      archivedReports.map((entry) => getActualDates(entry, channelId))
+    );
+    minDate = archivedDates.reduce((min, d) => (d.start < min ? d.start : min), '9999-99-99');
+    maxDate = archivedDates.reduce((max, d) => (d.end > max ? d.end : max), '');
+  }
 
   const requestedStart = params.startDate || minDate;
   const requestedEnd = params.endDate || maxDate;
@@ -676,23 +735,14 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
   let effectiveMinDate = minDate;
   let effectiveMaxDate = maxDate;
   if (cacheEntries.length > 0) {
+    // getActualDates applies the same metadata-first, API-window-fallback rule
+    // the cache layer uses for coverage analysis. Previously reimplemented
+    // inline here, which risked the two drifting apart.
     const cacheDates = await Promise.all(
-      cacheEntries.map(async (e) => {
-        const meta = await loadReportMetadata(channelId, e.reportId, params.type);
-        if (meta?.startTimeActual) {
-          const s = meta.startTimeActual;
-          return {
-            min: `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`,
-            max: meta.endTimeActual
-              ? `${meta.endTimeActual.slice(0, 4)}-${meta.endTimeActual.slice(4, 6)}-${meta.endTimeActual.slice(6, 8)}`
-              : `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`,
-          };
-        }
-        return { min: e.startTime.split('T')[0], max: e.endTime.split('T')[0] };
-      })
+      cacheEntries.map((entry) => getActualDates(entry, channelId))
     );
-    const cacheEarliest = cacheDates.reduce((min, d) => d.min < min ? d.min : min, '9999-99-99');
-    const cacheLatest = cacheDates.reduce((max, d) => d.max > max ? d.max : max, '');
+    const cacheEarliest = cacheDates.reduce((min, d) => d.start < min ? d.start : min, '9999-99-99');
+    const cacheLatest = cacheDates.reduce((max, d) => d.end > max ? d.end : max, '');
     if (cacheEarliest < effectiveMinDate) effectiveMinDate = cacheEarliest;
     if (cacheLatest > effectiveMaxDate) effectiveMaxDate = cacheLatest;
   }
@@ -902,6 +952,25 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
     }
   }
 
+  // Coverage gaps (issue #155). `availableRange` is only an outer bound: when
+  // the cache and the API cover disjoint islands (cache holds January, API
+  // holds June) it spans both and implies a continuity that doesn't exist.
+  // Derive the real holes from the actual data windows of the reports that
+  // contributed rows (the cached ones that were read, plus the freshly
+  // downloaded ones), so the CLI warning and MCP consumers read one signal
+  // instead of each inferring gaps their own way.
+  const cachedCoveredRanges = await Promise.all(
+    cachedReports.map((entry) => getActualDates(entry, channelId))
+  );
+  const coveredRanges = [
+    ...cachedCoveredRanges,
+    // fetchedWindows carries YYYYMMDD row dates; the gap helpers work in
+    // YYYY-MM-DD.
+    ...fetchedWindows.map((w) => ({ start: normalizeDate(w.min), end: normalizeDate(w.max) })),
+  ];
+  const uncoveredRanges = findDateGaps(coveredRanges, adjustedStart, adjustedEnd)
+    .map((gap) => ({ startDate: gap.start, endDate: gap.end }));
+
   return {
     status: 'ok',
     jobId,
@@ -910,6 +979,7 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
     requestedRange: { startDate: requestedStart, endDate: requestedEnd },
     adjustedRange: { startDate: adjustedStart, endDate: adjustedEnd },
     availableRange: { startDate: effectiveMinDate, endDate: effectiveMaxDate },
+    uncoveredRanges,
     cachedReports,
     fetchedReports: reportsToFetch,
   };

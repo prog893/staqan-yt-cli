@@ -396,7 +396,17 @@ export function computeDateRangeOverlap(
 }
 
 /**
- * Merge overlapping/adjacent date ranges
+ * Merge overlapping/adjacent date ranges.
+ *
+ * Returns fresh objects and never mutates the caller's input. `[...ranges]`
+ * is only a shallow copy, so the previous implementation wrote through to the
+ * caller's own range objects: it seeded `merged` with `sorted[0]` and then
+ * extended `last.end` in place. `analyzeCacheCoverage` hit this
+ * directly: it passes the same `{start,end}` objects to `findDateGaps` that
+ * it afterwards classifies as fully/partially covered, so merging two
+ * adjacent cached reports silently widened the first report's end date and
+ * mis-classified its coverage (loading the same cached report twice and
+ * inflating the reported cached-report count).
  */
 export function mergeDateRanges(
   ranges: { start: string; end: string }[]
@@ -407,7 +417,7 @@ export function mergeDateRanges(
     new Date(a.start).getTime() - new Date(b.start).getTime()
   );
 
-  const merged: { start: string; end: string }[] = [sorted[0]];
+  const merged: { start: string; end: string }[] = [{ ...sorted[0] }];
 
   for (let i = 1; i < sorted.length; i++) {
     const current = sorted[i];
@@ -422,7 +432,7 @@ export function mergeDateRanges(
         last.end = current.end;
       }
     } else {
-      merged.push(current);
+      merged.push({ ...current });
     }
   }
 
@@ -472,7 +482,7 @@ export function findDateGaps(
 /**
  * Convert YYYYMMDD string to YYYY-MM-DD for consistent date handling
  */
-function normalizeDate(d: string): string {
+export function normalizeDate(d: string): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
   if (/^\d{4}\d{2}\d{2}$/.test(d)) return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
   // Handle ISO timestamps
@@ -485,7 +495,7 @@ function normalizeDate(d: string): string {
  * We use these instead of the API report time windows for gap analysis,
  * because API windows span 2 calendar days and overlap with adjacent reports.
  */
-async function getActualDates(
+export async function getActualDates(
   entry: CacheIndexEntry,
   channelId: string
 ): Promise<{ start: string; end: string }> {

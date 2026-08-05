@@ -240,6 +240,15 @@ The cache is keyed by the authenticated channel ID, not by `--channel` / `defaul
 - 1-2 day delay from actual data
 - Use `--start-date` and `--end-date` to control range
 
+### Coverage and gaps
+
+YouTube expires reports from the API after 30-60 days, while `fetch-reports` keeps them locally forever. The two sources are consulted together:
+
+- **The local archive is used even when the API has nothing left.** An old job whose reports have all expired still serves from cache rather than reporting "no reports yet".
+- **Gaps are reported explicitly.** The date range shown as available is an outer bound across both sources, so when they cover disjoint periods (archive holds January, API holds June) the span between them is a hole, not data. Any such holes are listed under an `Incomplete Data` warning on stderr, and exposed to MCP consumers as `uncoveredRanges` in the structured result.
+
+A date that is covered but simply had no activity is not a gap. Only dates that no source could supply are reported.
+
 ---
 
 ## fetch-reports

@@ -68,7 +68,7 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       return;
     }
 
-    const { rows: filteredData, cachedReports, fetchedReports } = result;
+    const { rows: filteredData, cachedReports, fetchedReports, uncoveredRanges } = result;
     const { startDate: requestedStart, endDate: requestedEnd } = result.requestedRange;
     const { startDate: adjustedStart, endDate: adjustedEnd } = result.adjustedRange;
     const { startDate: effectiveMinDate, endDate: effectiveMaxDate } = result.availableRange;
@@ -139,56 +139,45 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
         break;
     }
 
-    // Warn about missing dates in the returned data
-    if (filteredData.length > 0 && !options.videoId) {
-      const returnedDates = new Set(filteredData.map(row => row.date));
-      // Generate expected date range
-      const rangeStart = new Date(adjustedStart);
-      const rangeEnd = new Date(adjustedEnd);
-      const expectedDates: string[] = [];
-      const current = new Date(rangeStart);
-      while (current <= rangeEnd) {
-        expectedDates.push(current.toISOString().split('T')[0].replace(/-/g, ''));
-        current.setDate(current.getDate() + 1);
-      }
-      const missingDates = expectedDates.filter(d => !returnedDates.has(d));
-      if (missingDates.length > 0) {
-        // Format missing dates for display (group consecutive only)
-        const formattedMissing = missingDates.map(d => `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`);
-        const gaps: { start: string; end: string }[] = [];
-        let gapStart = formattedMissing[0];
-        let gapEnd = formattedMissing[0];
-        for (let i = 1; i < formattedMissing.length; i++) {
-          const prev = new Date(formattedMissing[i - 1]);
-          const curr = new Date(formattedMissing[i]);
-          const diffDays = Math.round((curr.getTime() - prev.getTime()) / (24 * 60 * 60 * 1000));
-          if (diffDays === 1) {
-            gapEnd = formattedMissing[i];
-          } else {
-            gaps.push({ start: gapStart, end: gapEnd });
-            gapStart = formattedMissing[i];
-            gapEnd = formattedMissing[i];
-          }
-        }
-        gaps.push({ start: gapStart, end: gapEnd });
+    // Warn about coverage gaps.
+    //
+    // Read from result.uncoveredRanges (computed in lib/reports.ts) rather
+    // than re-deriving gaps from the returned row dates. The old local
+    // computation treated any day without rows as missing data, which
+    // false-flagged quiet days: a report can legitimately cover a date and
+    // carry no rows for it because nothing happened. uncoveredRanges measures
+    // what the message actually claims, which is that no source covered those
+    // dates. Sharing it with the MCP surface also keeps the two consistent
+    // (issue #155).
+    //
+    // Skipped under --video-id: one video's absence on a date says nothing
+    // about whether the channel's data covers it.
+    const spanDays = (from: string, to: string) =>
+      Math.round((new Date(to).getTime() - new Date(from).getTime()) / (24 * 60 * 60 * 1000)) + 1;
 
-        process.stderr.write('\n');
-        process.stderr.write(chalk.yellow('⚠️  Incomplete Data:\n'));
-        process.stderr.write(chalk.gray(`  Requested: ${adjustedStart} to ${adjustedEnd} (${expectedDates.length} days)\n`));
-        process.stderr.write(chalk.gray(`  Returned:  ${returnedDates.size} of ${expectedDates.length} days\n`));
-        process.stderr.write(chalk.gray('  Missing:\n'));
-        for (const gap of gaps) {
-          const days = Math.round((new Date(gap.end).getTime() - new Date(gap.start).getTime()) / (24 * 60 * 60 * 1000)) + 1;
-          if (gap.start === gap.end) {
-            process.stderr.write(chalk.red(`    ${gap.start}\n`));
-          } else {
-            process.stderr.write(chalk.red(`    ${gap.start} → ${gap.end} (${days} days)\n`));
-          }
+    if (uncoveredRanges.length > 0 && !options.videoId) {
+      const totalDays = spanDays(adjustedStart, adjustedEnd);
+      const missingDays = uncoveredRanges.reduce(
+        (sum, gap) => sum + spanDays(gap.startDate, gap.endDate),
+        0
+      );
+
+      process.stderr.write('\n');
+      process.stderr.write(chalk.yellow('⚠️  Incomplete Data:\n'));
+      process.stderr.write(chalk.gray(`  Requested: ${adjustedStart} to ${adjustedEnd} (${totalDays} days)\n`));
+      process.stderr.write(chalk.gray(`  Covered:   ${totalDays - missingDays} of ${totalDays} days\n`));
+      process.stderr.write(chalk.gray('  Missing:\n'));
+      for (const gap of uncoveredRanges) {
+        const days = spanDays(gap.startDate, gap.endDate);
+        if (gap.startDate === gap.endDate) {
+          process.stderr.write(chalk.red(`    ${gap.startDate}\n`));
+        } else {
+          process.stderr.write(chalk.red(`    ${gap.startDate} → ${gap.endDate} (${days} days)\n`));
         }
-        process.stderr.write(chalk.yellow('  Tip:') + ' Data may have expired from YouTube or was never archived.\n');
-        process.stderr.write(chalk.gray('       ') + 'Run ' + chalk.cyan(`staqan-yt fetch-reports --type=${options.type}`) + ' to archive available data.\n');
-        process.stderr.write('\n');
       }
+      process.stderr.write(chalk.yellow('  Tip:') + ' Data may have expired from YouTube or was never archived.\n');
+      process.stderr.write(chalk.gray('       ') + 'Run ' + chalk.cyan(`staqan-yt fetch-reports --type=${options.type}`) + ' to archive available data.\n');
+      process.stderr.write('\n');
     }
 
     // Show expiration warning for the reports used
