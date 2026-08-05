@@ -461,7 +461,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: 'youtube_get_report_data',
-    description: 'Get YouTube Reporting API report data including thumbnail impressions, CTR, and other metrics. IMPORTANT: Thumbnail CTR data is ONLY available through the Reporting API, not regular analytics.',
+    description: 'Get YouTube Reporting API report data including thumbnail impressions, CTR, and other metrics. IMPORTANT: Thumbnail CTR data is ONLY available through the Reporting API, not regular analytics. Check `uncoveredRanges` in the result before treating the rows as complete: `availableRange` is only an outer bound, and any dates listed there had no source data (expired from the API and never archived locally).',
     inputSchema: {
       type: 'object',
       properties: {
