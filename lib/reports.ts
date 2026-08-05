@@ -778,21 +778,34 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
   const coverage = await analyzeCacheCoverage(channelId, params.type, adjustedStart, adjustedEnd);
   debug('Cache coverage:', coverage);
 
-  // Step 6: Load cached data
+  // Step 6: Load every cached report whose window overlaps the adjusted range.
+  //
+  // NOT driven by `coverage.fullyCovered`: analyzeCacheCoverage calls a report
+  // "fully covered" only when the report sits entirely inside the requested
+  // range, so the reverse case (one archived report spanning a narrower
+  // request, e.g. a Jan 1-31 report for a Jan 10-20 query) is classified
+  // partial and would never be loaded. That returned zero rows while claiming
+  // the range was uncovered, which the #154 archive-only path made reachable
+  // with no API reports to fall back on. Rows are clamped to the adjusted
+  // range further down, so loading a wider report is safe.
+  //
+  // `coverage` is still used below to decide which API reports to download.
   const cachedData: Record<string, string>[] = [];
   const cachedReports: CacheIndexEntry[] = [];
 
-  for (const range of coverage.fullyCovered) {
-    const [start, end] = range.split('/');
-    const cached = await findCachedReports(channelId, params.type, start, end);
+  const overlappingCached = await findCachedReports(channelId, params.type, adjustedStart, adjustedEnd);
+  const loadedReportIds = new Set<string>();
+  for (const cachedReport of overlappingCached) {
+    // findCachedReports can return the same report once per overlapping
+    // window; loading it twice would duplicate rows and inflate the count.
+    if (loadedReportIds.has(cachedReport.reportId)) continue;
+    loadedReportIds.add(cachedReport.reportId);
 
-    for (const cachedReport of cached) {
-      const reportData = await readCachedReport(channelId, cachedReport.reportId, params.type);
-      if (reportData) {
-        cachedData.push(...reportData.data);
-        cachedReports.push(cachedReport);
-        debug(`Loaded from cache: ${cachedReport.reportId}`);
-      }
+    const reportData = await readCachedReport(channelId, cachedReport.reportId, params.type);
+    if (reportData) {
+      cachedData.push(...reportData.data);
+      cachedReports.push(cachedReport);
+      debug(`Loaded from cache: ${cachedReport.reportId}`);
     }
   }
 
@@ -839,9 +852,19 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
 
   const jobCreated = new Date(jobCreateTime);
   const fetchedData: Record<string, string>[] = [];
-  // Actual data windows (YYYYMMDD row dates) of the fresh downloads — used to
-  // drop overlapping cached rows below.
+  // Actual data windows (YYYYMMDD row dates) of the fresh downloads, used to
+  // drop overlapping cached rows below. Only populated for downloads that
+  // actually carried rows: an empty download must not supersede real cached
+  // data for the same window.
   const fetchedWindows: { min: string; max: string }[] = [];
+  // Windows the downloads are known to COVER (YYYYMMDD), which is a different
+  // question from which rows they carried. A report can legitimately cover a
+  // period and contain zero rows because nothing happened, and treating that
+  // as absent coverage would make uncoveredRanges report a phantom gap, the
+  // exact false positive #155 exists to remove. Falls back to the report's
+  // own window, mirroring getActualDates' fallback for a cached entry whose
+  // metadata has no parsed row dates.
+  const fetchedCoverage: { min: string; max: string }[] = [];
 
   for (let i = 0; i < reportsToFetch.length; i++) {
     const report = reportsToFetch[i];
@@ -906,6 +929,15 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
     fetchedData.push(...data);
     if (dataMinDate && dataMaxDate) {
       fetchedWindows.push({ min: dataMinDate, max: dataMaxDate });
+      fetchedCoverage.push({ min: dataMinDate, max: dataMaxDate });
+    } else {
+      // Downloaded successfully but parsed no row dates (empty report). It
+      // still covers its window, so record that for gap analysis only.
+      fetchedCoverage.push({
+        min: report.startTime.split('T')[0].replace(/-/g, ''),
+        max: report.endTime.split('T')[0].replace(/-/g, ''),
+      });
+      debug(`Report ${report.id} had no row dates; recording its API window as covered`);
     }
 
     debug(`Downloaded: ${report.startTime} to ${report.endTime}`);
@@ -964,9 +996,9 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
   );
   const coveredRanges = [
     ...cachedCoveredRanges,
-    // fetchedWindows carries YYYYMMDD row dates; the gap helpers work in
+    // fetchedCoverage carries YYYYMMDD dates; the gap helpers work in
     // YYYY-MM-DD.
-    ...fetchedWindows.map((w) => ({ start: normalizeDate(w.min), end: normalizeDate(w.max) })),
+    ...fetchedCoverage.map((w) => ({ start: normalizeDate(w.min), end: normalizeDate(w.max) })),
   ];
   const uncoveredRanges = findDateGaps(coveredRanges, adjustedStart, adjustedEnd)
     .map((gap) => ({ startDate: gap.start, endDate: gap.end }));
