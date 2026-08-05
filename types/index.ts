@@ -391,6 +391,15 @@ export interface CacheIndexEntry {
   channelId: string;          // Channel this report belongs to
   startTime: string;          // YYYY-MM-DD
   endTime: string;            // YYYY-MM-DD
+  /**
+   * Report createTime from the YouTube API (ISO 8601).
+   *
+   * YouTube reissues a report for the same window when it has corrected data,
+   * so a window can have several reportIds and only the newest is valid. This
+   * is the ordering key for that. Optional because entries written before it
+   * was persisted do not carry it; see pickNewestPerWindow for the fallback.
+   */
+  createTime?: string;
   downloadedAt: string;       // ISO 8601 timestamp
   expiresAt: string;          // ISO 8601 timestamp
   fileSize: number;           // bytes
@@ -410,6 +419,7 @@ export interface ReportMetadata {
   jobId: string;
   startTime: string;          // From YouTube API
   endTime: string;            // From YouTube API
+  createTime?: string;        // Report createTime from the API; orders reissues of the same window
   startTimeActual: string;    // Actual data range in CSV (parsed)
   endTimeActual: string;      // Actual data range in CSV (parsed)
   downloadedAt: string;       // ISO 8601 timestamp
@@ -421,14 +431,26 @@ export interface ReportMetadata {
   row_count?: number;
 }
 
+/**
+ * What the local cache cannot supply for a requested date range.
+ *
+ * Deliberately reduced to this single field. The previous shape also carried
+ * `fullyCovered` and `partiallyCovered`, both of which were removed:
+ *
+ *  - `fullyCovered` meant "this cached report lies entirely inside the request",
+ *    which reads like the opposite of what it was. Driving the cache-load loop
+ *    from it meant a request contained within one wider archived report matched
+ *    nothing and returned zero rows.
+ *  - `partiallyCovered.missing` produced inverted ranges (start after end) in
+ *    exactly that containment case: a Jan 1-31 report against a Jan 10-20
+ *    request yielded a "missing" range of 2026-02-01 to 2025-12-31.
+ *
+ * `missingRanges` comes straight from findDateGaps, which was already the only
+ * correct source, so nothing of value was lost.
+ */
 export interface CacheCoverage {
-  fullyCovered: string[];     // Date ranges fully in cache
-  partiallyCovered: {         // Partial overlaps
-    range: { start: string; end: string };
-    cached: { start: string; end: string };
-    missing: { start: string; end: string };
-  }[];
-  notCovered: string[];       // Date ranges not in cache
+  /** Sub-ranges of the request that no cached report covers. Empty when fully covered. */
+  missingRanges: { start: string; end: string }[];
 }
 
 export interface ReportData {

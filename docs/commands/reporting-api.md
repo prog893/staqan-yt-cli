@@ -249,6 +249,10 @@ YouTube expires reports from the API after 30-60 days, while `fetch-reports` kee
 
 A date that is covered but simply had no activity is not a gap. Only dates that no source could supply are reported.
 
+**Reissued reports.** YouTube republishes a report for the same window when it has corrected figures, so the archive accumulates several report IDs per window (on a real archive this was 58% of windows for `channel_reach_basic_a1`). Only the newest is used; the superseded copies stay on disk but never contribute rows. Without this, a range could return the same date and video twice with different numbers, and any total computed from it would be inflated.
+
+Reports archived from this version onward record the API `createTime` used to order reissues. Entries archived earlier fall back to expiry date, which orders identically within a job.
+
 ---
 
 ## fetch-reports

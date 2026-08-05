@@ -30,6 +30,7 @@ import {
   ensureCacheDir,
   findCachedReports,
   findDateGaps,
+  pickNewestPerWindow,
   getActualDates,
   normalizeDate,
   parseCsvAndExtractRange,
@@ -794,13 +795,22 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
   const cachedReports: CacheIndexEntry[] = [];
 
   const overlappingCached = await findCachedReports(channelId, params.type, adjustedStart, adjustedEnd);
-  const loadedReportIds = new Set<string>();
-  for (const cachedReport of overlappingCached) {
-    // findCachedReports can return the same report once per overlapping
-    // window; loading it twice would duplicate rows and inflate the count.
-    if (loadedReportIds.has(cachedReport.reportId)) continue;
-    loadedReportIds.add(cachedReport.reportId);
 
+  // Collapse reissues before loading. YouTube publishes several reportIds for
+  // the same window when it corrects figures, and the archive keeps all of
+  // them; loading every one returns the stale rows alongside the corrected
+  // ones (same date and video_id, different values), which double-counts any
+  // aggregation. The API branch has always done this via createTime, so this
+  // brings the cache branch to parity.
+  const newestCached = pickNewestPerWindow(overlappingCached);
+  if (newestCached.length < overlappingCached.length) {
+    debug(
+      `Collapsed ${overlappingCached.length} cached report(s) to ${newestCached.length} ` +
+      `after dropping superseded reissues`
+    );
+  }
+
+  for (const cachedReport of newestCached) {
     const reportData = await readCachedReport(channelId, cachedReport.reportId, params.type);
     if (reportData) {
       cachedData.push(...reportData.data);
@@ -816,14 +826,8 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
   // Step 7: Fetch missing data
   const reportsToFetch: FetchedReportInfo[] = [];
 
-  // Build list of missing date ranges
-  const missingRanges = [
-    ...coverage.partiallyCovered.map(p => p.missing),
-    ...coverage.notCovered.map(r => {
-      const [start, end] = r.split('/');
-      return { start, end };
-    }),
-  ];
+  // Ranges the cache cannot supply, straight from the coverage analysis.
+  const missingRanges = coverage.missingRanges;
 
   // Filter reports to only fetch those covering missing ranges. Compare date
   // portions: the report bounds are full timestamps while the range bounds
@@ -909,6 +913,7 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
           jobId,
           startTime: report.startTime,
           endTime: report.endTime,
+          createTime: report.createTime,
           startTimeActual: dataMinDate,
           endTimeActual: dataMaxDate,
           downloadedAt: new Date().toISOString(),
