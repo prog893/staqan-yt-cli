@@ -171,20 +171,61 @@ export function pickNewestPerWindow(entries: CacheIndexEntry[]): CacheIndexEntry
   return [...newest.values()];
 }
 
+/**
+ * Compare two ISO 8601 instants chronologically. Returns a negative number
+ * when `a` is earlier, positive when later, 0 when equal or incomparable.
+ *
+ * String comparison is NOT safe here. The Reporting API returns createTime
+ * with microsecond precision (2026-07-26T13:23:08.447428Z), and any variation
+ * in that precision breaks lexical ordering: "…08Z" sorts after "…08.000001Z"
+ * because "." (0x2E) is below "Z" (0x5A), and "…08.447428Z" sorts after
+ * "…08.45Z" even though it is 3ms earlier. Parsing to epoch milliseconds is
+ * exact for every format the API emits.
+ *
+ * Date.parse truncates to milliseconds, which would tie two instants that
+ * differ only in microseconds, so sub-millisecond digits are compared
+ * separately to keep the ordering exact at the precision the API actually
+ * emits.
+ */
+function compareInstants(a: string, b: string): number {
+  const ta = Date.parse(a);
+  const tb = Date.parse(b);
+  if (Number.isNaN(ta) || Number.isNaN(tb)) {
+    // Unparseable timestamp: fall back to byte order so behaviour stays
+    // deterministic rather than silently treating everything as equal.
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+  if (ta !== tb) return ta - tb;
+  // Same millisecond: break the tie on the remaining fractional digits.
+  return fractionalNanoseconds(a) - fractionalNanoseconds(b);
+}
+
+/**
+ * Fractional seconds of an ISO timestamp as nanoseconds, zero-padded so
+ * ".45" and ".450000" compare equal and ".000001" is distinguishable from "".
+ */
+function fractionalNanoseconds(ts: string): number {
+  const match = /\.(\d+)/.exec(ts);
+  if (!match) return 0;
+  return Number(match[1].padEnd(9, '0').slice(0, 9));
+}
+
 /** True when `a` is a later reissue than `b`. See pickNewestPerWindow. */
 function isNewerReport(a: CacheIndexEntry, b: CacheIndexEntry): boolean {
-  if (a.createTime && b.createTime && a.createTime !== b.createTime) {
-    return a.createTime > b.createTime;
+  if (a.createTime && b.createTime) {
+    const byCreate = compareInstants(a.createTime, b.createTime);
+    if (byCreate !== 0) return byCreate > 0;
   }
   // Prefer an entry that knows its createTime over one that does not: it was
   // archived after the fix, so it is at least as trustworthy.
   if (Boolean(a.createTime) !== Boolean(b.createTime)) {
     return Boolean(a.createTime);
   }
-  if (a.expiresAt && b.expiresAt && a.expiresAt !== b.expiresAt) {
-    return a.expiresAt > b.expiresAt;
+  if (a.expiresAt && b.expiresAt) {
+    const byExpiry = compareInstants(a.expiresAt, b.expiresAt);
+    if (byExpiry !== 0) return byExpiry > 0;
   }
-  return (a.downloadedAt || '') > (b.downloadedAt || '');
+  return compareInstants(a.downloadedAt || '', b.downloadedAt || '') > 0;
 }
 
 export async function findCachedReports(

@@ -145,6 +145,76 @@ describe('pickNewestPerWindow', () => {
     expect(out[0].reportId).toBe('known');
   });
 
+  it('orders createTime chronologically, not lexically', () => {
+    // "…00Z" sorts AFTER "…00.000001Z" byte-wise, because "." (0x2E) is below
+    // "Z" (0x5A), so string comparison picks the earlier report as newest.
+    const out = pickNewestPerWindow([
+      base({ reportId: 'earlier', createTime: '2026-03-02T00:00:00Z' }),
+      base({ reportId: 'later', createTime: '2026-03-02T00:00:00.000001Z' }),
+    ]);
+    expect(out[0].reportId).toBe('later');
+  });
+
+  it('orders createTime correctly across differing fractional precision', () => {
+    // .447428 is 3ms BEFORE .45, but compares as greater byte-wise.
+    const out = pickNewestPerWindow([
+      base({ reportId: 'earlier', createTime: '2026-07-26T13:23:08.447428Z' }),
+      base({ reportId: 'later', createTime: '2026-07-26T13:23:08.45Z' }),
+    ]);
+    expect(out[0].reportId).toBe('later');
+  });
+
+  it('handles the microsecond precision the Reporting API actually returns', () => {
+    const out = pickNewestPerWindow([
+      base({ reportId: 'older', createTime: '2026-07-26T13:23:08.447428Z' }),
+      base({ reportId: 'newer', createTime: '2026-07-29T05:30:47.275044Z' }),
+    ]);
+    expect(out[0].reportId).toBe('newer');
+  });
+
+  it('distinguishes createTimes that differ only in microseconds', () => {
+    const out = pickNewestPerWindow([
+      base({ reportId: 'earlier', createTime: '2026-03-02T00:00:00.000001Z' }),
+      base({ reportId: 'later', createTime: '2026-03-02T00:00:00.000002Z' }),
+    ]);
+    expect(out[0].reportId).toBe('later');
+  });
+
+  it('treats equivalent fractional spellings as equal', () => {
+    // ".45" and ".450000" are the same instant, so neither supersedes the
+    // other on createTime and the expiresAt tiebreak decides.
+    const out = pickNewestPerWindow([
+      base({
+        reportId: 'loser',
+        createTime: '2026-03-02T00:00:00.45Z',
+        expiresAt: '2026-05-01T00:00:00Z',
+      }),
+      base({
+        reportId: 'winner',
+        createTime: '2026-03-02T00:00:00.450000Z',
+        expiresAt: '2026-05-06T00:00:00Z',
+      }),
+    ]);
+    expect(out[0].reportId).toBe('winner');
+  });
+
+  it('compares expiresAt chronologically too', () => {
+    const out = pickNewestPerWindow([
+      base({ reportId: 'earlier', expiresAt: '2026-05-01T00:00:00Z' }),
+      base({ reportId: 'later', expiresAt: '2026-05-01T00:00:00.000001Z' }),
+    ]);
+    expect(out[0].reportId).toBe('later');
+  });
+
+  it('stays deterministic when a timestamp is unparseable', () => {
+    const out = pickNewestPerWindow([
+      base({ reportId: 'bad', createTime: 'not-a-date' }),
+      base({ reportId: 'good', createTime: '2026-03-02T00:00:00Z' }),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(['bad', 'good']).toContain(out[0].reportId);
+  });
+
   it('leaves distinct windows untouched', () => {
     const out = pickNewestPerWindow([
       base({ reportId: 'a', startTime: '2026-03-01T08:00:00Z', endTime: '2026-03-02T08:00:00Z' }),
