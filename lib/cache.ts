@@ -187,7 +187,7 @@ export function pickNewestPerWindow(entries: CacheIndexEntry[]): CacheIndexEntry
  * separately to keep the ordering exact at the precision the API actually
  * emits.
  */
-function compareInstants(a: string, b: string): number {
+export function compareInstants(a: string, b: string): number {
   const ta = Date.parse(a);
   const tb = Date.parse(b);
   if (Number.isNaN(ta) || Number.isNaN(tb)) {

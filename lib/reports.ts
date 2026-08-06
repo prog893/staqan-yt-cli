@@ -30,6 +30,7 @@ import {
   ensureCacheDir,
   findCachedReports,
   findDateGaps,
+  compareInstants,
   pickNewestPerWindow,
   getActualDates,
   normalizeDate,
@@ -657,7 +658,11 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
   for (const report of allFetchedReports) {
     const key = `${report.startTime}|${report.endTime}`;
     const prev = newestByWindow.get(key);
-    if (!prev || report.createTime > prev.createTime) {
+    // compareInstants, not string comparison: createTime carries microsecond
+    // precision and any variation in it misorders lexically, which would pick
+    // the stale reissue. Same comparator the cache-side dedup uses, so both
+    // paths agree on which report supersedes which.
+    if (!prev || compareInstants(report.createTime, prev.createTime) > 0) {
       newestByWindow.set(key, report);
     }
   }

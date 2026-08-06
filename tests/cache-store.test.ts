@@ -12,6 +12,7 @@ import os from 'os';
 import path from 'path';
 import {
   analyzeCacheCoverage,
+  compareInstants,
   findCachedReports,
   getDataDir,
   pickNewestPerWindow,
@@ -207,12 +208,16 @@ describe('pickNewestPerWindow', () => {
   });
 
   it('stays deterministic when a timestamp is unparseable', () => {
+    // Byte-order fallback: "not-a-date" ("n" 0x6E) sorts after "2026-…"
+    // ("2" 0x32), so the unparseable entry wins. Pinned rather than accepting
+    // either value, so a comparator that returned 0 for unparseable input, or
+    // reversed the fallback, would fail here.
     const out = pickNewestPerWindow([
       base({ reportId: 'bad', createTime: 'not-a-date' }),
       base({ reportId: 'good', createTime: '2026-03-02T00:00:00Z' }),
     ]);
     expect(out).toHaveLength(1);
-    expect(['bad', 'good']).toContain(out[0].reportId);
+    expect(out[0].reportId).toBe('bad');
   });
 
   it('leaves distinct windows untouched', () => {
@@ -225,6 +230,40 @@ describe('pickNewestPerWindow', () => {
 
   it('returns an empty array for no entries', () => {
     expect(pickNewestPerWindow([])).toEqual([]);
+  });
+});
+
+describe('compareInstants', () => {
+  // Shared by both dedup paths: the cache-side pickNewestPerWindow and the
+  // API-side newestByWindow in lib/reports.ts.
+  const sign = (n: number) => (n === 0 ? 0 : n > 0 ? 1 : -1);
+
+  it('orders whole seconds against microseconds by time, not bytes', () => {
+    expect(sign(compareInstants('2026-03-02T00:00:00.000001Z', '2026-03-02T00:00:00Z'))).toBe(1);
+  });
+
+  it('orders differing fractional precision by time, not bytes', () => {
+    // .447428 is earlier than .45 despite comparing greater as a string.
+    expect(sign(compareInstants('2026-07-26T13:23:08.447428Z', '2026-07-26T13:23:08.45Z'))).toBe(-1);
+  });
+
+  it('treats equivalent fractional spellings as equal', () => {
+    expect(compareInstants('2026-03-02T00:00:00.45Z', '2026-03-02T00:00:00.450000Z')).toBe(0);
+  });
+
+  it('orders plain dates', () => {
+    expect(sign(compareInstants('2026-07-29T05:30:47.275044Z', '2026-07-26T13:23:08.447428Z'))).toBe(1);
+  });
+
+  it('is antisymmetric', () => {
+    const a = '2026-03-02T00:00:00.000001Z';
+    const b = '2026-03-02T00:00:02Z';
+    expect(sign(compareInstants(a, b))).toBe(-sign(compareInstants(b, a)));
+  });
+
+  it('falls back to byte order for unparseable input', () => {
+    expect(sign(compareInstants('not-a-date', '2026-03-02T00:00:00Z'))).toBe(1);
+    expect(compareInstants('not-a-date', 'not-a-date')).toBe(0);
   });
 });
 
