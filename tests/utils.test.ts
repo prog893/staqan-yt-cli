@@ -13,6 +13,9 @@ import {
   validateDateRange,
   validatePrivacyFilter,
   isRateLimitError,
+  classifyRetryableError,
+  retryPolicyFor,
+  withRateLimitRetry,
   getRetryAfterMs,
 } from '../lib/utils';
 
@@ -248,5 +251,153 @@ describe('getRetryAfterMs', () => {
   it('returns undefined when absent', () => {
     expect(getRetryAfterMs({})).toBeUndefined();
     expect(getRetryAfterMs({ response: {} })).toBeUndefined();
+  });
+});
+
+describe('classifyRetryableError', () => {
+  it('classifies daily quota from message wording', () => {
+    expect(classifyRetryableError({ message: 'Quota exceeded: queries per day' })).toBe('daily');
+  });
+
+  it('classifies per-minute quota from message wording', () => {
+    expect(classifyRetryableError({ message: 'Free requests per minute exceeded' })).toBe('rpm');
+  });
+
+  it('classifies per-second quota from message wording', () => {
+    expect(classifyRetryableError({ message: 'Requests per second limit exceeded' })).toBe('qps');
+  });
+
+  it('classifies transient server errors by status', () => {
+    for (const status of [500, 502, 503, 504, 408]) {
+      expect(classifyRetryableError({ status })).toBe('transient');
+    }
+  });
+
+  it('does not retry permanent client errors', () => {
+    for (const status of [400, 401, 403, 404]) {
+      expect(classifyRetryableError({ status })).toBeNull();
+    }
+  });
+
+  it('classifies 429 as a per-minute quota hit', () => {
+    expect(classifyRetryableError({ status: 429 })).toBe('rpm');
+  });
+
+  it('reads the status from response.status as well', () => {
+    expect(classifyRetryableError({ response: { status: 503 } })).toBe('transient');
+  });
+
+  it('classifies retriable network codes as transient', () => {
+    // Full set, so removing any one from RETRIABLE_NETWORK_CODES fails here.
+    for (const code of ['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ECONNREFUSED', 'ESOCKETTIMEDOUT', 'EPIPE']) {
+      expect(classifyRetryableError({ code })).toBe('transient');
+    }
+  });
+
+  it('uses googleapis reason fields when the message says nothing', () => {
+    const withReason = (reason: string) => ({
+      response: { data: { error: { errors: [{ reason }] } } },
+    });
+    expect(classifyRetryableError(withReason('userRateLimitExceeded'))).toBe('qps');
+    expect(classifyRetryableError(withReason('rateLimitExceeded'))).toBe('qps');
+    expect(classifyRetryableError(withReason('quotaExceeded'))).toBe('daily');
+    expect(classifyRetryableError(withReason('backendError'))).toBe('transient');
+    expect(classifyRetryableError(withReason('internalError'))).toBe('transient');
+  });
+
+  it('prefers quota wording over status so a daily cap is never retried as a rate limit', () => {
+    // A 403 whose body says "per day" must abort, not back off and retry.
+    expect(classifyRetryableError({
+      status: 403,
+      response: { data: { error: { errors: [{ message: 'Quota exceeded: queries per day' }] } } },
+    })).toBe('daily');
+  });
+
+  it('returns null for errors that are not worth retrying', () => {
+    expect(classifyRetryableError({ message: 'Video not found' })).toBeNull();
+    expect(classifyRetryableError(undefined)).toBeNull();
+    expect(classifyRetryableError('string error')).toBeNull();
+    expect(classifyRetryableError(null)).toBeNull();
+  });
+
+  it('keeps isRateLimitError behaviour unchanged for its existing callers', () => {
+    expect(isRateLimitError({ message: 'per day' })).toBe('daily');
+    expect(isRateLimitError({ message: 'per minute' })).toBe('rpm');
+    expect(isRateLimitError({ status: 500 })).toBeNull();
+  });
+});
+
+describe('withRateLimitRetry policy and Retry-After handling', () => {
+  const withRetryAfter = (seconds: number, message: string) =>
+    Object.assign(new Error(message), { response: { headers: { 'retry-after': String(seconds) } } });
+
+  it('aborts instead of clamping when Retry-After exceeds 30 minutes', async () => {
+    // Clamping a 3600s window to maxDelayMs and retrying would burn every
+    // attempt against a window that is still shut. downloadReport has always
+    // aborted at this threshold; both paths must agree.
+    let calls = 0;
+    const p = withRateLimitRetry(async () => {
+      calls++;
+      throw withRetryAfter(3600, 'Free requests per minute exceeded');
+    }, { label: 'jobs.list' });
+    await expect(p).rejects.toThrow(/rate limited for 3600s/);
+    expect(calls).toBe(1);
+  });
+
+  it('reports the wait length and the kind in the abort message', async () => {
+    const p = withRateLimitRetry(async () => {
+      throw withRetryAfter(5400, 'Free requests per minute exceeded');
+    }, { label: 'reportTypes.list' });
+    await expect(p).rejects.toThrow(/reportTypes\.list is rate limited for 5400s \(rpm\)/);
+  });
+
+  it('still retries when Retry-After is short', async () => {
+    let calls = 0;
+    const out = await withRateLimitRetry(async () => {
+      calls++;
+      if (calls === 1) throw withRetryAfter(0, 'Requests per second limit exceeded');
+      return 'ok';
+    }, { label: 'test', baseDelayMs: 1, maxDelayMs: 2 });
+    expect(out).toBe('ok');
+    expect(calls).toBe(2);
+  });
+
+  it('aborts immediately on a daily quota without consuming attempts', async () => {
+    let calls = 0;
+    const p = withRateLimitRetry(async () => {
+      calls++;
+      throw new Error('Quota exceeded: queries per day');
+    }, { label: 'test' });
+    await expect(p).rejects.toThrow(/Daily YouTube API quota exhausted/);
+    expect(calls).toBe(1);
+  });
+
+  it('rethrows a non-retriable error untouched', async () => {
+    const p = withRateLimitRetry(async () => { throw new Error('Video not found'); }, { label: 'test' });
+    await expect(p).rejects.toThrow('Video not found');
+  });
+
+  it('stops after maxAttempts total attempts, counting the first', async () => {
+    let calls = 0;
+    const p = withRateLimitRetry(async () => {
+      calls++;
+      throw Object.assign(new Error('boom'), { status: 503 });
+    }, { label: 'test', maxAttempts: 3, baseDelayMs: 1, maxDelayMs: 2 });
+    await expect(p).rejects.toThrow(/failed after 3 attempts \(transient\)/);
+    expect(calls).toBe(3);
+  });
+});
+
+describe('retryPolicyFor', () => {
+  it('gives qps a much shorter base delay than rpm, since it clears in about a second', () => {
+    expect(retryPolicyFor('qps').baseDelayMs).toBeLessThan(retryPolicyFor('rpm').baseDelayMs);
+  });
+
+  it('never retries a daily quota', () => {
+    expect(retryPolicyFor('daily').maxAttempts).toBe(1);
+  });
+
+  it('matches the constants the download path now shares', () => {
+    expect(retryPolicyFor('transient')).toMatchObject({ baseDelayMs: 2_000, maxDelayMs: 60_000 });
   });
 });
