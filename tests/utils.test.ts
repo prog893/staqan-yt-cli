@@ -288,7 +288,8 @@ describe('classifyRetryableError', () => {
   });
 
   it('classifies retriable network codes as transient', () => {
-    for (const code of ['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ECONNREFUSED']) {
+    // Full set, so removing any one from RETRIABLE_NETWORK_CODES fails here.
+    for (const code of ['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ECONNREFUSED', 'ESOCKETTIMEDOUT', 'EPIPE']) {
       expect(classifyRetryableError({ code })).toBe('transient');
     }
   });
@@ -301,6 +302,7 @@ describe('classifyRetryableError', () => {
     expect(classifyRetryableError(withReason('rateLimitExceeded'))).toBe('qps');
     expect(classifyRetryableError(withReason('quotaExceeded'))).toBe('daily');
     expect(classifyRetryableError(withReason('backendError'))).toBe('transient');
+    expect(classifyRetryableError(withReason('internalError'))).toBe('transient');
   });
 
   it('prefers quota wording over status so a daily cap is never retried as a rate limit', () => {
