@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, confirm, success, warning, info, debug, initCommand, createSpinner } from '../lib/utils';
+import { parseVideoId, confirm, success, warning, info, debug, initCommand, createSpinner, writeStdout } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatData } from '../lib/formatters';
 import { UpdateTagsOptions } from '../types';
@@ -134,7 +134,7 @@ async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void>
     // Dry run mode
     if (options.dryRun) {
       if (outputFormat !== 'pretty') {
-        console.log(formatData([{ videoId: parsedId, title, previousTags: currentTags, newTags, addedTags, removedTags, dryRun: true }], outputFormat));
+        await writeStdout(formatData([{ videoId: parsedId, title, previousTags: currentTags, newTags, addedTags, removedTags, dryRun: true }], outputFormat) + '\n');
       }
       info('Dry run mode - no changes will be applied');
       success('Preview complete');
@@ -168,7 +168,7 @@ async function updateVideoTagsCommand(options: UpdateTagsOptions): Promise<void>
     updateSpinner.succeed('Tags updated successfully');
 
     if (outputFormat !== 'pretty') {
-      console.log(formatData([{ videoId: parsedId, title, previousTags: currentTags, newTags, addedTags, removedTags, dryRun: false }], outputFormat));
+      await writeStdout(formatData([{ videoId: parsedId, title, previousTags: currentTags, newTags, addedTags, removedTags, dryRun: false }], outputFormat) + '\n');
     } else {
       console.log('');
     }

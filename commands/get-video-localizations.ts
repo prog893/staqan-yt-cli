@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getAllVideoLocalizations } from '../lib/youtube';
-import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, debug, initCommand, withSpinner, writeStdout } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { VideoIdsOption, VideoLocalization, OutputOption, VerboseOption } from '../types';
@@ -53,7 +53,7 @@ async function getVideoLocalizations(options: GetVideoLocalizationsOptions): Pro
         results.forEach(result => {
           jsonOutput[result.videoId] = result.localizations;
         });
-        console.log(formatJson(jsonOutput));
+        await writeStdout(formatJson(jsonOutput) + '\n');
         break;
 
       case 'table':
@@ -70,7 +70,7 @@ async function getVideoLocalizations(options: GetVideoLocalizationsOptions): Pro
             });
           });
         });
-        console.log(formatTable(tableData));
+        await writeStdout(formatTable(tableData) + '\n');
         break;
 
       case 'text':
@@ -96,7 +96,7 @@ async function getVideoLocalizations(options: GetVideoLocalizationsOptions): Pro
             });
           });
         });
-        console.log(formatCsv(csvData));
+        await writeStdout(formatCsv(csvData) + '\n');
         break;
 
       case 'pretty':

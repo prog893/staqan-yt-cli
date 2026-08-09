@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, debug, initCommand, withSpinner, writeStdout } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { GetThumbnailOptions } from '../types';
@@ -58,11 +58,11 @@ async function getThumbnailCommand(options: GetThumbnailOptions): Promise<void> 
 
     switch (outputFormat) {
       case 'json':
-        console.log(formatJson({ videoId: parsedId, title, thumbnails: thumbnailData }));
+        await writeStdout(formatJson({ videoId: parsedId, title, thumbnails: thumbnailData }) + '\n');
         break;
 
       case 'table':
-        console.log(formatTable(thumbnailData));
+        await writeStdout(formatTable(thumbnailData) + '\n');
         break;
 
       case 'text':
@@ -72,7 +72,7 @@ async function getThumbnailCommand(options: GetThumbnailOptions): Promise<void> 
         break;
 
       case 'csv':
-        console.log(formatCsv(thumbnailData));
+        await writeStdout(formatCsv(thumbnailData) + '\n');
         break;
 
       case 'pretty':

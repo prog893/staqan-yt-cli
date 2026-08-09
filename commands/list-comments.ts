@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { listVideoComments } from '../lib/youtube';
-import { formatDate, parsePositiveInt, debug, parseVideoId, initCommand, withSpinner, runOrExit } from '../lib/utils';
+import { formatDate, parsePositiveInt, debug, parseVideoId, initCommand, withSpinner, runOrExit, writeStdout } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ListCommentsOptions } from '../types';
@@ -47,7 +47,7 @@ async function listCommentsCommand(options: ListCommentsOptions): Promise<void> 
 
     switch (outputFormat) {
       case 'json':
-        console.log(formatJson(comments));
+        await writeStdout(formatJson(comments) + '\n');
         break;
 
       case 'table':
@@ -59,7 +59,7 @@ async function listCommentsCommand(options: ListCommentsOptions): Promise<void> 
           replies: comment.replyCount,
           date: formatDate(comment.publishedAt),
         }));
-        console.log(formatTable(tableData));
+        await writeStdout(formatTable(tableData) + '\n');
         break;
 
       case 'text':
@@ -90,7 +90,7 @@ async function listCommentsCommand(options: ListCommentsOptions): Promise<void> 
           publishedAt: comment.publishedAt,
           updatedAt: comment.updatedAt,
         }));
-        console.log(formatCsv(csvData));
+        await writeStdout(formatCsv(csvData) + '\n');
         break;
 
       case 'pretty':

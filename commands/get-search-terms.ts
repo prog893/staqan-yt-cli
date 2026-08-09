@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { parseVideoId, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, daysAgoYmd, runOrExit } from '../lib/utils';
+import { parseVideoId, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, daysAgoYmd, runOrExit, writeStdout } from '../lib/utils';
 import { fetchSearchTerms } from '../lib/analytics';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
@@ -41,17 +41,17 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
 
     switch (outputFormat) {
       case 'json':
-        console.log(formatJson({
+        await writeStdout(formatJson({
           videoId: parsedId,
           title,
           dateRange: { startDate, endDate },
           columnHeaders: result.columnHeaders,
           rows,
-        }));
+        }) + '\n');
         break;
 
       case 'table':
-        console.log(formatTable(searchTermsData));
+        await writeStdout(formatTable(searchTermsData) + '\n');
         break;
 
       case 'text':
@@ -65,7 +65,7 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
         if (result.columnHeaders.length > 0 && rows.length > 0) {
           console.log(convertToCSV(result.columnHeaders, rows));
         } else {
-          console.log(formatCsv(searchTermsData));
+          await writeStdout(formatCsv(searchTermsData) + '\n');
         }
         break;
 

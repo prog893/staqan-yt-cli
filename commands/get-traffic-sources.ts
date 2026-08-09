@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { parseVideoId, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, daysAgoYmd } from '../lib/utils';
+import { parseVideoId, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, daysAgoYmd, writeStdout } from '../lib/utils';
 import { fetchTrafficSources } from '../lib/analytics';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
@@ -71,22 +71,22 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
         if (columnHeaders.length > 0 && rows.length > 0) {
           console.log(convertToCSV(columnHeaders, rows));
         } else {
-          console.log(formatCsv(trafficData));
+          await writeStdout(formatCsv(trafficData) + '\n');
         }
         break;
 
       case 'json':
-        console.log(formatJson({
+        await writeStdout(formatJson({
           videoId: parsedId,
           title,
           dateRange: { startDate, endDate },
           columnHeaders,
           rows,
-        }));
+        }) + '\n');
         break;
 
       case 'table':
-        console.log(formatTable(trafficData));
+        await writeStdout(formatTable(trafficData) + '\n');
         break;
 
       case 'text':

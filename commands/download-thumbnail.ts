@@ -7,7 +7,7 @@ import { randomUUID } from 'crypto';
 import path from 'path';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, debug, initCommand, withSpinner, writeStdout } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson } from '../lib/formatters';
 import { DownloadThumbnailOptions } from '../types';
@@ -137,7 +137,7 @@ async function downloadThumbnailCommand(options: DownloadThumbnailOptions): Prom
 
     switch (outputFormat) {
       case 'json':
-        console.log(formatJson(result));
+        await writeStdout(formatJson(result) + '\n');
         break;
 
       case 'text':

@@ -1,4 +1,4 @@
-import { initCommand, withSpinner, formatTimestampWithTimezone, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
+import { initCommand, withSpinner, formatTimestampWithTimezone, validateDateOption, validateDateRange, runOrExit, writeStdout } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv, formatText } from '../lib/formatters';
 import { fetchReportData } from '../lib/reports';
@@ -104,21 +104,24 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
     // Output based on format
     const outputFormat = await getOutputFormat(options.output);
 
+    // Machine formats go through writeStdout, which awaits the flush. A report
+    // range easily exceeds the 64KB pipe buffer, and console.log would let the
+    // process end with the tail still queued, truncating mid-token (#161).
     switch (outputFormat) {
       case 'json':
-        console.log(formatJson(filteredData));
+        await writeStdout(formatJson(filteredData) + '\n');
         break;
 
       case 'csv':
-        console.log(formatCsv(filteredData));
+        await writeStdout(formatCsv(filteredData) + '\n');
         break;
 
       case 'text':
-        console.log(formatText(filteredData));
+        await writeStdout(formatText(filteredData) + '\n');
         break;
 
       case 'table':
-        console.log(formatTable(filteredData));
+        await writeStdout(formatTable(filteredData) + '\n');
         break;
 
       case 'pretty':

@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
+import { parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, validateDateOption, validateDateRange, runOrExit, writeStdout } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import {
@@ -79,7 +79,7 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
 
     switch (outputFormat) {
       case 'json':
-        console.log(formatJson({
+        await writeStdout(formatJson({
           channelId,
           channelTitle,
           contentType: contentTypeLabel,
@@ -88,11 +88,11 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
           dateRange: { startDate, endDate },
           columnHeaders: columnHeaders.map(h => h.name),
           rows,
-        }));
+        }) + '\n');
         break;
 
       case 'table':
-        console.log(formatTable(structuredRows));
+        await writeStdout(formatTable(structuredRows) + '\n');
         break;
 
       case 'text':
@@ -106,7 +106,7 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
         if (columnHeaders.length > 0 && rows.length > 0) {
           console.log(convertToCSV(columnHeaders, rows));
         } else {
-          console.log(formatCsv(structuredRows));
+          await writeStdout(formatCsv(structuredRows) + '\n');
         }
         break;
 

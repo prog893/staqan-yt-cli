@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { parseVideoId, debug, formatNumber, convertToCSV, initCommand, withSpinner, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
+import { parseVideoId, debug, formatNumber, convertToCSV, initCommand, withSpinner, validateDateOption, validateDateRange, runOrExit, writeStdout } from '../lib/utils';
 import { fetchVideoAnalytics } from '../lib/analytics';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
@@ -73,13 +73,13 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
         break;
 
       case 'json':
-        console.log(formatJson({
+        await writeStdout(formatJson({
           videoId: parsedId,
           title,
           dateRange: { startDate, endDate },
           columnHeaders,
           rows: allRows,
-        }));
+        }) + '\n');
         break;
 
       case 'table': {
@@ -88,7 +88,7 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
           metric: name,
           value: value.toString(),
         }));
-        console.log(formatTable(tableData));
+        await writeStdout(formatTable(tableData) + '\n');
         break;
       }
 

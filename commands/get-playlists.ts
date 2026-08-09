@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getPlaylistsById } from '../lib/youtube';
-import { formatDate, formatNumber, debug, parsePlaylistId, initCommand, withSpinner } from '../lib/utils';
+import { formatDate, formatNumber, debug, parsePlaylistId, initCommand, withSpinner, writeStdout } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { OutputOption, VerboseOption, PlaylistIdsOption } from '../types';
@@ -22,7 +22,7 @@ async function getPlaylistsCommand(options: PlaylistIdsOption & OutputOption & V
 
     switch (outputFormat) {
       case 'json':
-        console.log(formatJson(playlists));
+        await writeStdout(formatJson(playlists) + '\n');
         break;
 
       case 'table':
@@ -34,7 +34,7 @@ async function getPlaylistsCommand(options: PlaylistIdsOption & OutputOption & V
           privacy: playlist.privacyStatus,
           published: formatDate(playlist.publishedAt),
         }));
-        console.log(formatTable(tableData));
+        await writeStdout(formatTable(tableData) + '\n');
         break;
 
       case 'text':
@@ -62,7 +62,7 @@ async function getPlaylistsCommand(options: PlaylistIdsOption & OutputOption & V
           privacyStatus: playlist.privacyStatus,
           publishedAt: playlist.publishedAt,
         }));
-        console.log(formatCsv(csvData));
+        await writeStdout(formatCsv(csvData) + '\n');
         break;
 
       case 'pretty':

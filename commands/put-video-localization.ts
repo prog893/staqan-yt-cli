@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { putVideoLocalization } from '../lib/youtube';
-import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, debug, initCommand, withSpinner, writeStdout } from '../lib/utils';
 import { normalizeLanguage, getLanguageName } from '../lib/language';
 import { getOutputFormat } from '../lib/config';
 import { formatData } from '../lib/formatters';
@@ -49,14 +49,14 @@ async function putVideoLocalizationCommand(options: PutLocalizationOptions): Pro
     spinner.succeed(chalk.green(`Successfully created ${langName} (${langCode}) localization`));
 
     if (outputFormat !== 'pretty') {
-      console.log(formatData([{
+      await writeStdout(formatData([{
         videoId: parsedId,
         language: langCode,
         languageName: langName,
         title,
         description,
         action: 'created',
-      }], outputFormat));
+      }], outputFormat) + '\n');
       return;
     }
 

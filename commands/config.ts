@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { getConfig, getConfigValue, setConfigValue, getOutputFormat, DEFAULT_LOCK_TIMEOUT_MS } from '../lib/config';
-import { success, info, CACHE_DIR } from '../lib/utils';
+import { success, info, CACHE_DIR, writeStdout } from '../lib/utils';
 import { formatData } from '../lib/formatters';
 import { ConfigKey, CONFIG_KEYS, CONFIG_KEY_HELP, OutputFormat } from '../types';
 import { installCompletion, detectShell } from '../lib/completion';
@@ -54,11 +54,11 @@ async function configCommand(
     const explicitLockTimeout = await getConfigValue('lock.timeout');
 
     if (outputFormat !== 'pretty') {
-      console.log(formatData([
+      await writeStdout(formatData([
         { key: 'default.channel', value: config.default?.channel ?? null },
         { key: 'default.output', value: config.default?.output ?? 'pretty' },
         { key: 'lock.timeout', value: explicitLockTimeout !== undefined ? Number(explicitLockTimeout) : DEFAULT_LOCK_TIMEOUT_MS },
-      ], outputFormat));
+      ], outputFormat) + '\n');
       return;
     }
 
@@ -90,7 +90,7 @@ async function configCommand(
       await invalidateChannelCache();
     }
     if (outputFormat !== 'pretty') {
-      console.log(formatData([{ key, value }], outputFormat));
+      await writeStdout(formatData([{ key, value }], outputFormat) + '\n');
     }
     const displayValue = key === 'lock.timeout' ? `${value}ms` : value;
     success(`Set ${chalk.cyan(key)} = ${chalk.yellow(displayValue)}`);
@@ -112,7 +112,7 @@ async function configCommand(
     // 'text' and 'pretty' keep the raw-value contract (`config get x` has
     // always printed just the value — scripts depend on it).
     if (outputFormat !== 'pretty' && outputFormat !== 'text') {
-      console.log(formatData([{ key, value: currentValue ?? null }], outputFormat));
+      await writeStdout(formatData([{ key, value: currentValue ?? null }], outputFormat) + '\n');
       return;
     }
 

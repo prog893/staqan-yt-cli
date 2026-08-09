@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { info, initCommand, formatTimestampWithTimezone, withSpinner } from '../lib/utils';
+import { info, initCommand, formatTimestampWithTimezone, withSpinner, writeStdout } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv, formatText } from '../lib/formatters';
 import { fetchReportJobs } from '../lib/reports';
@@ -77,19 +77,19 @@ async function listReportJobsCommand(options: ListReportJobsOptions): Promise<vo
     // Output based on format
     switch (outputFormat) {
       case 'json':
-        console.log(formatJson(jobsData));
+        await writeStdout(formatJson(jobsData) + '\n');
         break;
 
       case 'csv':
-        console.log(formatCsv(jobsData));
+        await writeStdout(formatCsv(jobsData) + '\n');
         break;
 
       case 'text':
-        console.log(formatText(jobsData));
+        await writeStdout(formatText(jobsData) + '\n');
         break;
 
       case 'table':
-        console.log(formatTable(jobsData));
+        await writeStdout(formatTable(jobsData) + '\n');
         break;
 
       case 'pretty':

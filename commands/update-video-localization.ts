@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { updateVideoLocalization } from '../lib/youtube';
-import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, debug, initCommand, withSpinner, writeStdout } from '../lib/utils';
 import { normalizeLanguage, getLanguageName } from '../lib/language';
 import { getOutputFormat } from '../lib/config';
 import { formatData } from '../lib/formatters';
@@ -46,14 +46,14 @@ async function updateVideoLocalizationCommand(options: UpdateLocalizationOptions
     spinner.succeed(chalk.green(`Successfully updated ${langName} (${langCode}) localization`));
 
     if (outputFormat !== 'pretty') {
-      console.log(formatData([{
+      await writeStdout(formatData([{
         videoId: parsedId,
         language: langCode,
         languageName: langName,
         title: title ?? null,
         description: description ?? null,
         action: 'updated',
-      }], outputFormat));
+      }], outputFormat) + '\n');
       return;
     }
 

@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getChannelVideos } from '../lib/youtube';
-import { formatDate, parsePositiveInt, debug, initCommand, withSpinner, validatePrivacyFilter, runOrExit } from '../lib/utils';
+import { formatDate, parsePositiveInt, debug, initCommand, withSpinner, validatePrivacyFilter, runOrExit, writeStdout } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv, formatPrivacyStatus } from '../lib/formatters';
 import { ChannelOption, OutputOption, LimitOption, VerboseOption, TypeFilterOption, PrivacyFilterOption } from '../types';
@@ -47,7 +47,7 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
 
     switch (outputFormat) {
       case 'json':
-        console.log(formatJson(videos));
+        await writeStdout(formatJson(videos) + '\n');
         break;
 
       case 'table':
@@ -58,7 +58,7 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
           privacy: video.privacyStatus || '-', // '-' sentinel: human-readable placeholder for unauthenticated/missing data
           type: video.videoType,
         }));
-        console.log(formatTable(tableData));
+        await writeStdout(formatTable(tableData) + '\n');
         break;
 
       case 'text':
@@ -76,7 +76,7 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
           privacy: video.privacyStatus || '', // empty string: CSV convention — absent field, not a sentinel value
           type: video.videoType,
         }));
-        console.log(formatCsv(csvData));
+        await writeStdout(formatCsv(csvData) + '\n');
         break;
 
       case 'pretty':

@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { debug, formatNumber, initCommand, withSpinner, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
+import { debug, formatNumber, initCommand, withSpinner, validateDateOption, validateDateRange, runOrExit, writeStdout } from '../lib/utils';
 import { requireChannel, getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { fetchChannelAnalytics, ChannelAnalyticsResult } from '../lib/analytics';
@@ -92,7 +92,7 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
         columnHeaders: columnHeaders.map(h => h.name),
         rows,
       };
-      console.log(formatJson(jsonData));
+      await writeStdout(formatJson(jsonData) + '\n');
     } else if (outputFormat === 'csv') {
       // Build CSV data
       const csvData: Record<string, unknown>[] = [];
@@ -104,7 +104,7 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
         }
         csvData.push(rowData);
       }
-      console.log(formatCsv(csvData));
+      await writeStdout(formatCsv(csvData) + '\n');
     } else if (outputFormat === 'table') {
       // Build table data
       const tableData: Record<string, string>[] = [];
@@ -117,7 +117,7 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
         }
         tableData.push(rowData);
       }
-      console.log(formatTable(tableData));
+      await writeStdout(formatTable(tableData) + '\n');
     } else if (outputFormat === 'text') {
       // Tab-delimited output
       const headerNames = columnHeaders.map(h => h.name || '').join('\t');
