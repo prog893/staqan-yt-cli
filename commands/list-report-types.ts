@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { initCommand, withSpinner } from '../lib/utils';
+import { initCommand, withSpinner, writeStdout } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { fetchReportTypes, ReportTypeInfo } from '../lib/reports';
@@ -43,26 +43,26 @@ async function listReportTypesCommand(options: ReportTypesOptions): Promise<void
     // Output based on format
     switch (outputFormat) {
       case 'json':
-        console.log(formatJson({ reportTypes }));
+        await writeStdout(formatJson({ reportTypes }) + '\n');
         break;
 
       case 'csv':
-        console.log(formatCsv(reportTypes));
+        await writeStdout(formatCsv(reportTypes) + '\n');
         break;
 
       case 'text':
-        Object.entries(grouped).forEach(([category, types]) => {
-          console.log(`\n${category.toUpperCase()}:`);
-          types.forEach(rt => {
-            console.log(`  ${rt.id}`);
-            console.log(`    Name: ${rt.name}`);
-            console.log('');
-          });
-        });
+        await writeStdout(
+          Object.entries(grouped).map(([category, types]) =>
+            [
+              `\n${category.toUpperCase()}:`,
+              ...types.flatMap(rt => [`  ${rt.id}`, `    Name: ${rt.name}`, '']),
+            ].join('\n')
+          ).join('\n') + '\n'
+        );
         break;
 
       case 'table':
-        console.log(formatTable(reportTypes));
+        await writeStdout(formatTable(reportTypes) + '\n');
         break;
 
       case 'pretty':

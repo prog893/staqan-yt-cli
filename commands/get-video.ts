@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getVideoInfo } from '../lib/youtube';
-import { parseVideoId, formatDate, formatNumber, debug, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, formatDate, formatNumber, debug, initCommand, withSpinner, writeStdout } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { OutputOption, VerboseOption, VideoIdOption, VideoIdsOption } from '../types';
@@ -27,7 +27,7 @@ async function videoInfoCommand(options: OutputOption & VerboseOption & (VideoId
 
     switch (outputFormat) {
       case 'json':
-        console.log(formatJson(videos));
+        await writeStdout(formatJson(videos) + '\n');
         break;
 
       case 'table':
@@ -42,13 +42,12 @@ async function videoInfoCommand(options: OutputOption & VerboseOption & (VideoId
           likes: formatNumber(video.statistics.likeCount),
           type: video.videoType,
         }));
-        console.log(formatTable(tableData));
+        await writeStdout(formatTable(tableData) + '\n');
         break;
 
       case 'text':
         // Tab-delimited output for scripting
-        videos.forEach(video => {
-          console.log([
+        await writeStdout(videos.map(video => [
             video.id,
             video.title,
             video.channelTitle,
@@ -58,8 +57,7 @@ async function videoInfoCommand(options: OutputOption & VerboseOption & (VideoId
             video.statistics.likeCount,
             video.statistics.commentCount,
             video.videoType,
-          ].join('\t'));
-        });
+          ].join('\t')).join('\n') + '\n');
         break;
 
       case 'csv':
@@ -74,7 +72,7 @@ async function videoInfoCommand(options: OutputOption & VerboseOption & (VideoId
           comments: video.statistics.commentCount,
           type: video.videoType,
         }));
-        console.log(formatCsv(csvData));
+        await writeStdout(formatCsv(csvData) + '\n');
         break;
 
       case 'pretty':

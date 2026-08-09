@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getVideoLocalization } from '../lib/youtube';
-import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, debug, initCommand, withSpinner, writeStdout } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { LocalizationOptions } from '../types';
@@ -32,7 +32,7 @@ async function getVideoLocalizationCommand(options: LocalizationOptions): Promis
 
     switch (outputFormat) {
       case 'json':
-        console.log(formatJson(localization));
+        await writeStdout(formatJson(localization) + '\n');
         break;
 
       case 'table':
@@ -42,16 +42,16 @@ async function getVideoLocalizationCommand(options: LocalizationOptions): Promis
           title: localization.title,
           isMain: localization.isMainLanguage ? 'YES' : 'NO',
         }];
-        console.log(formatTable(tableData));
+        await writeStdout(formatTable(tableData) + '\n');
         break;
 
       case 'text':
-        console.log([
+        await writeStdout([
           localization.language,
           localization.languageName,
           localization.title,
           localization.isMainLanguage ? 'MAIN' : 'LOC'
-        ].join('\t'));
+        ].join('\t') + '\n');
         break;
 
       case 'csv':
@@ -62,7 +62,7 @@ async function getVideoLocalizationCommand(options: LocalizationOptions): Promis
           description: localization.description,
           isMain: localization.isMainLanguage ? 'YES' : 'NO',
         }];
-        console.log(formatCsv(csvData));
+        await writeStdout(formatCsv(csvData) + '\n');
         break;
 
       case 'pretty':

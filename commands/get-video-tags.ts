@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, debug, initCommand, withSpinner, writeStdout } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { GetTagsOptions } from '../types';
@@ -42,21 +42,21 @@ async function getVideoTagsCommand(options: GetTagsOptions): Promise<void> {
 
     switch (outputFormat) {
       case 'json':
-        console.log(formatJson({ videoId: parsedId, title, tags }));
+        await writeStdout(formatJson({ videoId: parsedId, title, tags }) + '\n');
         break;
 
       case 'table':
         const tableData = tags.map((tag, index) => ({ index: index + 1, tag }));
-        console.log(formatTable(tableData));
+        await writeStdout(formatTable(tableData) + '\n');
         break;
 
       case 'text':
-        tags.forEach(tag => console.log(tag));
+        await writeStdout(tags.map(tag => tag).join('\n') + '\n');
         break;
 
       case 'csv':
         const csvData = tags.map((tag, index) => ({ index: index + 1, tag }));
-        console.log(formatCsv(csvData));
+        await writeStdout(formatCsv(csvData) + '\n');
         break;
 
       case 'pretty':

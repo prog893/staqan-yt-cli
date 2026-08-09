@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { uploadCaption } from '../lib/youtube';
-import { parseVideoId, debug, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, debug, initCommand, withSpinner, writeStdout } from '../lib/utils';
 import { normalizeLanguage, getLanguageName } from '../lib/language';
 import { getOutputFormat } from '../lib/config';
 import { formatData } from '../lib/formatters';
@@ -81,7 +81,7 @@ async function putCaptionCommand(options: PutCaptionOptions): Promise<void> {
     ));
 
     if (outputFormat !== 'pretty') {
-      console.log(formatData([{ ...result, action: result.replaced ? 'replaced' : 'uploaded' }], outputFormat));
+      await writeStdout(formatData([{ ...result, action: result.replaced ? 'replaced' : 'uploaded' }], outputFormat) + '\n');
       return;
     }
 

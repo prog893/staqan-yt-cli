@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
+import { parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, validateDateOption, validateDateRange, runOrExit, writeStdout } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import {
@@ -79,7 +79,7 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
 
     switch (outputFormat) {
       case 'json':
-        console.log(formatJson({
+        await writeStdout(formatJson({
           channelId,
           channelTitle,
           contentType: contentTypeLabel,
@@ -88,25 +88,28 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
           dateRange: { startDate, endDate },
           columnHeaders: columnHeaders.map(h => h.name),
           rows,
-        }));
+        }) + '\n');
         break;
 
       case 'table':
-        console.log(formatTable(structuredRows));
+        await writeStdout(formatTable(structuredRows) + '\n');
         break;
 
       case 'text':
-        console.log(['rank', 'searchTerm', 'views', 'watchTimeMinutes'].join('\t'));
-        structuredRows.forEach(r => {
-          console.log([r.rank, r.searchTerm, r.views, r.watchTimeMinutes].join('\t'));
-        });
+        // Header and rows in one write so the whole payload is flushed together.
+        await writeStdout(
+          [
+            ['rank', 'searchTerm', 'views', 'watchTimeMinutes'].join('\t'),
+            ...structuredRows.map(r => [r.rank, r.searchTerm, r.views, r.watchTimeMinutes].join('\t')),
+          ].join('\n') + '\n'
+        );
         break;
 
       case 'csv':
         if (columnHeaders.length > 0 && rows.length > 0) {
-          console.log(convertToCSV(columnHeaders, rows));
+          await writeStdout(convertToCSV(columnHeaders, rows) + '\n');
         } else {
-          console.log(formatCsv(structuredRows));
+          await writeStdout(formatCsv(structuredRows) + '\n');
         }
         break;
 

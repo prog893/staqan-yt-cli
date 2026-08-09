@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getChannelInfo } from '../lib/youtube';
-import { formatDate, formatNumber, debug, initCommand, withSpinner } from '../lib/utils';
+import { formatDate, formatNumber, debug, initCommand, withSpinner, writeStdout } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { ChannelOption, OutputOption, VerboseOption } from '../types';
@@ -32,7 +32,7 @@ async function getChannelCommand(options: ChannelOption & OutputOption & Verbose
 
     switch (outputFormat) {
       case 'json':
-        console.log(formatJson(channel));
+        await writeStdout(formatJson(channel) + '\n');
         break;
 
       case 'table':
@@ -51,11 +51,11 @@ async function getChannelCommand(options: ChannelOption & OutputOption & Verbose
           country: channel.country || 'N/A',
           published: formatDate(channel.publishedAt),
         }];
-        console.log(formatTable(tableData));
+        await writeStdout(formatTable(tableData) + '\n');
         break;
 
       case 'text':
-        console.log([
+        await writeStdout([
           channel.id,
           channel.title,
           channel.handle || '',
@@ -65,7 +65,7 @@ async function getChannelCommand(options: ChannelOption & OutputOption & Verbose
           channel.statistics.viewCount,
           channel.country || '',
           channel.publishedAt,
-        ].join('\t'));
+        ].join('\t') + '\n');
         break;
 
       case 'csv':
@@ -86,7 +86,7 @@ async function getChannelCommand(options: ChannelOption & OutputOption & Verbose
           country: channel.country || '',
           publishedAt: channel.publishedAt,
         }];
-        console.log(formatCsv(csvData));
+        await writeStdout(formatCsv(csvData) + '\n');
         break;
 
       case 'pretty':

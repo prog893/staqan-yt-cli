@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { parseVideoId, debug, formatNumber, convertToCSV, initCommand, withSpinner, validateDateOption, validateDateRange, runOrExit } from '../lib/utils';
+import { parseVideoId, debug, formatNumber, convertToCSV, initCommand, withSpinner, validateDateOption, validateDateRange, runOrExit, writeStdout } from '../lib/utils';
 import { fetchVideoAnalytics } from '../lib/analytics';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
@@ -69,17 +69,17 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
           process.stderr.write(chalk.yellow('⚠ No analytics data available for this time period.\n'));
           return;
         }
-        console.log(convertToCSV(columnHeaders, allRows));
+        await writeStdout(convertToCSV(columnHeaders, allRows) + '\n');
         break;
 
       case 'json':
-        console.log(formatJson({
+        await writeStdout(formatJson({
           videoId: parsedId,
           title,
           dateRange: { startDate, endDate },
           columnHeaders,
           rows: allRows,
-        }));
+        }) + '\n');
         break;
 
       case 'table': {
@@ -88,15 +88,15 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
           metric: name,
           value: value.toString(),
         }));
-        console.log(formatTable(tableData));
+        await writeStdout(formatTable(tableData) + '\n');
         break;
       }
 
       case 'text':
         // Tab-delimited output of aggregated metrics
-        Object.entries(aggregated).forEach(([name, value]) => {
-          console.log([name, value].join('\t'));
-        });
+        await writeStdout(
+          Object.entries(aggregated).map(([name, value]) => [name, value].join('\t')).join('\n') + '\n'
+        );
         break;
 
       case 'pretty':

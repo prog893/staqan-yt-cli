@@ -507,6 +507,33 @@ async function withSpinner<T>(
 }
 
 /**
+ * Write machine-readable output to stdout and wait until it has been handed
+ * to the OS.
+ *
+ * `console.log` does not wait. When stdout is a pipe the kernel buffer is
+ * 64KB, so a larger payload is written in chunks and the remainder is queued
+ * inside the stream. If the process ends before that queue drains, the tail is
+ * silently dropped: the consumer sees output cut mid-token and the command
+ * still exits 0. For JSON that means unparseable output, and for any format it
+ * means a downstream aggregation is wrong rather than merely short (#161).
+ *
+ * The write callback fires only once the chunk has been flushed, so awaiting
+ * it is what makes the output whole. Use this for anything a script consumes;
+ * `console.log` remains fine for human-facing lines, which are short.
+ */
+function writeStdout(data: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    process.stdout.write(data, (err) => {
+      if (!err) return resolve();
+      // EPIPE means the consumer closed early, as `| head` does. That is the
+      // consumer's choice, not a failure of this command.
+      if ((err as NodeJS.ErrnoException).code === 'EPIPE') return resolve();
+      reject(err);
+    });
+  });
+}
+
+/**
  * Sleep for specified milliseconds
  */
 async function sleep(ms: number): Promise<void> {
@@ -723,6 +750,7 @@ export {
   progress,
   convertToCSV,
   chunkDateRange,
+  writeStdout,
   sleep,
   isRateLimitError,
   getRetryAfterMs,

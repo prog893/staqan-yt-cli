@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { parseVideoId, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, daysAgoYmd } from '../lib/utils';
+import { parseVideoId, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, daysAgoYmd, writeStdout } from '../lib/utils';
 import { fetchTrafficSources } from '../lib/analytics';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
@@ -69,30 +69,28 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
     switch (outputFormat) {
       case 'csv':
         if (columnHeaders.length > 0 && rows.length > 0) {
-          console.log(convertToCSV(columnHeaders, rows));
+          await writeStdout(convertToCSV(columnHeaders, rows) + '\n');
         } else {
-          console.log(formatCsv(trafficData));
+          await writeStdout(formatCsv(trafficData) + '\n');
         }
         break;
 
       case 'json':
-        console.log(formatJson({
+        await writeStdout(formatJson({
           videoId: parsedId,
           title,
           dateRange: { startDate, endDate },
           columnHeaders,
           rows,
-        }));
+        }) + '\n');
         break;
 
       case 'table':
-        console.log(formatTable(trafficData));
+        await writeStdout(formatTable(trafficData) + '\n');
         break;
 
       case 'text':
-        trafficData.forEach(item => {
-          console.log([item.source, item.views, item.percentage].join('\t'));
-        });
+        await writeStdout(trafficData.map(item => [item.source, item.views, item.percentage].join('\t')).join('\n') + '\n');
         break;
 
       case 'pretty':

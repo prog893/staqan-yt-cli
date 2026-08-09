@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { searchVideos } from '../lib/youtube';
-import { formatDate, parsePositiveInt, debug, initCommand, withSpinner, runOrExit } from '../lib/utils';
+import { formatDate, parsePositiveInt, debug, initCommand, withSpinner, runOrExit, writeStdout } from '../lib/utils';
 import { getConfigValue, getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { SearchVideosOptions, QueryOption } from '../types';
@@ -84,7 +84,7 @@ async function searchVideosCommand(options: SearchVideosOptions & QueryOption): 
 
     switch (outputFormat) {
       case 'json':
-        console.log(formatJson(videos));
+        await writeStdout(formatJson(videos) + '\n');
         break;
 
       case 'table':
@@ -94,18 +94,16 @@ async function searchVideosCommand(options: SearchVideosOptions & QueryOption): 
           channel: video.channelTitle || '-',
           published: formatDate(video.publishedAt),
         }));
-        console.log(formatTable(tableData));
+        await writeStdout(formatTable(tableData) + '\n');
         break;
 
       case 'text':
-        videos.forEach(video => {
-          console.log([
+        await writeStdout(videos.map(video => [
             video.id,
             video.title,
             video.channelTitle || '-',
             video.publishedAt
-          ].join('\t'));
-        });
+          ].join('\t')).join('\n') + '\n');
         break;
 
       case 'csv':
@@ -115,7 +113,7 @@ async function searchVideosCommand(options: SearchVideosOptions & QueryOption): 
           channel: video.channelTitle || '',
           published: video.publishedAt,
         }));
-        console.log(formatCsv(csvData));
+        await writeStdout(formatCsv(csvData) + '\n');
         break;
 
       case 'pretty':

@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { parseVideoId, debug, convertToCSV, parseDuration, formatTimestamp, initCommand, withSpinner } from '../lib/utils';
+import { parseVideoId, debug, convertToCSV, parseDuration, formatTimestamp, initCommand, withSpinner, writeStdout } from '../lib/utils';
 import { fetchVideoRetention } from '../lib/analytics';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
@@ -37,18 +37,18 @@ async function getRetentionCommand(options: RetentionOptions): Promise<void> {
           process.stderr.write(chalk.yellow('⚠ No retention data available for this time period.\n'));
           return;
         }
-        console.log(convertToCSV(columnHeaders, allRows));
+        await writeStdout(convertToCSV(columnHeaders, allRows) + '\n');
         break;
 
       case 'json':
-        console.log(formatJson({
+        await writeStdout(formatJson({
           videoId: parsedId,
           title,
           duration,
           dateRange: { startDate, endDate },
           columnHeaders,
           rows: allRows,
-        }));
+        }) + '\n');
         break;
 
       case 'table': {
@@ -59,20 +59,20 @@ async function getRetentionCommand(options: RetentionOptions): Promise<void> {
           retentionPercent: ((row[1] as number) * 100).toFixed(1) + '%',
           relativePerformance: (row[2] as number).toFixed(2),
         }));
-        console.log(formatTable(tableData));
+        await writeStdout(formatTable(tableData) + '\n');
         break;
       }
 
       case 'text': {
         // Tab-delimited output
         const totalSeconds = parseDuration(duration);
-        allRows.forEach(row => {
-          console.log([
+        await writeStdout(
+          allRows.map(row => [
             formatTimestamp(row[0] as number * totalSeconds),
             ((row[1] as number) * 100).toFixed(1),
             (row[2] as number).toFixed(2)
-          ].join('\t'));
-        });
+          ].join('\t')).join('\n') + '\n'
+        );
         break;
       }
 

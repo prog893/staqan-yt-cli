@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getVideoInfo, updateVideoMetadata } from '../lib/youtube';
-import { parseVideoId, confirm, success, warning, info, debug, initCommand, createSpinner } from '../lib/utils';
+import { parseVideoId, confirm, success, warning, info, debug, initCommand, createSpinner, writeStdout } from '../lib/utils';
 import { getOutputFormat } from '../lib/config';
 import { formatData } from '../lib/formatters';
 import { UpdateVideoOptions, VideoIdOption } from '../types';
@@ -65,7 +65,7 @@ async function updateMetadataCommand(options: UpdateVideoOptions & VideoIdOption
     // Dry run mode
     if (options.dryRun) {
       if (outputFormat !== 'pretty') {
-        console.log(formatData([{ videoId: parsedId, ...updates, dryRun: true }], outputFormat));
+        await writeStdout(formatData([{ videoId: parsedId, ...updates, dryRun: true }], outputFormat) + '\n');
       }
       info('Dry run mode - no changes will be applied');
       success('Preview complete');
@@ -87,12 +87,12 @@ async function updateMetadataCommand(options: UpdateVideoOptions & VideoIdOption
     updateSpinner.succeed('Metadata updated successfully');
 
     if (outputFormat !== 'pretty') {
-      console.log(formatData([{
+      await writeStdout(formatData([{
         videoId: parsedId,
         ...updates,
         url: `https://youtube.com/watch?v=${parsedId}`,
         dryRun: false,
-      }], outputFormat));
+      }], outputFormat) + '\n');
     } else {
       console.log('');
     }

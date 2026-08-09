@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { listChannelPlaylists } from '../lib/youtube';
-import { formatDate, formatNumber, parsePositiveInt, debug, initCommand, withSpinner, validatePrivacyFilter, runOrExit } from '../lib/utils';
+import { formatDate, formatNumber, parsePositiveInt, debug, initCommand, withSpinner, validatePrivacyFilter, runOrExit, writeStdout } from '../lib/utils';
 import { getOutputFormat, requireChannel } from '../lib/config';
 import { formatJson, formatTable, formatCsv, formatPrivacyStatus } from '../lib/formatters';
 import { ChannelOption, OutputOption, LimitOption, VerboseOption, PrivacyFilterOption } from '../types';
@@ -35,7 +35,7 @@ async function listPlaylistsCommand(options: ChannelOption & OutputOption & Limi
 
     switch (outputFormat) {
       case 'json':
-        console.log(formatJson(playlists));
+        await writeStdout(formatJson(playlists) + '\n');
         break;
 
       case 'table':
@@ -46,13 +46,11 @@ async function listPlaylistsCommand(options: ChannelOption & OutputOption & Limi
           privacy: playlist.privacyStatus,
           published: formatDate(playlist.publishedAt),
         }));
-        console.log(formatTable(tableData));
+        await writeStdout(formatTable(tableData) + '\n');
         break;
 
       case 'text':
-        playlists.forEach(playlist => {
-          console.log([playlist.id, playlist.title, playlist.itemCount, playlist.privacyStatus, playlist.publishedAt].join('\t'));
-        });
+        await writeStdout(playlists.map(playlist => [playlist.id, playlist.title, playlist.itemCount, playlist.privacyStatus, playlist.publishedAt].join('\t')).join('\n') + '\n');
         break;
 
       case 'csv':
@@ -66,7 +64,7 @@ async function listPlaylistsCommand(options: ChannelOption & OutputOption & Limi
           privacyStatus: playlist.privacyStatus,
           publishedAt: playlist.publishedAt,
         }));
-        console.log(formatCsv(csvData));
+        await writeStdout(formatCsv(csvData) + '\n');
         break;
 
       case 'pretty':
