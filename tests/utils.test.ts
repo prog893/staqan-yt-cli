@@ -14,6 +14,8 @@ import {
   validatePrivacyFilter,
   isRateLimitError,
   classifyRetryableError,
+  retryPolicyFor,
+  withRateLimitRetry,
   getRetryAfterMs,
 } from '../lib/utils';
 
@@ -320,5 +322,80 @@ describe('classifyRetryableError', () => {
     expect(isRateLimitError({ message: 'per day' })).toBe('daily');
     expect(isRateLimitError({ message: 'per minute' })).toBe('rpm');
     expect(isRateLimitError({ status: 500 })).toBeNull();
+  });
+});
+
+describe('withRateLimitRetry policy and Retry-After handling', () => {
+  const withRetryAfter = (seconds: number, message: string) =>
+    Object.assign(new Error(message), { response: { headers: { 'retry-after': String(seconds) } } });
+
+  it('aborts instead of clamping when Retry-After exceeds 30 minutes', async () => {
+    // Clamping a 3600s window to maxDelayMs and retrying would burn every
+    // attempt against a window that is still shut. downloadReport has always
+    // aborted at this threshold; both paths must agree.
+    let calls = 0;
+    const p = withRateLimitRetry(async () => {
+      calls++;
+      throw withRetryAfter(3600, 'Free requests per minute exceeded');
+    }, { label: 'jobs.list' });
+    await expect(p).rejects.toThrow(/rate limited for 3600s/);
+    expect(calls).toBe(1);
+  });
+
+  it('reports the wait length and the kind in the abort message', async () => {
+    const p = withRateLimitRetry(async () => {
+      throw withRetryAfter(5400, 'Free requests per minute exceeded');
+    }, { label: 'reportTypes.list' });
+    await expect(p).rejects.toThrow(/reportTypes\.list is rate limited for 5400s \(rpm\)/);
+  });
+
+  it('still retries when Retry-After is short', async () => {
+    let calls = 0;
+    const out = await withRateLimitRetry(async () => {
+      calls++;
+      if (calls === 1) throw withRetryAfter(0, 'Requests per second limit exceeded');
+      return 'ok';
+    }, { label: 'test', baseDelayMs: 1, maxDelayMs: 2 });
+    expect(out).toBe('ok');
+    expect(calls).toBe(2);
+  });
+
+  it('aborts immediately on a daily quota without consuming attempts', async () => {
+    let calls = 0;
+    const p = withRateLimitRetry(async () => {
+      calls++;
+      throw new Error('Quota exceeded: queries per day');
+    }, { label: 'test' });
+    await expect(p).rejects.toThrow(/Daily YouTube API quota exhausted/);
+    expect(calls).toBe(1);
+  });
+
+  it('rethrows a non-retriable error untouched', async () => {
+    const p = withRateLimitRetry(async () => { throw new Error('Video not found'); }, { label: 'test' });
+    await expect(p).rejects.toThrow('Video not found');
+  });
+
+  it('stops after maxAttempts total attempts, counting the first', async () => {
+    let calls = 0;
+    const p = withRateLimitRetry(async () => {
+      calls++;
+      throw Object.assign(new Error('boom'), { status: 503 });
+    }, { label: 'test', maxAttempts: 3, baseDelayMs: 1, maxDelayMs: 2 });
+    await expect(p).rejects.toThrow(/failed after 3 attempts \(transient\)/);
+    expect(calls).toBe(3);
+  });
+});
+
+describe('retryPolicyFor', () => {
+  it('gives qps a much shorter base delay than rpm, since it clears in about a second', () => {
+    expect(retryPolicyFor('qps').baseDelayMs).toBeLessThan(retryPolicyFor('rpm').baseDelayMs);
+  });
+
+  it('never retries a daily quota', () => {
+    expect(retryPolicyFor('daily').maxAttempts).toBe(1);
+  });
+
+  it('matches the constants the download path now shares', () => {
+    expect(retryPolicyFor('transient')).toMatchObject({ baseDelayMs: 2_000, maxDelayMs: 60_000 });
   });
 });

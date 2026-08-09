@@ -553,6 +553,13 @@ const RETRIABLE_NETWORK_CODES = new Set([
 /** HTTP statuses where the server is asking to be tried again. */
 const TRANSIENT_STATUSES = new Set([500, 502, 503, 504, 408]);
 
+/**
+ * A Retry-After at or above this is treated as a closed quota window rather
+ * than a transient hiccup, and aborts instead of being clamped and retried.
+ * Matches the threshold `downloadReport` has always used.
+ */
+const LONG_RETRY_AFTER_MS = 30 * 60 * 1000;
+
 /** Pull the HTTP status off the various shapes an error can arrive in. */
 function getErrorStatus(err: unknown): number | undefined {
   if (!err || typeof err !== 'object') return undefined;
@@ -650,24 +657,10 @@ function retryPolicyFor(kind: RetryKind): { baseDelayMs: number; maxDelayMs: num
 }
 
 function isRateLimitError(err: unknown): 'rpm' | 'daily' | null {
-  if (!err || typeof err !== 'object') return null;
-
-  const messages: string[] = [];
-
-  // googleapis / GaxiosError: the API message is usually on err.message
-  const topMessage = (err as { message?: unknown }).message;
-  if (typeof topMessage === 'string') messages.push(topMessage);
-
-  // Some errors nest the YouTube message under response.data.error.errors[].message
-  const nested = (err as { response?: { data?: { error?: { errors?: Array<{ message?: unknown }>; message?: unknown } } } }).response?.data?.error;
-  if (nested?.message && typeof nested.message === 'string') messages.push(nested.message);
-  if (Array.isArray(nested?.errors)) {
-    for (const e of nested.errors) {
-      if (e && typeof e.message === 'string') messages.push(e.message);
-    }
-  }
-
-  for (const msg of messages) {
+  // Delegates the error-shape walk to collectErrorMessages. Keeping a second
+  // copy here meant both had to be updated together whenever googleapis
+  // changed how it nests messages.
+  for (const msg of collectErrorMessages(err)) {
     const lower = msg.toLowerCase();
     if (lower.includes('per day')) return 'daily';
     if (lower.includes('per minute')) return 'rpm';
@@ -708,30 +701,40 @@ function getRetryAfterMs(err: unknown): number | undefined {
 }
 
 /**
- * Retry a YouTube API call that may hit the per-minute (RPM) quota limit.
+ * Retry a YouTube API call that failed for a reason worth retrying.
  *
- * On "Free requests per minute": backs off exponentially — 5s → 10s → 20s →
- * 40s → 80s, capped at `maxDelayMs` (default 90s) — and retries, up to
- * `maxRetries` times. Each retry emits a `progress()` line so the user (or
- * cron log) can see what's happening. Honors the server's Retry-After header
- * (via getRetryAfterMs) and waits the larger of (Retry-After, exponential),
- * but still capped by `maxDelayMs`.
+ * The failure is classified by `classifyRetryableError` and each kind gets the
+ * backoff suited to how quickly it clears (see `retryPolicyFor`):
  *
- * On "Free requests per day" (or any longer-window quota — week / month):
- * throws immediately with a clear message — no amount of waiting will
- * recover within the same window, so retrying wastes time and hides the
- * real problem from the operator.
+ *  - `qps` and `rpm`: exponential backoff, honoring the server's Retry-After
+ *    when it asks for longer than our own wait.
+ *  - `transient`: same treatment, since a 5xx or a dropped socket says nothing
+ *    is wrong with the request itself.
+ *  - `daily`: throws immediately. The quota resets at 00:00 PT, so no amount
+ *    of waiting recovers within the run and retrying only hides the problem.
+ *
+ * A Retry-After of 30 minutes or more also throws rather than being clamped.
+ * That length means a closed quota window, not a hiccup, and retrying under a
+ * clamped delay would burn every attempt against a window that is still shut.
+ * `downloadReport` has always applied this rule; both paths now agree.
+ *
+ * Each retry emits a `progress()` line so the operator (or a cron log) can see
+ * the wait rather than watching an apparently hung command.
  *
  * On any other error: re-throws as-is.
+ *
+ * `maxAttempts` counts total attempts including the first, not retries after
+ * it. Naming it `maxRetries` previously made `3` look like four calls when it
+ * meant three. No caller overrides it; the per-kind policy applies by default.
  */
 async function withRateLimitRetry<T>(
   fn: () => Promise<T>,
-  opts: { maxRetries?: number; baseDelayMs?: number; maxDelayMs?: number; label?: string } = {}
+  opts: { maxAttempts?: number; baseDelayMs?: number; maxDelayMs?: number; label?: string } = {}
 ): Promise<T> {
   const label = opts.label ?? 'API call';
   // An explicit override applies to every kind; otherwise each kind uses the
   // policy suited to how quickly that condition clears.
-  const overrideAttempts = opts.maxRetries;
+  const overrideAttempts = opts.maxAttempts;
   const overrideBase = opts.baseDelayMs;
   const overrideMax = opts.maxDelayMs;
 
@@ -768,13 +771,31 @@ async function withRateLimitRetry<T>(
         );
       }
 
+      const serverMs = getRetryAfterMs(err);
+
+      // A Retry-After this long is a closed quota window, not a hiccup.
+      // Clamping it to maxDelayMs and retrying anyway would spend every
+      // remaining attempt against a window that is still shut, then fail with
+      // a message that looks like a generic API error. downloadReport has
+      // always aborted on the same threshold; both paths now agree.
+      if (serverMs !== undefined && serverMs >= LONG_RETRY_AFTER_MS) {
+        throw new Error(
+          `${label} is rate limited for ${Math.round(serverMs / 1000)}s (${kind}). ` +
+          `Aborting instead of retrying, since the wait exceeds ` +
+          `${Math.round(LONG_RETRY_AFTER_MS / 60000)} minutes. ` +
+          `Original error: ${(err as Error).message}`
+        );
+      }
+
       const expMs = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs);
       // Honor the server's Retry-After when it asks for longer than our own
       // backoff, but never below it.
-      const serverMs = getRetryAfterMs(err);
-      const waitMs = serverMs !== undefined
+      const targetMs = serverMs !== undefined
         ? Math.min(Math.max(serverMs, expMs), maxDelayMs)
         : expMs;
+      // Equal jitter. Concurrent calls that hit the same limit would otherwise
+      // wake at identical instants and re-trigger it together.
+      const waitMs = targetMs / 2 + Math.random() * (targetMs / 2);
       const waitSec = Math.round(waitMs / 1000);
       const source = serverMs !== undefined && serverMs > expMs ? ' (server Retry-After)' : '';
       const reason = {
@@ -866,6 +887,7 @@ export {
   sleep,
   isRateLimitError,
   classifyRetryableError,
+  retryPolicyFor,
   getRetryAfterMs,
   withRateLimitRetry,
   parsePositiveInt,

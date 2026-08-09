@@ -24,7 +24,7 @@ import https from 'https';
 import path from 'path';
 import { google, youtubereporting_v1 } from 'googleapis';
 import { getAuthenticatedClient } from './auth';
-import { debug, progress, validateDateRange, withRateLimitRetry, classifyRetryableError } from './utils';
+import { debug, progress, validateDateRange, withRateLimitRetry, classifyRetryableError, retryPolicyFor } from './utils';
 import {
   analyzeCacheCoverage,
   ensureCacheDir,
@@ -282,7 +282,10 @@ export async function downloadReport(
       const kind = classifyRetryableError(err);
       if (kind === 'transient' && attempt < maxRetries) {
         const detail = (err as NodeJS.ErrnoException)?.code ?? (err as Error)?.message ?? 'unknown';
-        const waitMs = Math.min(2000 * 2 ** (attempt - 1), 60000);
+        // Shared policy rather than duplicated constants, so the download
+        // path cannot drift from the API path it is meant to match.
+        const policy = retryPolicyFor('transient');
+        const waitMs = Math.min(policy.baseDelayMs * 2 ** (attempt - 1), policy.maxDelayMs);
         progress(
           `Download transient error (${detail}) for ${report.id}, ` +
           `retrying in ${Math.round(waitMs / 1000)}s (attempt ${attempt}/${maxRetries})...`
