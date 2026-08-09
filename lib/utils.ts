@@ -532,6 +532,123 @@ async function sleep(ms: number): Promise<void> {
  * The googleapis library surfaces the API's `errors[].message` either in
  * `err.message` or nested in `err.response.data.error.errors[]`. We check both.
  */
+/**
+ * How a failed API call should be retried.
+ *
+ *  - `daily`     quota resets at 00:00 PT. Waiting is measured in hours, so
+ *                the caller aborts rather than sleeping.
+ *  - `rpm`       per-minute quota. Clears within a minute.
+ *  - `qps`       per-second or per-user rate limit. Clears almost immediately,
+ *                so it warrants a much shorter backoff than `rpm`.
+ *  - `transient` server-side 5xx or a network blip. Nothing is wrong with the
+ *                request, so the same call is expected to succeed on retry.
+ */
+type RetryKind = 'daily' | 'rpm' | 'qps' | 'transient';
+
+/** Network-level failures that are worth retrying unchanged. */
+const RETRIABLE_NETWORK_CODES = new Set([
+  'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ECONNREFUSED', 'ESOCKETTIMEDOUT', 'EPIPE',
+]);
+
+/** HTTP statuses where the server is asking to be tried again. */
+const TRANSIENT_STATUSES = new Set([500, 502, 503, 504, 408]);
+
+/** Pull the HTTP status off the various shapes an error can arrive in. */
+function getErrorStatus(err: unknown): number | undefined {
+  if (!err || typeof err !== 'object') return undefined;
+  const e = err as {
+    status?: unknown; code?: unknown;
+    response?: { status?: unknown };
+    statusCode?: unknown;
+  };
+  for (const candidate of [e.status, e.response?.status, e.statusCode, e.code]) {
+    const n = typeof candidate === 'string' ? Number(candidate) : candidate;
+    if (typeof n === 'number' && Number.isFinite(n) && n >= 100 && n < 600) return n;
+  }
+  return undefined;
+}
+
+/** googleapis puts a machine-readable `reason` on each nested error entry. */
+function getErrorReasons(err: unknown): string[] {
+  if (!err || typeof err !== 'object') return [];
+  const nested = (err as {
+    response?: { data?: { error?: { errors?: Array<{ reason?: unknown }> } } };
+  }).response?.data?.error;
+  if (!Array.isArray(nested?.errors)) return [];
+  return nested.errors
+    .map((e) => (e && typeof e.reason === 'string' ? e.reason : ''))
+    .filter(Boolean);
+}
+
+/** Collect every message string an API error might carry. */
+function collectErrorMessages(err: unknown): string[] {
+  if (!err || typeof err !== 'object') return [];
+  const messages: string[] = [];
+  const topMessage = (err as { message?: unknown }).message;
+  if (typeof topMessage === 'string') messages.push(topMessage);
+  const nested = (err as {
+    response?: { data?: { error?: { errors?: Array<{ message?: unknown }>; message?: unknown } } };
+  }).response?.data?.error;
+  if (nested?.message && typeof nested.message === 'string') messages.push(nested.message);
+  if (Array.isArray(nested?.errors)) {
+    for (const e of nested.errors) {
+      if (e && typeof e.message === 'string') messages.push(e.message);
+    }
+  }
+  return messages;
+}
+
+/**
+ * Classify a failed API call for retry purposes.
+ *
+ * Message text alone is not enough. It misses server-side 5xx entirely, which
+ * is what dropped a report download mid-archive-refresh, and it misses the
+ * per-second limit that googleapis reports as `userRateLimitExceeded` with no
+ * "per second" wording. Status codes and googleapis `reason` fields are
+ * checked alongside the text.
+ *
+ * Quota wording is checked before status, because a 403 carrying "per day"
+ * must abort rather than being retried as a generic rate limit.
+ */
+function classifyRetryableError(err: unknown): RetryKind | null {
+  if (!err || typeof err !== 'object') return null;
+
+  const messages = collectErrorMessages(err).map((m) => m.toLowerCase());
+  for (const msg of messages) {
+    if (msg.includes('per day')) return 'daily';
+    if (msg.includes('per minute')) return 'rpm';
+    if (msg.includes('per second')) return 'qps';
+  }
+
+  const reasons = getErrorReasons(err);
+  // quotaExceeded without "per minute"/"per second" wording is the daily cap.
+  if (reasons.includes('quotaExceeded')) return 'daily';
+  if (reasons.includes('userRateLimitExceeded') || reasons.includes('rateLimitExceeded')) return 'qps';
+  if (reasons.includes('backendError') || reasons.includes('internalError')) return 'transient';
+
+  const code = (err as NodeJS.ErrnoException).code;
+  if (typeof code === 'string' && RETRIABLE_NETWORK_CODES.has(code)) return 'transient';
+
+  const status = getErrorStatus(err);
+  if (status === 429) return 'rpm';
+  if (status !== undefined && TRANSIENT_STATUSES.has(status)) return 'transient';
+
+  return null;
+}
+
+/**
+ * Backoff policy per failure kind. `qps` clears in about a second, so starting
+ * at 5s like `rpm` would waste most of the wait.
+ */
+function retryPolicyFor(kind: RetryKind): { baseDelayMs: number; maxDelayMs: number; maxAttempts: number } {
+  switch (kind) {
+    case 'qps': return { baseDelayMs: 1_000, maxDelayMs: 15_000, maxAttempts: 6 };
+    case 'rpm': return { baseDelayMs: 5_000, maxDelayMs: 90_000, maxAttempts: 5 };
+    case 'transient': return { baseDelayMs: 2_000, maxDelayMs: 60_000, maxAttempts: 5 };
+    case 'daily': return { baseDelayMs: 0, maxDelayMs: 0, maxAttempts: 1 };
+  }
+}
+
 function isRateLimitError(err: unknown): 'rpm' | 'daily' | null {
   if (!err || typeof err !== 'object') return null;
 
@@ -611,44 +728,67 @@ async function withRateLimitRetry<T>(
   fn: () => Promise<T>,
   opts: { maxRetries?: number; baseDelayMs?: number; maxDelayMs?: number; label?: string } = {}
 ): Promise<T> {
-  const maxRetries = opts.maxRetries ?? 5;
-  const baseDelayMs = opts.baseDelayMs ?? 5_000;
-  const maxDelayMs = opts.maxDelayMs ?? 90_000;
   const label = opts.label ?? 'API call';
+  // An explicit override applies to every kind; otherwise each kind uses the
+  // policy suited to how quickly that condition clears.
+  const overrideAttempts = opts.maxRetries;
+  const overrideBase = opts.baseDelayMs;
+  const overrideMax = opts.maxDelayMs;
 
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+  let attempt = 0;
+  for (;;) {
+    attempt++;
     try {
       return await fn();
     } catch (err) {
-      lastError = err;
-      const kind = isRateLimitError(err);
+      const kind = classifyRetryableError(err);
+
+      if (kind === null) throw err;
+
       if (kind === 'daily') {
         throw new Error(
           `Daily YouTube API quota exhausted while running ${label}. ` +
-          `Aborting — wait until 00:00 PT (quota reset) or request a quota increase. ` +
+          `Aborting: the quota resets at 00:00 PT, so waiting here is not useful. ` +
+          `Wait for the reset or request a quota increase. ` +
           `Original error: ${(err as Error).message}`
         );
       }
-      if (kind === 'rpm' && attempt < maxRetries) {
-        const expMs = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs);
-        // Honor server's Retry-After when it's larger than our exponential wait.
-        const serverMs = getRetryAfterMs(err);
-        const waitMs = serverMs !== undefined
-          ? Math.min(Math.max(serverMs, expMs), maxDelayMs)
-          : expMs;
-        const waitSec = Math.round(waitMs / 1000);
-        const source = serverMs !== undefined && serverMs > expMs ? ' (server Retry-After)' : '';
-        progress(`RPM quota hit on ${label} (attempt ${attempt}/${maxRetries}), backing off ${waitSec}s${source} before retry...`);
-        await sleep(waitMs);
-        continue;
+
+      const policy = retryPolicyFor(kind);
+      const maxAttempts = overrideAttempts ?? policy.maxAttempts;
+      const baseDelayMs = overrideBase ?? policy.baseDelayMs;
+      const maxDelayMs = overrideMax ?? policy.maxDelayMs;
+
+      if (attempt >= maxAttempts) {
+        // Out of attempts. Surface what was being retried so the failure is
+        // actionable instead of looking like a plain API error.
+        throw new Error(
+          `${label} failed after ${maxAttempts} attempts (${kind}). ` +
+          `Original error: ${(err as Error).message}`
+        );
       }
-      // Not a retriable rate-limit error (or out of attempts) — bubble up.
-      throw err;
+
+      const expMs = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs);
+      // Honor the server's Retry-After when it asks for longer than our own
+      // backoff, but never below it.
+      const serverMs = getRetryAfterMs(err);
+      const waitMs = serverMs !== undefined
+        ? Math.min(Math.max(serverMs, expMs), maxDelayMs)
+        : expMs;
+      const waitSec = Math.round(waitMs / 1000);
+      const source = serverMs !== undefined && serverMs > expMs ? ' (server Retry-After)' : '';
+      const reason = {
+        rpm: 'per-minute quota',
+        qps: 'per-second rate limit',
+        transient: 'transient server or network error',
+      }[kind];
+      progress(
+        `${reason} on ${label} (attempt ${attempt}/${maxAttempts}), ` +
+        `waiting ${waitSec}s${source} before retry...`
+      );
+      await sleep(waitMs);
     }
   }
-  // Should be unreachable, but keep typescript happy.
-  throw lastError instanceof Error ? lastError : new Error(`Max RPM retries exceeded for ${label}`);
 }
 
 /**
@@ -725,6 +865,7 @@ export {
   chunkDateRange,
   sleep,
   isRateLimitError,
+  classifyRetryableError,
   getRetryAfterMs,
   withRateLimitRetry,
   parsePositiveInt,

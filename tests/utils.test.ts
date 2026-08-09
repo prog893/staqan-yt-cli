@@ -13,6 +13,7 @@ import {
   validateDateRange,
   validatePrivacyFilter,
   isRateLimitError,
+  classifyRetryableError,
   getRetryAfterMs,
 } from '../lib/utils';
 
@@ -248,5 +249,76 @@ describe('getRetryAfterMs', () => {
   it('returns undefined when absent', () => {
     expect(getRetryAfterMs({})).toBeUndefined();
     expect(getRetryAfterMs({ response: {} })).toBeUndefined();
+  });
+});
+
+describe('classifyRetryableError', () => {
+  it('classifies daily quota from message wording', () => {
+    expect(classifyRetryableError({ message: 'Quota exceeded: queries per day' })).toBe('daily');
+  });
+
+  it('classifies per-minute quota from message wording', () => {
+    expect(classifyRetryableError({ message: 'Free requests per minute exceeded' })).toBe('rpm');
+  });
+
+  it('classifies per-second quota from message wording', () => {
+    expect(classifyRetryableError({ message: 'Requests per second limit exceeded' })).toBe('qps');
+  });
+
+  it('classifies transient server errors by status', () => {
+    for (const status of [500, 502, 503, 504, 408]) {
+      expect(classifyRetryableError({ status })).toBe('transient');
+    }
+  });
+
+  it('does not retry permanent client errors', () => {
+    for (const status of [400, 401, 403, 404]) {
+      expect(classifyRetryableError({ status })).toBeNull();
+    }
+  });
+
+  it('classifies 429 as a per-minute quota hit', () => {
+    expect(classifyRetryableError({ status: 429 })).toBe('rpm');
+  });
+
+  it('reads the status from response.status as well', () => {
+    expect(classifyRetryableError({ response: { status: 503 } })).toBe('transient');
+  });
+
+  it('classifies retriable network codes as transient', () => {
+    for (const code of ['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ECONNREFUSED']) {
+      expect(classifyRetryableError({ code })).toBe('transient');
+    }
+  });
+
+  it('uses googleapis reason fields when the message says nothing', () => {
+    const withReason = (reason: string) => ({
+      response: { data: { error: { errors: [{ reason }] } } },
+    });
+    expect(classifyRetryableError(withReason('userRateLimitExceeded'))).toBe('qps');
+    expect(classifyRetryableError(withReason('rateLimitExceeded'))).toBe('qps');
+    expect(classifyRetryableError(withReason('quotaExceeded'))).toBe('daily');
+    expect(classifyRetryableError(withReason('backendError'))).toBe('transient');
+  });
+
+  it('prefers quota wording over status so a daily cap is never retried as a rate limit', () => {
+    // A 403 whose body says "per day" must abort, not back off and retry.
+    expect(classifyRetryableError({
+      status: 403,
+      response: { data: { error: { errors: [{ message: 'Quota exceeded: queries per day' }] } } },
+    })).toBe('daily');
+  });
+
+  it('returns null for errors that are not worth retrying', () => {
+    expect(classifyRetryableError({ message: 'Video not found' })).toBeNull();
+    expect(classifyRetryableError(undefined)).toBeNull();
+    expect(classifyRetryableError('string error')).toBeNull();
+    expect(classifyRetryableError(null)).toBeNull();
+  });
+
+  it('keeps isRateLimitError behaviour unchanged for its existing callers', () => {
+    expect(isRateLimitError({ message: 'per day' })).toBe('daily');
+    expect(isRateLimitError({ message: 'per minute' })).toBe('rpm');
+    expect(isRateLimitError({ status: 500 })).toBeNull();
   });
 });

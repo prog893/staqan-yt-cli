@@ -24,7 +24,7 @@ import https from 'https';
 import path from 'path';
 import { google, youtubereporting_v1 } from 'googleapis';
 import { getAuthenticatedClient } from './auth';
-import { debug, progress, validateDateRange, withRateLimitRetry } from './utils';
+import { debug, progress, validateDateRange, withRateLimitRetry, classifyRetryableError } from './utils';
 import {
   analyzeCacheCoverage,
   ensureCacheDir,
@@ -164,7 +164,14 @@ export function downloadOnce(
         if (response.statusCode !== 200) {
           response.resume();
           unlink(dest).catch(() => {});
-          reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
+          // Carry the status on the error so the caller can tell a retriable
+          // 5xx from a permanent 4xx. Without it every non-200 looked alike
+          // and a transient 500 aborted the whole report.
+          const httpErr = Object.assign(
+            new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`),
+            { status: response.statusCode },
+          );
+          reject(httpErr);
           return;
         }
 
@@ -267,13 +274,23 @@ export async function downloadReport(
       progress(`Download RPM 429 for ${report.id}, backing off ${waitSec}s (attempt ${attempt}/${maxRetries})...`);
       await new Promise((r) => setTimeout(r, waitSec * 1000));
     } catch (err) {
-      const code = (err as NodeJS.ErrnoException)?.code;
-      if ((code === 'ECONNRESET' || code === 'ETIMEDOUT' || code === 'EAI_AGAIN') && attempt < maxRetries) {
-        progress(`Download network error (${code}) for ${report.id}, retrying in 5s (attempt ${attempt}/${maxRetries})...`);
-        await new Promise((r) => setTimeout(r, 5000));
+      // Shared classifier, so the download path treats a 500/502/503/504 and a
+      // dropped socket the same way the API calls do. Previously only three
+      // network codes were retried here and any 5xx aborted the report
+      // immediately, which lost a download to a transient server error during
+      // a full archive refresh.
+      const kind = classifyRetryableError(err);
+      if (kind === 'transient' && attempt < maxRetries) {
+        const detail = (err as NodeJS.ErrnoException)?.code ?? (err as Error)?.message ?? 'unknown';
+        const waitMs = Math.min(2000 * 2 ** (attempt - 1), 60000);
+        progress(
+          `Download transient error (${detail}) for ${report.id}, ` +
+          `retrying in ${Math.round(waitMs / 1000)}s (attempt ${attempt}/${maxRetries})...`
+        );
+        await new Promise((r) => setTimeout(r, waitMs));
         continue;
       }
-      // Non-retriable — bubble up so the caller logs it.
+      // Non-retriable, or out of attempts. Bubble up so the caller logs it.
       throw err;
     }
   }
