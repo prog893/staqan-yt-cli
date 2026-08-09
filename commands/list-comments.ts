@@ -63,16 +63,14 @@ async function listCommentsCommand(options: ListCommentsOptions): Promise<void> 
         break;
 
       case 'text':
-        comments.forEach(comment => {
-          console.log([
+        await writeStdout(comments.map(comment => [
             comment.id,
             comment.authorName,
             comment.likeCount,
             comment.replyCount,
             comment.publishedAt,
             comment.textOriginal.replace(/\n/g, ' '),
-          ].join('\t'));
-        });
+          ].join('\t')).join('\n') + '\n');
         break;
 
       case 'csv':

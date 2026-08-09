@@ -405,7 +405,7 @@ async function getVideoInfo(videoIds: string[]): Promise<VideoInfo[]> {
       commentCount: parseInt(item.statistics?.commentCount || '0'),
     },
     duration: item.contentDetails!.duration!,
-    privacyStatus: item.status!.privacyStatus! as PrivacyStatus,
+    privacyStatus: item.status!.privacyStatus! as PrivacyStatus, // YouTube API guarantees exactly: 'public' | 'private' | 'unlisted'
     videoType: videoTypes.get(item.id!) || 'regular',
   }));
 }
@@ -797,7 +797,7 @@ async function getPlaylistInfo(playlistId: string): Promise<PlaylistInfo> {
     channelTitle: item.snippet!.channelTitle!,
     publishedAt: item.snippet!.publishedAt!,
     itemCount: item.contentDetails!.itemCount || 0,
-    privacyStatus: item.status!.privacyStatus! as PrivacyStatus,
+    privacyStatus: item.status!.privacyStatus! as PrivacyStatus, // YouTube API guarantees exactly: 'public' | 'private' | 'unlisted'
     thumbnails: item.snippet!.thumbnails!,
   };
 }
@@ -835,7 +835,7 @@ async function getPlaylistsById(playlistIds: string[]): Promise<PlaylistInfo[]> 
       channelTitle: item.snippet!.channelTitle!,
       publishedAt: item.snippet!.publishedAt!,
       itemCount: item.contentDetails!.itemCount || 0,
-      privacyStatus: item.status!.privacyStatus! as PrivacyStatus,
+      privacyStatus: item.status!.privacyStatus! as PrivacyStatus, // YouTube API guarantees exactly: 'public' | 'private' | 'unlisted'
       thumbnails: item.snippet!.thumbnails!,
     })));
   }
@@ -877,7 +877,7 @@ async function listChannelPlaylists(channelHandle: string, maxResults = 50): Pro
       channelTitle: item.snippet!.channelTitle!,
       publishedAt: item.snippet!.publishedAt!,
       itemCount: item.contentDetails!.itemCount || 0,
-      privacyStatus: item.status!.privacyStatus! as PrivacyStatus,
+      privacyStatus: item.status!.privacyStatus! as PrivacyStatus, // YouTube API guarantees exactly: 'public' | 'private' | 'unlisted'
     })));
 
     nextPageToken = playlistResponse.nextPageToken || undefined;

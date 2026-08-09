@@ -55,15 +55,13 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
         break;
 
       case 'text':
-        searchTermsData.forEach(item => {
-          console.log([item.rank, item.searchTerm, item.views].join('\t'));
-        });
+        await writeStdout(searchTermsData.map(item => [item.rank, item.searchTerm, item.views].join('\t')).join('\n') + '\n');
         break;
 
       case 'csv':
         // Use convertToCSV for consistency with analytics commands
         if (result.columnHeaders.length > 0 && rows.length > 0) {
-          console.log(convertToCSV(result.columnHeaders, rows));
+          await writeStdout(convertToCSV(result.columnHeaders, rows) + '\n');
         } else {
           await writeStdout(formatCsv(searchTermsData) + '\n');
         }

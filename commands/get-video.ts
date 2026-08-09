@@ -47,8 +47,7 @@ async function videoInfoCommand(options: OutputOption & VerboseOption & (VideoId
 
       case 'text':
         // Tab-delimited output for scripting
-        videos.forEach(video => {
-          console.log([
+        await writeStdout(videos.map(video => [
             video.id,
             video.title,
             video.channelTitle,
@@ -58,8 +57,7 @@ async function videoInfoCommand(options: OutputOption & VerboseOption & (VideoId
             video.statistics.likeCount,
             video.statistics.commentCount,
             video.videoType,
-          ].join('\t'));
-        });
+          ].join('\t')).join('\n') + '\n');
         break;
 
       case 'csv':

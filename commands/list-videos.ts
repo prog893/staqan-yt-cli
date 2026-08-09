@@ -62,10 +62,8 @@ async function channelVideosCommand(options: ChannelOption & OutputOption & Limi
         break;
 
       case 'text':
-        videos.forEach(video => {
           // '-' sentinel: human-readable placeholder; consistent with table format for tab-delimited consumers
-          console.log([video.id, video.title, formatDate(video.publishedAt), video.privacyStatus || '-', video.videoType].join('\t'));
-        });
+        await writeStdout(videos.map(video => [video.id, video.title, formatDate(video.publishedAt), video.privacyStatus || '-', video.videoType].join('\t')).join('\n') + '\n');
         break;
 
       case 'csv':

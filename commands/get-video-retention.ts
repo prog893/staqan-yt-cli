@@ -37,7 +37,7 @@ async function getRetentionCommand(options: RetentionOptions): Promise<void> {
           process.stderr.write(chalk.yellow('⚠ No retention data available for this time period.\n'));
           return;
         }
-        console.log(convertToCSV(columnHeaders, allRows));
+        await writeStdout(convertToCSV(columnHeaders, allRows) + '\n');
         break;
 
       case 'json':
@@ -66,13 +66,13 @@ async function getRetentionCommand(options: RetentionOptions): Promise<void> {
       case 'text': {
         // Tab-delimited output
         const totalSeconds = parseDuration(duration);
-        allRows.forEach(row => {
-          console.log([
+        await writeStdout(
+          allRows.map(row => [
             formatTimestamp(row[0] as number * totalSeconds),
             ((row[1] as number) * 100).toFixed(1),
             (row[2] as number).toFixed(2)
-          ].join('\t'));
-        });
+          ].join('\t')).join('\n') + '\n'
+        );
         break;
       }
 

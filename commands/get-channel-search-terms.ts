@@ -96,15 +96,18 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
         break;
 
       case 'text':
-        console.log(['rank', 'searchTerm', 'views', 'watchTimeMinutes'].join('\t'));
-        structuredRows.forEach(r => {
-          console.log([r.rank, r.searchTerm, r.views, r.watchTimeMinutes].join('\t'));
-        });
+        // Header and rows in one write so the whole payload is flushed together.
+        await writeStdout(
+          [
+            ['rank', 'searchTerm', 'views', 'watchTimeMinutes'].join('\t'),
+            ...structuredRows.map(r => [r.rank, r.searchTerm, r.views, r.watchTimeMinutes].join('\t')),
+          ].join('\n') + '\n'
+        );
         break;
 
       case 'csv':
         if (columnHeaders.length > 0 && rows.length > 0) {
-          console.log(convertToCSV(columnHeaders, rows));
+          await writeStdout(convertToCSV(columnHeaders, rows) + '\n');
         } else {
           await writeStdout(formatCsv(structuredRows) + '\n');
         }

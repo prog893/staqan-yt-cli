@@ -69,7 +69,7 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
     switch (outputFormat) {
       case 'csv':
         if (columnHeaders.length > 0 && rows.length > 0) {
-          console.log(convertToCSV(columnHeaders, rows));
+          await writeStdout(convertToCSV(columnHeaders, rows) + '\n');
         } else {
           await writeStdout(formatCsv(trafficData) + '\n');
         }
@@ -90,9 +90,7 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
         break;
 
       case 'text':
-        trafficData.forEach(item => {
-          console.log([item.source, item.views, item.percentage].join('\t'));
-        });
+        await writeStdout(trafficData.map(item => [item.source, item.views, item.percentage].join('\t')).join('\n') + '\n');
         break;
 
       case 'pretty':

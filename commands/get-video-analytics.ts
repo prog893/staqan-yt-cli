@@ -69,7 +69,7 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
           process.stderr.write(chalk.yellow('⚠ No analytics data available for this time period.\n'));
           return;
         }
-        console.log(convertToCSV(columnHeaders, allRows));
+        await writeStdout(convertToCSV(columnHeaders, allRows) + '\n');
         break;
 
       case 'json':
@@ -94,9 +94,9 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
 
       case 'text':
         // Tab-delimited output of aggregated metrics
-        Object.entries(aggregated).forEach(([name, value]) => {
-          console.log([name, value].join('\t'));
-        });
+        await writeStdout(
+          Object.entries(aggregated).map(([name, value]) => [name, value].join('\t')).join('\n') + '\n'
+        );
         break;
 
       case 'pretty':

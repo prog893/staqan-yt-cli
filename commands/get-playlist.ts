@@ -42,8 +42,7 @@ async function getPlaylistCommand(options: OutputOption & VerboseOption & (Playl
         break;
 
       case 'text':
-        playlists.forEach(playlist => {
-          console.log([
+        await writeStdout(playlists.map(playlist => [
             playlist.id,
             playlist.title,
             playlist.channelId,
@@ -51,8 +50,7 @@ async function getPlaylistCommand(options: OutputOption & VerboseOption & (Playl
             playlist.itemCount,
             playlist.privacyStatus,
             playlist.publishedAt,
-          ].join('\t'));
-        });
+          ].join('\t')).join('\n') + '\n');
         break;
 
       case 'csv':

@@ -51,14 +51,14 @@ async function listReportTypesCommand(options: ReportTypesOptions): Promise<void
         break;
 
       case 'text':
-        Object.entries(grouped).forEach(([category, types]) => {
-          console.log(`\n${category.toUpperCase()}:`);
-          types.forEach(rt => {
-            console.log(`  ${rt.id}`);
-            console.log(`    Name: ${rt.name}`);
-            console.log('');
-          });
-        });
+        await writeStdout(
+          Object.entries(grouped).map(([category, types]) =>
+            [
+              `\n${category.toUpperCase()}:`,
+              ...types.flatMap(rt => [`  ${rt.id}`, `    Name: ${rt.name}`, '']),
+            ].join('\n')
+          ).join('\n') + '\n'
+        );
         break;
 
       case 'table':

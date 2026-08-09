@@ -141,7 +141,7 @@ async function downloadThumbnailCommand(options: DownloadThumbnailOptions): Prom
         break;
 
       case 'text':
-        console.log(destPath);
+        await writeStdout(destPath + '\n');
         break;
 
       case 'pretty':

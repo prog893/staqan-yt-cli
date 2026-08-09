@@ -51,7 +51,7 @@ async function getVideoTagsCommand(options: GetTagsOptions): Promise<void> {
         break;
 
       case 'text':
-        tags.forEach(tag => console.log(tag));
+        await writeStdout(tags.map(tag => tag).join('\n') + '\n');
         break;
 
       case 'csv':

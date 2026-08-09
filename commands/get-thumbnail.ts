@@ -66,9 +66,7 @@ async function getThumbnailCommand(options: GetThumbnailOptions): Promise<void> 
         break;
 
       case 'text':
-        thumbnailData.forEach(thumb => {
-          console.log([thumb.quality, thumb.url, thumb.width || '', thumb.height || ''].join('\t'));
-        });
+        await writeStdout(thumbnailData.map(thumb => [thumb.quality, thumb.url, thumb.width || '', thumb.height || ''].join('\t')).join('\n') + '\n');
         break;
 
       case 'csv':

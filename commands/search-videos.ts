@@ -98,14 +98,12 @@ async function searchVideosCommand(options: SearchVideosOptions & QueryOption): 
         break;
 
       case 'text':
-        videos.forEach(video => {
-          console.log([
+        await writeStdout(videos.map(video => [
             video.id,
             video.title,
             video.channelTitle || '-',
             video.publishedAt
-          ].join('\t'));
-        });
+          ].join('\t')).join('\n') + '\n');
         break;
 
       case 'csv':

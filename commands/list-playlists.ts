@@ -50,9 +50,7 @@ async function listPlaylistsCommand(options: ChannelOption & OutputOption & Limi
         break;
 
       case 'text':
-        playlists.forEach(playlist => {
-          console.log([playlist.id, playlist.title, playlist.itemCount, playlist.privacyStatus, playlist.publishedAt].join('\t'));
-        });
+        await writeStdout(playlists.map(playlist => [playlist.id, playlist.title, playlist.itemCount, playlist.privacyStatus, playlist.publishedAt].join('\t')).join('\n') + '\n');
         break;
 
       case 'csv':

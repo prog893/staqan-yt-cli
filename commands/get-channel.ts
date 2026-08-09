@@ -55,7 +55,7 @@ async function getChannelCommand(options: ChannelOption & OutputOption & Verbose
         break;
 
       case 'text':
-        console.log([
+        await writeStdout([
           channel.id,
           channel.title,
           channel.handle || '',
@@ -65,7 +65,7 @@ async function getChannelCommand(options: ChannelOption & OutputOption & Verbose
           channel.statistics.viewCount,
           channel.country || '',
           channel.publishedAt,
-        ].join('\t'));
+        ].join('\t') + '\n');
         break;
 
       case 'csv':

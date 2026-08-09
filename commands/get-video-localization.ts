@@ -46,12 +46,12 @@ async function getVideoLocalizationCommand(options: LocalizationOptions): Promis
         break;
 
       case 'text':
-        console.log([
+        await writeStdout([
           localization.language,
           localization.languageName,
           localization.title,
           localization.isMainLanguage ? 'MAIN' : 'LOC'
-        ].join('\t'));
+        ].join('\t') + '\n');
         break;
 
       case 'csv':
