@@ -275,6 +275,7 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
             jobId,
             startTime,
             endTime,
+            createTime: report.createTime || undefined,
             startTimeActual: minDate || startTime,
             endTimeActual: maxDate || endTime,
             downloadedAt: new Date().toISOString(),

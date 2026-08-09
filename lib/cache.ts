@@ -4,7 +4,19 @@ import { CONFIG_DIR, debug, warning } from './utils';
 import { CacheIndex, CacheIndexEntry, ReportMetadata, CacheCoverage } from '../types';
 
 // Base data directory
-export const DATA_DIR = path.join(CONFIG_DIR, 'data');
+/**
+ * Root of the on-disk report archive.
+ *
+ * Resolved per call rather than captured once at import, and overridable via
+ * `STAQAN_YT_DATA_DIR`. The override exists so the filesystem-dependent cache
+ * layer can be tested against a temp directory instead of the real archive:
+ * the module-level constant this replaced was baked in at import time, which
+ * made redirecting it from a test impossible once any other module had loaded
+ * it. Not intended for normal use; unset, behaviour is unchanged.
+ */
+export function getDataDir(): string {
+  return process.env.STAQAN_YT_DATA_DIR || path.join(CONFIG_DIR, 'data');
+}
 
 // Cache index version
 const CACHE_INDEX_VERSION = '2.0';
@@ -12,11 +24,11 @@ const CACHE_INDEX_VERSION = '2.0';
 // ─── Per-channel path helpers ──────────────────────────────────────────────────
 
 function getChannelReportsDir(channelId: string): string {
-  return path.join(DATA_DIR, channelId, 'reports');
+  return path.join(getDataDir(), channelId, 'reports');
 }
 
 function getChannelCacheIndexPath(channelId: string): string {
-  return path.join(DATA_DIR, channelId, 'reports', 'cache-index.json');
+  return path.join(getDataDir(), channelId, 'reports', 'cache-index.json');
 }
 
 /**
@@ -123,6 +135,97 @@ export async function isReportCached(
 ): Promise<boolean> {
   const index = await loadCacheIndex(channelId);
   return index.entries.some(entry => entry.reportId === reportId);
+}
+
+/**
+ * Collapse cached reports to one per API window, keeping the newest.
+ *
+ * YouTube reissues a report for the same [startTime, endTime] window when it
+ * has corrected figures, so the cache legitimately accumulates several
+ * reportIds per window (58% of windows for channel_reach_basic_a1 on a real
+ * archive). Loading all of them returns both the stale and the corrected rows:
+ * same date and video_id, different metric values, which silently double-counts
+ * any aggregation. The API path has always collapsed these via createTime;
+ * this is the cache-side equivalent.
+ *
+ * Recency key, in order of preference:
+ *  1. `createTime` from the API, persisted since this was fixed.
+ *  2. `expiresAt`, for entries archived before createTime was stored. Expiry is
+ *     createTime plus 30 days (backfill reports, created within ~4 days of the
+ *     job) or 60 days (regular). Within one job createTime only increases and
+ *     the added window never shrinks, so ordering by expiresAt agrees with
+ *     ordering by createTime.
+ *  3. `downloadedAt`, as a last resort if expiry is missing or equal.
+ */
+export function pickNewestPerWindow(entries: CacheIndexEntry[]): CacheIndexEntry[] {
+  const newest = new Map<string, CacheIndexEntry>();
+
+  for (const entry of entries) {
+    const key = `${entry.startTime}|${entry.endTime}`;
+    const prev = newest.get(key);
+    if (!prev || isNewerReport(entry, prev)) {
+      newest.set(key, entry);
+    }
+  }
+
+  return [...newest.values()];
+}
+
+/**
+ * Compare two ISO 8601 instants chronologically. Returns a negative number
+ * when `a` is earlier, positive when later, 0 when equal or incomparable.
+ *
+ * String comparison is NOT safe here. The Reporting API returns createTime
+ * with microsecond precision (2026-07-26T13:23:08.447428Z), and any variation
+ * in that precision breaks lexical ordering: "…08Z" sorts after "…08.000001Z"
+ * because "." (0x2E) is below "Z" (0x5A), and "…08.447428Z" sorts after
+ * "…08.45Z" even though it is 3ms earlier. Parsing to epoch milliseconds is
+ * exact for every format the API emits.
+ *
+ * Date.parse truncates to milliseconds, which would tie two instants that
+ * differ only in microseconds, so sub-millisecond digits are compared
+ * separately to keep the ordering exact at the precision the API actually
+ * emits.
+ */
+export function compareInstants(a: string, b: string): number {
+  const ta = Date.parse(a);
+  const tb = Date.parse(b);
+  if (Number.isNaN(ta) || Number.isNaN(tb)) {
+    // Unparseable timestamp: fall back to byte order so behaviour stays
+    // deterministic rather than silently treating everything as equal.
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+  if (ta !== tb) return ta - tb;
+  // Same millisecond: break the tie on the remaining fractional digits.
+  return fractionalNanoseconds(a) - fractionalNanoseconds(b);
+}
+
+/**
+ * Fractional seconds of an ISO timestamp as nanoseconds, zero-padded so
+ * ".45" and ".450000" compare equal and ".000001" is distinguishable from "".
+ */
+function fractionalNanoseconds(ts: string): number {
+  const match = /\.(\d+)/.exec(ts);
+  if (!match) return 0;
+  return Number(match[1].padEnd(9, '0').slice(0, 9));
+}
+
+/** True when `a` is a later reissue than `b`. See pickNewestPerWindow. */
+function isNewerReport(a: CacheIndexEntry, b: CacheIndexEntry): boolean {
+  if (a.createTime && b.createTime) {
+    const byCreate = compareInstants(a.createTime, b.createTime);
+    if (byCreate !== 0) return byCreate > 0;
+  }
+  // Prefer an entry that knows its createTime over one that does not: it was
+  // archived after the fix, so it is at least as trustworthy.
+  if (Boolean(a.createTime) !== Boolean(b.createTime)) {
+    return Boolean(a.createTime);
+  }
+  if (a.expiresAt && b.expiresAt) {
+    const byExpiry = compareInstants(a.expiresAt, b.expiresAt);
+    if (byExpiry !== 0) return byExpiry > 0;
+  }
+  return compareInstants(a.downloadedAt || '', b.downloadedAt || '') > 0;
 }
 
 export async function findCachedReports(
@@ -323,6 +426,9 @@ export async function saveReportToCache(
     channelId,
     startTime: metadata.startTime,
     endTime: metadata.endTime,
+    // Carried into the index so pickNewestPerWindow can order reissues of the
+    // same window without opening every metadata file.
+    createTime: metadata.createTime,
     downloadedAt: metadata.downloadedAt,
     expiresAt: metadata.expiresAt,
     fileSize: metadata.fileSize,
@@ -531,63 +637,15 @@ export async function analyzeCacheCoverage(
   );
 
   if (cachedReports.length === 0) {
-    return {
-      fullyCovered: [],
-      partiallyCovered: [],
-      notCovered: [`${requestedStart}/${requestedEnd}`],
-    };
+    return { missingRanges: [{ start: requestedStart, end: requestedEnd }] };
   }
 
-  const fullyCovered: string[] = [];
-  const partiallyCovered: CacheCoverage['partiallyCovered'] = [];
-  const notCovered: string[] = [];
-
-  // Resolve actual data dates for each cached report (reads metadata if needed)
-  const entriesWithDates = await Promise.all(
-    cachedReports.map(async (r) => ({
-      entry: r,
-      dates: await getActualDates(r, channelId),
-    }))
+  // Collapse reissues first so coverage reflects the reports that will
+  // actually be loaded, then subtract their real data windows from the
+  // request. findDateGaps handles sorting, merging and adjacency.
+  const cachedRanges = await Promise.all(
+    pickNewestPerWindow(cachedReports).map((entry) => getActualDates(entry, channelId))
   );
 
-  const cachedRanges = entriesWithDates.map(e => e.dates);
-  const gaps = findDateGaps(cachedRanges, requestedStart, requestedEnd);
-
-  for (const { dates } of entriesWithDates) {
-    const cachedStart = dates.start;
-    const cachedEnd = dates.end;
-
-    const overlap = computeDateRangeOverlap(
-      cachedStart,
-      cachedEnd,
-      requestedStart,
-      requestedEnd
-    );
-
-    if (!overlap) continue;
-
-    if (overlap.start === cachedStart && overlap.end === cachedEnd) {
-      fullyCovered.push(`${cachedStart}/${cachedEnd}`);
-    } else {
-      const missingStart = overlap.start < cachedStart
-        ? overlap.start
-        : new Date(new Date(cachedEnd).getTime() + 86400000).toISOString().split('T')[0];
-
-      const missingEnd = overlap.end > cachedEnd
-        ? overlap.end
-        : new Date(new Date(cachedStart).getTime() - 86400000).toISOString().split('T')[0];
-
-      partiallyCovered.push({
-        range: { start: requestedStart, end: requestedEnd },
-        cached: { start: overlap.start, end: overlap.end },
-        missing: { start: missingStart, end: missingEnd },
-      });
-    }
-  }
-
-  for (const gap of gaps) {
-    notCovered.push(`${gap.start}/${gap.end}`);
-  }
-
-  return { fullyCovered, partiallyCovered, notCovered };
+  return { missingRanges: findDateGaps(cachedRanges, requestedStart, requestedEnd) };
 }

@@ -229,6 +229,13 @@ staqan-yt-cli/
 - `default.output` - Default output format: `json`, `table`, `text`, `pretty`, or `csv` (defaults to `pretty`)
 - `lock.timeout` - Lock acquisition timeout in milliseconds for `fetch-reports` (defaults to `60000`; overridden by `STAQAN_YT_LOCK_TIMEOUT_MS` env var)
 
+### Environment Variables
+
+- `STAQAN_YT_LOCK_TIMEOUT_MS` - Overrides the `lock.timeout` config value. Precedence: env var > config > 60s default.
+- `STAQAN_YT_DATA_DIR` - Overrides the root of the on-disk report archive, normally `~/.staqan-yt-cli/data`. Resolved per call via `getDataDir()` in `lib/cache.ts`, so it can be set at runtime.
+
+  This exists as a **test seam**, not a user-facing relocation feature: it lets the filesystem-backed cache layer (`tests/cache-store.test.ts`) run against a temp directory instead of the real archive. It is deliberately not config-backed, because `getLockPath()` in `lib/lock.ts` resolves the archive root synchronously and reading config is async. Making the archive root relocatable through `config.json` is a reasonable feature, but it needs a config key, a CLI flag, validation and a migration story for existing archives, so it belongs in its own change rather than riding along with a cache fix.
+
 ### How Configuration Works
 
 - Config values are loaded when commands execute
