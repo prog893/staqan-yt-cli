@@ -298,7 +298,7 @@ _staqa_nyt_completion() {
     --sort|-s)
       COMPREPLY=( \$(compgen -W "top new" -- "\${cur}") ); return ;;
     --format)
-      COMPREPLY=( \$(compgen -W "srt vtt sbv scc ttml json" -- "\${cur}") ); return ;;
+      COMPREPLY=( \$(compgen -W "raw srt vtt sbv ttml" -- "\${cur}") ); return ;;
     --dimensions)
       COMPREPLY=( \$(compgen -W "video day month insightTrafficSourceType insightTrafficSourceDetail creatorContentType country province city deviceType operatingSystem insightPlaybackLocationType insightPlayerLocationType subscribedStatus" -- "\${cur}") ); return ;;
     staqan-yt)
@@ -801,7 +801,7 @@ ${commandList}
       local CURRENT=\$((\$CURRENT - 1))
       _arguments \\
         '--caption-id[Caption ID]:id:( )' \\
-        '--format[Caption format]:format:(srt vtt sbv scc ttml json)' \\
+        '--format[Caption format]:format:(raw srt vtt sbv ttml)' \\
         '--verbose[Enable verbose output]'
       ;;
     put-caption)

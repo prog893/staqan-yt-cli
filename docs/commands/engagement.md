@@ -170,7 +170,7 @@ staqan-yt get-caption --caption-id <captionId>
 
 - `--caption-id <id>` - Caption track ID (get from `list-captions`) (required)
 
-- `--format <format>` - Caption format: srt, vtt, sbv, scc, ttml, json (default: json)
+- `--format <format>` - Caption format: raw, srt, vtt, sbv, ttml (default: raw)
 - `-v, --verbose` - Enable verbose output with debug information
 - `-h, --help` - Show help
 
@@ -182,70 +182,81 @@ staqan-yt get-caption --caption-id <captionId>
 # List captions on one of your own videos to get the caption ID
 staqan-yt list-captions --video-id <your-video-id>
 
-# Download captions (JSON format by default)
+# Download the track in the format it was uploaded in
 staqan-yt get-caption --caption-id <caption-id>
 
 # Download as SRT (subtitle file format)
 staqan-yt get-caption --caption-id <caption-id> --format srt > captions.srt
 
-# Download as VTT
+# Download as VTT (web players)
 staqan-yt get-caption --caption-id <caption-id> --format vtt > captions.vtt
 
-# Download as text
-staqan-yt get-caption --caption-id <caption-id> --format json | jq -r '.[].text'
+# Extract plain text from the SRT output
+staqan-yt get-caption --caption-id <caption-id> --format srt | \
+  grep -v -E '^[0-9]+$|-->|^$'
 ```
 
 ### Caption Formats
 
-**Text formats:**
-- `json` - Structured JSON with timing (default)
-- `scc` - Scenarist Closed Caption format
+The API performs the conversion, so the requested format is what comes back
+regardless of how the track was originally uploaded.
 
-**Subtitle formats:**
+- `raw` (default) - the track exactly as uploaded, no conversion requested
 - `srt` - SubRip format (most players)
 - `vtt` - WebVTT format (web players)
 - `sbv` - YouTube subtitle format
-- `ttml` - TTML format (professional)
+- `ttml` - TTML format (professional, XML)
+
+> **No JSON output.** `--format json` is accepted as an alias for `raw`,
+> because `json` was the previous default, but it never produced JSON and the
+> API rejects `tfmt=json` outright. Parse the timed text formats instead. This
+> is why the older `--format json | jq '.[].text'` recipes do not work.
+
+> **`scc` is not available.** The API rejects scc conversion for caption tracks
+> with HTTP 404 on every track type, so the CLI declines it up front rather
+> than forwarding a request that cannot succeed.
 
 ### Caption ID Format
 
-Caption IDs typically follow the format:
-```
-<language_code>.<video_id>
-```
+Caption IDs are opaque strings assigned by YouTube, roughly 44 to 56
+characters, and they encode nothing you can construct by hand:
 
-Examples:
-- `en.<video-id>` - English captions
-- `ja.<video-id>` - Japanese captions
-- `en.<video-id>.3` - Multiple English tracks
+```
+AUieDaZbd2DZ0wKrWG97SNiRKW7wUMhu8EHRLSSSOCGt3nWyK-SuEhLW
+```
 
 Use `staqan-yt list-captions --video-id <your-video-id>` to get the exact caption ID for your videos.
 
 ### Working with Captions
 
+These use `--format srt` and strip the cue numbers, timestamps and blank lines
+that SRT puts between the text. Ask for `srt` explicitly rather than relying on
+the default, since `raw` returns whatever format the track happens to be in.
+
 **Extract plain text:**
 
 ```bash
-staqan-yt get-caption --caption-id <caption-id> --format json | \
-  jq -r '.[].text' > transcript.txt
+staqan-yt get-caption --caption-id <caption-id> --format srt | \
+  grep -v -E '^[0-9]+$|-->|^$' > transcript.txt
 ```
 
 **Create word cloud:**
 
 ```bash
-staqan-yt get-caption --caption-id <caption-id> --format json | \
-  jq -r '.[].text' | \
+staqan-yt get-caption --caption-id <caption-id> --format srt | \
+  grep -v -E '^[0-9]+$|-->|^$' | \
   tr '[:upper:]' '[:lower:]' | \
   tr -d '[:punct:]' | \
   tr ' ' '\n' | \
+  grep -v '^$' | \
   sort | uniq -c | sort -rn
 ```
 
 **Find mentions:**
 
 ```bash
-staqan-yt get-caption --caption-id <caption-id> --format json | \
-  jq -r '.[].text' | \
+staqan-yt get-caption --caption-id <caption-id> --format srt | \
+  grep -v -E '^[0-9]+$|-->|^$' | \
   grep -i '@\|twitter\|instagram'
 ```
 
@@ -312,28 +323,31 @@ staqan-yt list-comments --video-id VIDEO_ID --output json | \
 # Get plain text transcript from captions
 staqan-yt list-captions --video-id VIDEO_ID --output json | \
   jq -r '.[0].id' | \
-  xargs staqan-yt get-caption --caption-id --format json | \
-  jq -r '.[].text' > transcript.txt
+  xargs -I{} staqan-yt get-caption --caption-id {} --format srt | \
+  grep -v -E '^[0-9]+$|-->|^$' > transcript.txt
 ```
 
 ### Download Multiple Captions
 
+Take the language from the listing, not from the caption ID. IDs are opaque and
+carry no language prefix. The track kind is in the filename too, since a video
+can carry both a manual and an auto-generated track in the same language.
+
 ```bash
 # Download all available caption tracks
 staqan-yt list-captions --video-id VIDEO_ID --output json | \
-  jq -r '.[].id' | \
-  while read caption_id; do
-    language=$(echo $caption_id | cut -d. -f1)
-    staqan-yt get-caption --caption-id "$caption_id" --format srt > "${language}.srt"
+  jq -r '.[] | "\(.id)\t\(.language)\t\(.trackKind)"' | \
+  while IFS=$'\t' read -r caption_id language kind; do
+    staqan-yt get-caption --caption-id "$caption_id" --format srt > "${language}-${kind}.srt"
   done
 ```
 
 ### Caption Search
 
 ```bash
-# Search for specific terms in captions
-staqan-yt get-caption --caption-id en.VIDEO_ID --format json | \
-  jq -r '.[] | select(.text | contains("keyword"))'
+# Search for specific terms in captions, with the timestamp above each hit
+staqan-yt get-caption --caption-id <caption-id> --format srt | \
+  grep -i -B 2 'keyword'
 ```
 
 ### Comment Frequency Analysis
