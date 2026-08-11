@@ -520,6 +520,7 @@ ${commandList}
       local CURRENT=\$((\$CURRENT - 1))
       # Space-separated variadic: walk back to detect if we're inside --video-ids'
       # value list. Exclude already-used IDs via compadd -F.
+      # See docs/development/shell-completion-guide.md#variadic-pre-check-pattern
       if [[ \$words[\$CURRENT] != -* ]]; then
         local j=\$((\$CURRENT - 1))
         local -a _vused=()
@@ -535,6 +536,9 @@ ${commandList}
           esac
         done
       fi
+      # The pre-check owns every --video-ids value, the first one included, so
+      # the _staqan_yt_video_ids action below only ever completes the flag name.
+      # (The singular --video-id flags do reach that helper.)
       _arguments \\
         '--video-ids[Video IDs (variadic)]: :_staqan_yt_video_ids' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
@@ -566,7 +570,8 @@ ${commandList}
     get-video-localizations)
       local words=(\$words[1] \$words[3,-1])
       local CURRENT=\$((\$CURRENT - 1))
-      # Same variadic pre-check as get-videos
+      # Same variadic pre-check as get-videos.
+      # See docs/development/shell-completion-guide.md#variadic-pre-check-pattern
       if [[ \$words[\$CURRENT] != -* ]]; then
         local j=\$((\$CURRENT - 1))
         local -a _vused=()
@@ -707,6 +712,7 @@ ${commandList}
       # Space-separated variadic: walk back to detect if we're inside --privacy's
       # value list. Pattern from Docker/_docker: use \${words[(r)val]} to check
       # already-used values, then offer only the remaining ones.
+      # See docs/development/shell-completion-guide.md#variadic-pre-check-pattern
       if [[ \$words[\$CURRENT] != -* ]]; then
         local j=\$((\$CURRENT - 1))
         local -a _pused=()
@@ -726,6 +732,11 @@ ${commandList}
           esac
         done
       fi
+      # Value completion for --privacy never reaches _arguments. The words slice
+      # above drops the empty word being completed, so \$words[\$CURRENT] is empty
+      # (never -*) and the pre-check runs for the first value as well as later
+      # ones. The inline (public private unlisted) action is still required: it
+      # is what completes the flag name and supplies its description.
       _arguments \\
         '--channel[Channel handle or ID]:channel:' \\
         '--limit[Limit number of results]:n:' \\
@@ -737,7 +748,8 @@ ${commandList}
     list-playlists)
       local words=(\$words[1] \$words[3,-1])
       local CURRENT=\$((\$CURRENT - 1))
-      # Same space-separated variadic pre-check as list-videos
+      # Same space-separated variadic pre-check as list-videos.
+      # See docs/development/shell-completion-guide.md#variadic-pre-check-pattern
       if [[ \$words[\$CURRENT] != -* ]]; then
         local j=\$((\$CURRENT - 1))
         local -a _pused=()
@@ -757,6 +769,8 @@ ${commandList}
           esac
         done
       fi
+      # Same division of labour as list-videos: the pre-check owns every
+      # --privacy value, the inline action only completes the flag name.
       _arguments \\
         '--channel[Channel handle or ID]:channel:' \\
         '--limit[Limit number of results]:n:' \\
