@@ -98,6 +98,11 @@ async function listCaptionsCommand(options: ListCaptionsOptions): Promise<void> 
           const kindLabel = cap.trackKind === 'automatic' ? chalk.yellow('automatic (YouTube-generated)') : chalk.green('manual (user-uploaded)');
           // A track that is a draft, still syncing, or failed shows nothing to
           // viewers. Only `serving` and published means the captions are live.
+          //
+          // isDraft is checked FIRST and independently of status: a draft track
+          // is reported by the API as `status: serving` (live-verified by
+          // uploading one with --draft), so keying visibility off status alone
+          // would announce an invisible track as visible.
           const isLive = cap.status === 'serving' && !cap.isDraft;
           const visibility = cap.isDraft
             ? chalk.yellow('draft (not visible to viewers)')

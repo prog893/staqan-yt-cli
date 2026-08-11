@@ -100,6 +100,19 @@ describe('mapCaptionItem track state', () => {
     expect(caption.isAutoSynced).toBe(false);
   });
 
+  // Live-verified by uploading a track with --draft: YouTube reports it as
+  // `status: serving` alongside `isDraft: true`. The two fields are
+  // independent, so a visibility check keyed off status alone is wrong.
+  it('keeps status and isDraft independent, as the API reports them', () => {
+    const caption = mapCaptionItem(makeCaption('standard', 'unknown', {
+      status: 'serving',
+      isDraft: true,
+    }));
+
+    expect(caption.status).toBe('serving');
+    expect(caption.isDraft).toBe(true);
+  });
+
   it('narrows the documented statuses', () => {
     expect(mapCaptionItem(makeCaption('standard', 'unknown', { status: 'serving' })).status).toBe('serving');
     expect(mapCaptionItem(makeCaption('standard', 'unknown', { status: 'syncing' })).status).toBe('syncing');

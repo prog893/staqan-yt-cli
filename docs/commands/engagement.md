@@ -128,6 +128,16 @@ rejected during processing (see `failureReason`). The `pretty` and `table`
 formats report this as a `Visibility` / `status` field so a draft or failed
 track is not mistaken for a working one.
 
+> **`serving` does not mean visible.** A draft track is reported by the API as
+> `status: "serving"` with `isDraft: true`. Filter on both fields, never on
+> `status` alone:
+>
+> ```bash
+> # Tracks actually shown to viewers
+> staqan-yt list-captions --video-id VIDEO_ID --output json | \
+>   jq '.[] | select(.status == "serving" and .isDraft == false)'
+> ```
+
 ### Caption Sources
 
 **Manual (`manual`):**

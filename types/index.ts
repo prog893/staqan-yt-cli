@@ -287,10 +287,14 @@ export interface ChannelInfo {
 // Caption-related types
 export type CaptionTrackKind = 'manual' | 'automatic';
 
-// Processing state of a caption track. Only `serving` tracks are visible to
-// viewers: `syncing` is still being timed against the audio, and `failed`
-// means the upload was rejected (see `failureReason`). A track can exist and
-// still show nothing on the video, so this is reported alongside the track.
+// Processing state of a caption track: `syncing` is still being timed against
+// the audio, and `failed` means the upload was rejected (see `failureReason`).
+// A track can exist and still show nothing on the video, so this is reported
+// alongside the track.
+//
+// `serving` is necessary but NOT sufficient for the track to be visible: a
+// draft track is also reported as `serving` (live-verified). Visibility is
+// `status === 'serving' && !isDraft`.
 export type CaptionTrackStatus = 'serving' | 'syncing' | 'failed' | 'unknown';
 
 // Which audio track the captions belong to. `primary` is the main audio,
