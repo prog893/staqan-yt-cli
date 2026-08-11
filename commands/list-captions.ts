@@ -114,11 +114,29 @@ async function listCaptionsCommand(options: ListCaptionsOptions): Promise<void> 
                   ? chalk.red(`failed${cap.failureReason ? ` (${cap.failureReason})` : ''}`)
                   : chalk.gray('unknown');
 
+          // Attributes worth a line only when they are set. Every one of these
+          // is false/default on the overwhelming majority of real tracks, so
+          // printing them unconditionally would bury the fields that decide
+          // whether the captions work. Use --output csv for the full record.
+          const attributes = [
+            cap.isClosedCaptions ? 'closed captions' : null,
+            cap.isLarge ? 'large text' : null,
+            cap.isEasyReader ? 'easy reader' : null,
+            cap.isAutoSynced ? 'auto-synced timing' : null,
+            cap.audioTrackType !== 'unknown' ? `${cap.audioTrackType} audio` : null,
+          ].filter((a): a is string => a !== null);
+
           const title = cap.name ? `${cap.languageName} (${cap.language}) - ${cap.name}` : `${cap.languageName} (${cap.language})`;
           console.log(chalk.bold(`${index + 1}. ${title}`));
           console.log(chalk.gray('   Caption ID: ') + chalk.yellow(cap.id));
           console.log(chalk.gray('   Source:     ') + kindLabel);
           console.log(chalk.gray('   Visibility: ') + visibility);
+          if (attributes.length > 0) {
+            console.log(chalk.gray('   Attributes: ') + attributes.join(', '));
+          }
+          if (cap.lastUpdated) {
+            console.log(chalk.gray('   Updated:    ') + cap.lastUpdated);
+          }
           if (!isLive) {
             console.log(chalk.gray('   Note:       ') + chalk.yellow('this track is not currently shown on the video'));
           }
