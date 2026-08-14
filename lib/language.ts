@@ -126,7 +126,10 @@ function getLanguageName(code: string): string | null {
   }
 
   // The alias table wins so the three main languages keep their established
-  // names regardless of what CLDR calls them in a future ICU version.
+  // names regardless of ICU version or platform. CLDR wording genuinely does
+  // differ between the two: macOS names zh-Hans "Chinese, Simplified" while
+  // Linux names it "Simplified Chinese". Display names are therefore for
+  // humans to read, never for callers to compare against.
   if (LANGUAGE_MAP[code]) {
     return LANGUAGE_MAP[code].name;
   }
