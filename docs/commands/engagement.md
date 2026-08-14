@@ -211,7 +211,7 @@ regardless of how the track was originally uploaded.
 > because `json` was the previous default, but it never produced JSON and the
 > API rejects `tfmt=json` outright. Parse the timed text formats instead. This
 > is why the older `--format json | jq '.[].text'` recipes do not work.
-
+>
 > **`scc` is not available.** The API rejects scc conversion for caption tracks
 > with HTTP 404 on every track type, so the CLI declines it up front rather
 > than forwarding a request that cannot succeed.
@@ -221,7 +221,7 @@ regardless of how the track was originally uploaded.
 Caption IDs are opaque strings assigned by YouTube, roughly 44 to 56
 characters, and they encode nothing you can construct by hand:
 
-```
+```text
 AUieDaZbd2DZ0wKrWG97SNiRKW7wUMhu8EHRLSSSOCGt3nWyK-SuEhLW
 ```
 

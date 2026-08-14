@@ -38,10 +38,16 @@ async function getCaptionCommand(options: GetCaptionOptions): Promise<void> {
 
     spinner.succeed('Caption downloaded');
 
+    // The contract here is byte fidelity, not newline normalization: this
+    // output is a caption file. srt, vtt and sbv end with two newlines, and
+    // that trailing blank line terminates the final cue, so collapsing it to
+    // one would corrupt the format. The conditional only guards against
+    // leaving a shell prompt mid-line if a format ever returns no trailing
+    // newline; every format observed live returns at least one.
+    //
     // Must be writeStdout, not console.log: redirecting to a file is this
     // command's primary use, and console.log silently truncates piped output
-    // at 65536 bytes with exit 0 (issue #161). Caption files cross that
-    // easily, ttml most of all.
+    // at 65536 bytes with exit 0 (issue #161). ttml on a long video crosses it.
     await writeStdout(content.endsWith('\n') ? content : content + '\n');
   } catch (err) {
     spinner.fail('Failed to download caption');
