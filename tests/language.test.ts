@@ -44,6 +44,26 @@ describe('normalizeLanguage', () => {
     expect(getLanguageName('tlh')).toBe('Klingon');
   });
 
+  // Intl.DisplayNames.of() is stricter than getCanonicalLocales: it raises
+  // RangeError for extension and private-use subtags that canonicalize fine.
+  // Unguarded, that surfaced as the raw ICU text "argument is not a language
+  // id" for input that is perfectly valid BCP-47.
+  it('accepts tags carrying extension or private-use subtags', () => {
+    expect(normalizeLanguage('en-x-private')).toBe('en-x-private');
+    expect(normalizeLanguage('de-DE-u-co-phonebk')).toBe('de-DE-u-co-phonebk');
+    expect(normalizeLanguage('en-US-x-foo')).toBe('en-US-x-foo');
+  });
+
+  it('names those tags from the base subtag instead of throwing', () => {
+    expect(getLanguageName('en-x-private')).toMatch(/english/i);
+    expect(getLanguageName('de-DE-u-co-phonebk')).toMatch(/german/i);
+  });
+
+  it('still rejects an extension tag whose base names no language', () => {
+    expect(normalizeLanguage('bogus-x-private')).toBeNull();
+    expect(getLanguageName('bogus-x-private')).toBeNull();
+  });
+
   it('returns null for malformed or empty input', () => {
     expect(normalizeLanguage('123')).toBeNull();
     expect(normalizeLanguage('x')).toBeNull();

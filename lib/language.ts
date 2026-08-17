@@ -32,6 +32,33 @@ function canonicalizeTag(tag: string): string | null {
   }
 }
 
+/**
+ * Display name for an already-canonical tag, or null when it names no
+ * language. Never throws.
+ *
+ * `of()` is stricter than `getCanonicalLocales`: it raises RangeError
+ * ("argument is not a language id") for extension and private-use subtags that
+ * canonicalize perfectly well, including legitimate tags like
+ * `de-DE-u-co-phonebk` and `en-x-private`. Those still name a real language, so
+ * the extensions are dropped and the base subtag is named instead, rather than
+ * leaking an ICU error message for valid input.
+ */
+function resolveDisplayName(canonical: string): string | null {
+  try {
+    return displayNames.of(canonical) ?? null;
+  } catch {
+    const base = canonical.split('-')[0];
+    if (!base || base === canonical) {
+      return null;
+    }
+    try {
+      return displayNames.of(base) ?? null;
+    } catch {
+      return null;
+    }
+  }
+}
+
 const LANGUAGE_MAP: LanguageMap = {
   'en': {
     code: 'en',
@@ -87,7 +114,7 @@ function normalizeLanguage(input: string | undefined | null): string | null {
 
   // Well-formed but not a language the platform recognizes. Passing it through
   // would trade a clear client-side error for an opaque one from the API.
-  if (!displayNames.of(canonical)) {
+  if (!resolveDisplayName(canonical)) {
     return null;
   }
 
@@ -139,7 +166,7 @@ function getLanguageName(code: string): string | null {
     return null;
   }
 
-  return displayNames.of(canonical) ?? null;
+  return resolveDisplayName(canonical);
 }
 
 /**
