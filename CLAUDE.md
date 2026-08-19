@@ -371,6 +371,10 @@ staqan-yt-cli/
 - **A `COMMENTED` follow-up does not clear a `CHANGES_REQUESTED`.** Bare
   re-kicks usually no-op; ask for an explicit verdict listing each finding.
 - **Total silence means quota**, not a stuck review.
+- **Never kick a rate-limited PR on a guess.** Compute
+  `available_at = <rate-limit comment>.updated_at + N minutes` (the value is
+  relative to `updated_at`, not `created_at`, and does not tick down). Wait,
+  then kick **once**. Do not poll a PR that is rate limited.
 
 **Every fix needs an E2E proof, not just unit tests:**
 

@@ -67,6 +67,51 @@ first pass. Please post an updated review. If anything is still open from your
 side, say which and I will fix it rather than merge past it.
 ```
 
+### Never kick a rate-limited PR on a guess
+
+When the quota is exhausted, CodeRabbit posts a comment saying
+`Next review available in: N minutes`. **Do the arithmetic before kicking.**
+Polling a rate-limited PR, or re-kicking to "check", is pure noise.
+
+The `N minutes` value is relative to the comment's **`updated_at`**, not its
+`created_at`, and it does not tick down on its own. So:
+
+```
+available_at = updated_at + N minutes
+```
+
+```bash
+gh api "/repos/prog893/staqan-yt-cli/issues/<N>/comments?per_page=100" \
+  --jq '.[] | select(.user.login=="coderabbitai[bot]")
+        | {updated:.updated_at, body:.body}' \
+  | python3 -c "
+import sys,json,re,datetime
+raw=sys.stdin.read(); dec=json.JSONDecoder(); objs=[]; i=0
+while i < len(raw):
+    while i<len(raw) and raw[i] in ' \n\r\t': i+=1
+    if i>=len(raw): break
+    o,j=dec.raw_decode(raw,i); objs.append(o); i=j
+now=datetime.datetime.now(datetime.timezone.utc)
+for o in objs:
+    m=re.search(r'Next review available in:\**\s*\**(\d+)\s*minutes', o['body'])
+    if not m: continue
+    upd=datetime.datetime.fromisoformat(o['updated'].replace('Z','+00:00'))
+    avail=upd+datetime.timedelta(minutes=int(m.group(1)))
+    d=(avail-now).total_seconds()/60
+    print(avail.strftime('%H:%M UTC'), '=', (avail+datetime.timedelta(hours=9)).strftime('%H:%M JST'),
+          '| wait %.0f min' % d if d>0 else '| OPEN')
+"
+```
+
+Kicking early is not catastrophic, just wasteful. Measured on #172: the comment
+said 57 minutes at `created 01:02:40` and 41 minutes at `updated 01:18:55`,
+which resolve to `01:59:40` and `01:59:55`. The **absolute** availability time
+stayed put; only the displayed countdown was recomputed against the new
+`updated_at`. So a kick refreshes the message rather than extending the window,
+but it still adds a comment and tells you nothing you could not have computed.
+
+One kick after `available_at`, not a poll loop before it.
+
 ### Reading its silence
 
 | symptom | cause | action |
