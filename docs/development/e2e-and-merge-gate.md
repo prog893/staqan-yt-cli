@@ -257,12 +257,45 @@ exercised against an **unlisted** test video only.
 
 The round trip:
 
-1. Capture the full prior state, including every field you are not changing.
+1. Capture a **canonical projection** of the prior state: every field you are
+   changing, plus every field you might disturb, and nothing server-managed.
 2. Make the change and verify it.
 3. Restore.
-4. `diff` the captured state against a fresh read to prove the restore was exact.
+4. `diff` the projection against a fresh read to prove the restore was exact.
 
 Step 4 is not optional. It is what catches the restore being incomplete.
+
+**Do not diff the raw API envelope.** YouTube resources carry server-managed
+fields that a write can change, which would make step 4 fail on runs where the
+restore was perfectly correct, training you to ignore the one check that matters.
+
+- `etag` is byte-stable across repeated reads of an untouched resource, so any
+  change in it reflects a write rather than read noise. Including it in the
+  projection turns every write test into a false positive.
+- Caption `snippet.lastUpdated` is write-stamped. Visible directly in the
+  archive: a track carrying `2023-11-02T13:35:10Z` sits beside one stamped at
+  the moment of upload.
+
+Project the fields under test instead:
+
+```ts
+// Read both times through the same projection, so the diff can only show a
+// real difference. Adding `etag` here would make every run look like a failure.
+const r = await yt.videos.list({ part: ['snippet', 'localizations'], id: [videoId] });
+const v = r.data.items![0];
+console.log(JSON.stringify({
+  defaultLanguage: v.snippet?.defaultLanguage,
+  defaultAudioLanguage: v.snippet?.defaultAudioLanguage,   // the field that drifted
+  title: v.snippet?.title,
+  categoryId: v.snippet?.categoryId,
+  tags: v.snippet?.tags,
+  localizations: v.localizations ?? null,
+}, null, 2));
+```
+
+The projection has to be wider than the field under test. `defaultAudioLanguage`
+was not being changed deliberately, and including it anyway is the only reason
+the drift below was caught.
 
 > **Send the whole `snippet` on `videos.update`.** Fields omitted from the
 > payload get re-derived by YouTube rather than left alone. A restore that sent
