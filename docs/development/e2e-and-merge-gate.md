@@ -55,7 +55,7 @@ What does not reliably work:
 What works: **ask for an explicit verdict**, listing each finding and its
 current status.
 
-```
+```text
 @coderabbitai Requesting an explicit sign-off review on this PR.
 
 1. <finding> - fixed in <sha>
@@ -76,50 +76,109 @@ Polling a rate-limited PR, or re-kicking to "check", is pure noise.
 The `N minutes` value is relative to the comment's **`updated_at`**, not its
 `created_at`, and it does not tick down on its own. So:
 
-```
+```text
 available_at = updated_at + N minutes
 ```
 
+Fails closed: a `gh` outage exits non-zero rather than printing nothing and
+looking like "no limit, go ahead". Reports only the newest notice, since older
+ones on the same PR are stale.
+
 ```bash
-gh api "/repos/prog893/staqan-yt-cli/issues/<N>/comments?per_page=100" \
-  --jq '.[] | select(.user.login=="coderabbitai[bot]")
-        | {updated:.updated_at, body:.body}' \
-  | python3 -c "
-import sys,json,re,datetime
-raw=sys.stdin.read(); dec=json.JSONDecoder(); objs=[]; i=0
-while i < len(raw):
-    while i<len(raw) and raw[i] in ' \n\r\t': i+=1
-    if i>=len(raw): break
-    o,j=dec.raw_decode(raw,i); objs.append(o); i=j
-now=datetime.datetime.now(datetime.timezone.utc)
-for o in objs:
-    m=re.search(r'Next review available in:\**\s*\**(\d+)\s*minutes', o['body'])
-    if not m: continue
-    upd=datetime.datetime.fromisoformat(o['updated'].replace('Z','+00:00'))
-    avail=upd+datetime.timedelta(minutes=int(m.group(1)))
-    d=(avail-now).total_seconds()/60
-    print(avail.strftime('%H:%M UTC'), '=', (avail+datetime.timedelta(hours=9)).strftime('%H:%M JST'),
-          '| wait %.0f min' % d if d>0 else '| OPEN')
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Fetch separately so a gh failure is its own exit code. Folding it into the
+# pipeline would report "still waiting", and a caller that sleeps on that would
+# wait forever on an expired token.
+json=$(gh api \
+  "/repos/prog893/staqan-yt-cli/issues/${1:?PR number required}/comments?per_page=100" \
+  --jq '[.[] | select(.user.login=="coderabbitai[bot]")]') \
+  || { echo "gh api failed: cannot determine rate-limit state" >&2; exit 3; }
+
+printf '%s' "$json" | python3 -c "
+import sys, json, re, datetime
+
+notices = []
+for o in json.load(sys.stdin):
+    m = re.search(r'Next review available in:\**\s*\**(\d+)\s*minutes', o['body'])
+    if m:
+        upd = datetime.datetime.fromisoformat(o['updated_at'].replace('Z', '+00:00'))
+        notices.append((upd, upd + datetime.timedelta(minutes=int(m.group(1)))))
+
+if not notices:
+    print('no rate-limit notice on this PR')
+    raise SystemExit(2)
+
+_, avail = max(notices)                     # newest notice only
+wait = (avail - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
+jst = (avail + datetime.timedelta(hours=9)).strftime('%H:%M JST')
+print(avail.strftime('%H:%M UTC'), '=', jst,
+      '| wait %.0f min' % (wait / 60) if wait > 0 else '| OPEN')
+raise SystemExit(1 if wait > 0 else 0)
 "
 ```
 
-Kicking early is not catastrophic, just wasteful. Measured on #172: the comment
-said 57 minutes at `created 01:02:40` and 41 minutes at `updated 01:18:55`,
-which resolve to `01:59:40` and `01:59:55`. The **absolute** availability time
-stayed put; only the displayed countdown was recomputed against the new
-`updated_at`. So a kick refreshes the message rather than extending the window,
-but it still adds a comment and tells you nothing you could not have computed.
+Exit codes: `0` open, `1` still waiting, `2` no notice found, `3` lookup failed.
+Only `0` and `2` mean it is safe to kick.
+
+Kicking early is not catastrophic, just wasteful. Three readings on #172, each
+after a kick:
+
+| anchor | states | resolves to |
+|---|---|---|
+| `created 01:02:40` | 57 min | `01:59:40` |
+| `updated 01:18:55` | 41 min | `01:59:55` |
+| `updated 01:28:02` | 31 min | `01:59:02` |
+
+The resolved times differ by up to 53 seconds, so they are not identical. What
+matters is the scale: the spread is under a minute against a window of roughly
+40, meaning a kick **recomputes the countdown against the new `updated_at`
+without restarting the quota window**. Treat the resolved time as accurate to
+about a minute, not to the second.
+
+So an early kick does not push the wait out. It still adds a comment and tells
+you nothing you could not have computed, which is reason enough not to.
 
 One kick after `available_at`, not a poll loop before it.
 
 ### Reading its silence
 
-| symptom | cause | action |
+| symptom | likely cause | action |
 |---|---|---|
-| No acknowledgement at all | Quota exhausted. The limit notice does not always post. | Wait, then re-kick once. |
-| "Review limit reached" comment | Quota, explicitly. | Wait for the stated window, then kick. |
+| No acknowledgement at all | **Ambiguous.** Most often quota, whose notice does not always post, but auth, bot configuration and GitHub outages look identical. | Diagnose before waiting (below). |
+| "Review limit reached" comment | Quota, explicitly. | Compute the window, then one kick. |
 | "Repository access failed during verification" | GitHub API incident. | Ask it to retry once the API recovers. |
+| "Action not completed / Review rate limited" with no countdown | Incremental no-op: the commits are already marked reviewed. | `@coderabbitai full review`. |
+| `Reviews resumed` but still no review | `resume` un-pauses; it does not re-examine seen commits. | `@coderabbitai full review`. |
 | Posts `COMMENTED`, verdict unchanged | Stale verdict. | Ask for an explicit verdict, as above. |
+
+Silence is not proof of quota. Rule it out before waiting an hour on a guess:
+
+```bash
+gh auth status                                    # token still valid?
+gh api /repos/prog893/staqan-yt-cli --jq .full_name   # API reachable at all?
+gh api /repos/prog893/staqan-yt-cli/installation --jq .app_slug 2>/dev/null \
+  || echo "app install not visible"               # bot still installed?
+```
+
+A GitHub incident is the common non-quota cause, and it shows up as scattered
+`HTTP 503`/`504` from `gh` itself rather than as anything CodeRabbit posts.
+
+### Which command to use
+
+The three are not interchangeable, and picking the wrong one wastes a cycle:
+
+| command | what it does | use when |
+|---|---|---|
+| `@coderabbitai review` | Incremental. Skips commits it has already seen. | New commits were pushed since the last review. |
+| `@coderabbitai resume` | Un-pauses automatic reviews. | Reviews were paused. |
+| `@coderabbitai full review` | Re-examines everything, ignoring incremental state. | `review` no-ops, or a failed attempt marked commits as seen without producing a review. |
+
+A rate-limited first attempt marks the commits reviewed, so `review` afterwards
+answers "does not re-review already reviewed commits" and `resume` reports
+success while changing nothing. `full review` is what actually produces the
+review in that state.
 
 ---
 
@@ -153,7 +212,7 @@ Exit codes, byte counts, checksums, distinct-value counts. Not eyeballing.
 
 "`--format` now works" is weak. This is not:
 
-```
+```text
 distinct md5 across 5 formats:  before 1,  after 5
 ```
 
@@ -162,12 +221,30 @@ distinct md5 across 5 formats:  before 1,  after 5
 When two open PRs touch the same files, each one's CI run tested it against the
 `main` it branched from, not against the other. Trial-merge locally first:
 
+Cleanup runs on a trap, not chained after validation with `&&`. Chaining leaves
+the trial branch and a half-merged working tree behind on exactly the runs where
+something failed, which is when you least want to be untangling git state.
+
 ```bash
-git checkout -b trial/x main
-git merge --no-ff --no-commit origin/<branch>
-bun run type-check && bun run lint && bun test && bun run build
-# live check here too, then:
-git merge --abort && git checkout main && git branch -D trial/x
+#!/usr/bin/env bash
+set -euo pipefail
+
+trial="trial/$(date +%s)"
+cleanup() {
+  git merge --abort 2>/dev/null || true
+  git checkout main -q
+  git branch -D "$trial" -q 2>/dev/null || true
+}
+trap cleanup EXIT
+
+git checkout -b "$trial" main -q
+git merge --no-ff --no-commit "origin/$1"
+
+bun run type-check
+bun run lint
+bun test
+bun run build
+# live check against the real API here too
 ```
 
 ---
@@ -205,7 +282,7 @@ The `get-caption --format` fix (#167).
 
 Before, on `main`:
 
-```
+```text
 --format json  8698 bytes md5=7f488731...
 --format srt   8698 bytes md5=7f488731...
 --format vtt   8698 bytes md5=7f488731...
@@ -214,7 +291,7 @@ distinct md5 across formats: 1        <- the bug, stated as a number
 
 After, on `main`:
 
-```
+```text
 --format raw   8697 bytes md5=4e322db6...
 --format srt   8238 bytes md5=8fa29c79...
 --format vtt   7990 bytes md5=81ed25e4...   first line: WEBVTT

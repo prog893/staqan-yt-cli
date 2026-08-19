@@ -362,14 +362,19 @@ staqan-yt-cli/
 `APPROVED` review and CI is green. No separate human sign-off is required.
 
 - **Never merge on `CHANGES_REQUESTED`.** Green checks are not approval:
+
   ```bash
   gh pr view <N> --repo prog893/staqan-yt-cli --json reviewDecision,reviews \
     --jq '{decision:.reviewDecision, reviews:[.reviews[]|.state]}'
   ```
+
 - **Argue with it when it is wrong**, using measurements or the codebase
   convention. It verifies and withdraws findings that do not hold up.
 - **A `COMMENTED` follow-up does not clear a `CHANGES_REQUESTED`.** Bare
   re-kicks usually no-op; ask for an explicit verdict listing each finding.
+- **Pick the right command**: `review` is incremental and skips seen commits,
+  `resume` only un-pauses, `full review` forces a re-examination. A rate-limited
+  first attempt marks commits as seen, so only `full review` recovers it.
 - **Total silence means quota**, not a stuck review.
 - **Never kick a rate-limited PR on a guess.** Compute
   `available_at = <rate-limit comment>.updated_at + N minutes` (the value is
