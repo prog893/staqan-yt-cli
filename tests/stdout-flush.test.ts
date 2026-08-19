@@ -23,6 +23,11 @@ import os from 'os';
 import path from 'path';
 
 const PIPE_BUFFER_BYTES = 65536;
+// How far past the buffer a truncated write may land. The cut point is a race
+// between process exit and the pipe drain, so it is not exactly the buffer
+// size every time; CI has been seen at 65537. Kept far below the full payload
+// so the band still distinguishes truncation from a complete write.
+const TRUNCATION_SLOP_BYTES = 64;
 const ROWS = 4000;
 const UTILS = path.resolve('lib/utils');
 // Absolute specifiers: the scripts run from a temp dir, where a bare 'ora'
@@ -68,7 +73,15 @@ describe('writeStdout under the ora exit hooks (issue #161)', () => {
       `import ora from '${ORA}';
        ora('spinner');
        console.log(${PAYLOAD});`));
-    expect(out.stdout.length).toBe(PIPE_BUFFER_BYTES);
+
+    // Asserted as a band, not as exactly PIPE_BUFFER_BYTES (issue #170). Where
+    // the write is cut is a race between process exit and the pipe drain, so
+    // CI intermittently observed 65537 and failed PRs that touched nothing
+    // near this code. The claim being pinned is "truncated, at the pipe
+    // boundary", and the full payload is roughly 4.7x the buffer, so the band
+    // cannot be reached by anything except truncation right there.
+    expect(out.stdout.length).toBeGreaterThanOrEqual(PIPE_BUFFER_BYTES);
+    expect(out.stdout.length).toBeLessThan(PIPE_BUFFER_BYTES + TRUNCATION_SLOP_BYTES);
   });
 
   it('the same payload is complete without ora, which is why this was missed', async () => {
