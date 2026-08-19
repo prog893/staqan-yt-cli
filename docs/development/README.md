@@ -43,6 +43,7 @@ This directory contains comprehensive guides for developing and maintaining the 
 
 ### Maintenance & Operations
 - **[Git Workflow Guide](git-workflow.md)** - Branch strategy, commits, releases, and protection
+- **[E2E Proof and the Merge Gate](e2e-and-merge-gate.md)** - CodeRabbit as merge gate, before/after/no-regression proof, and never testing writes on published videos
 - **[Maintenance Guide](maintenance-guide.md)** - Dependency updates and Dependabot vulnerability management
 - **[Troubleshooting Guide](troubleshooting.md)** - TypeScript and build error resolution
 

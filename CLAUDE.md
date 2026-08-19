@@ -156,7 +156,7 @@ staqan-yt-cli/
 ├── CONTRIBUTING.md           # Contributor guide
 ├── CLAUDE.md                 # This file - AI development instructions
 └── docs/
-    ├── development/          # Development guides (11 guides)
+    ├── development/          # Development guides (13 guides)
     ├── commands/             # Command reference
     └── *.md                  # Setup, troubleshooting, etc.
 ```
@@ -309,6 +309,7 @@ staqan-yt-cli/
 
 ### Maintenance & Operations
 - **[Git Workflow Guide](docs/development/git-workflow.md)** - Branch strategy, commits, releases, and protection
+- **[E2E Proof and the Merge Gate](docs/development/e2e-and-merge-gate.md)** - Merge gate, E2E proof, and safe live testing
 - **[Maintenance Guide](docs/development/maintenance-guide.md)** - Dependency updates and Dependabot vulnerability management
 - **[Troubleshooting Guide](docs/development/troubleshooting.md)** - TypeScript and build error resolution
 
@@ -352,6 +353,49 @@ staqan-yt-cli/
 
 **Verify branch**: `git branch --show-current` (MUST NOT be "main")
 **Verify staged files**: `git diff --staged --name-only`
+
+---
+
+## 🚦 Merge Gate + E2E Proof
+
+**CodeRabbit is the merge gate.** A PR merges when CodeRabbit has posted an
+`APPROVED` review and CI is green. No separate human sign-off is required.
+
+- **Never merge on `CHANGES_REQUESTED`.** Green checks are not approval:
+
+  ```bash
+  gh pr view <N> --repo prog893/staqan-yt-cli --json reviewDecision,reviews \
+    --jq '{decision:.reviewDecision, reviews:[.reviews[]|.state]}'
+  ```
+
+- **Argue with it when it is wrong**, using measurements or the codebase
+  convention. It verifies and withdraws findings that do not hold up.
+- **A `COMMENTED` follow-up does not clear a `CHANGES_REQUESTED`.** Bare
+  re-kicks usually no-op; ask for an explicit verdict listing each finding.
+- **Pick the right command**: `review` is incremental and skips seen commits,
+  `resume` only un-pauses, `full review` forces a re-examination. A rate-limited
+  first attempt marks commits as seen, so only `full review` recovers it.
+- **Total silence means quota**, not a stuck review.
+- **Never kick a rate-limited PR on a guess.** Compute
+  `available_at = <rate-limit comment>.updated_at + N minutes` (the value is
+  relative to `updated_at`, not `created_at`, and does not tick down). Wait,
+  then kick **once**. Do not poll a PR that is rate limited.
+
+**Every fix needs an E2E proof, not just unit tests:**
+
+1. Capture the broken behavior on `main` **before** merging.
+2. Re-run the **identical** commands **after** merging.
+3. Prove no regressions: inputs that worked still work, invalid inputs are
+   still rejected, full suite green.
+
+Use exit codes, byte counts and checksums, not eyeballing. Trial-merge locally
+when two PRs touch the same files, since CI never tested that combination.
+
+**🚨 Never test mutating commands against published videos.** Use an unlisted
+video, capture the full prior state, restore it, and `diff` to prove the
+restore was exact.
+
+**→ See [E2E Proof and the Merge Gate](docs/development/e2e-and-merge-gate.md)**
 
 ---
 
