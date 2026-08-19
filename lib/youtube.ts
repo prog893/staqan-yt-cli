@@ -1038,30 +1038,26 @@ async function listCaptions(videoId: string): Promise<CaptionInfo[]> {
 /**
  * Download caption content
  * @param captionId - Caption track ID
- * @param format - Output format (srt, vtt, sbv, scc, ttml, or json for raw)
+ * @param format - `raw` for the track's original format, or a format the API
+ *                 converts to (srt, vtt, sbv, ttml)
  * @returns Caption content as string
  */
-async function downloadCaption(captionId: string, format: CaptionFormat = 'json'): Promise<string> {
+async function downloadCaption(captionId: string, format: CaptionFormat = 'raw'): Promise<string> {
   debug(`Downloading caption: ${captionId}, format: ${format}`);
   const youtube = await getYouTubeClient();
 
-  // YouTube API downloads caption content
-  // The download endpoint returns the caption content
-  const response = await youtube.captions.download({
-    id: captionId,
-  }, { responseType: 'text' });
-
-  // The response is the actual caption content
-  const content = response.data as string;
-
-  // If format is json, just return the raw content
-  if (format === 'json') {
-    return content;
+  // `tfmt` is the only thing that makes --format do anything. Omitting it
+  // returns the track in whatever format it was uploaded in, which is what
+  // `raw` means. This used to be omitted unconditionally, so every --format
+  // value returned byte-identical content (issue #167).
+  const params: youtube_v3.Params$Resource$Captions$Download = { id: captionId };
+  if (format !== 'raw') {
+    params.tfmt = format;
   }
 
-  // For other formats, YouTube returns the format that was uploaded
-  // The user would need to convert if needed
-  return content;
+  const response = await youtube.captions.download(params, { responseType: 'text' });
+
+  return response.data as string;
 }
 
 export interface UploadedCaption {

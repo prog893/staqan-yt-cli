@@ -301,8 +301,23 @@ export type CaptionTrackStatus = 'serving' | 'syncing' | 'failed' | 'unknown';
 // `descriptive` is audio description, `commentary` is a commentary track.
 export type CaptionAudioTrackType = 'unknown' | 'primary' | 'commentary' | 'descriptive';
 
-export const CAPTION_FORMATS = ['srt', 'vtt', 'sbv', 'scc', 'ttml', 'json'] as const;
+// Formats the API converts to, passed straight through as `tfmt` on
+// captions.download. Live-verified: these four return genuinely different
+// bytes, and `scc` is rejected with HTTP 404 on every track type tried
+// (manual, ASR, multiple languages), so it is not offered (issue #167).
+export const CAPTION_TFMT_FORMATS = ['srt', 'vtt', 'sbv', 'ttml'] as const;
+export type CaptionTfmtFormat = typeof CAPTION_TFMT_FORMATS[number];
+
+// Values accepted by `get-caption --format`. `raw` omits `tfmt` entirely,
+// which returns the track in whatever format it was uploaded in.
+export const CAPTION_FORMATS = ['raw', 'srt', 'vtt', 'sbv', 'ttml'] as const;
 export type CaptionFormat = typeof CAPTION_FORMATS[number];
+
+// `json` was the previous default and never produced JSON: with `tfmt` never
+// sent, it returned the track's original format. `tfmt=json` is in fact an
+// HTTP 400. Kept as an alias for `raw` so existing scripts keep working
+// rather than failing on a renamed default.
+export const CAPTION_FORMAT_ALIASES: Record<string, CaptionFormat> = { json: 'raw' };
 
 // File extensions accepted for caption uploads (put-caption). The API
 // accepts any bytes and only fails during processing, so uploads are
@@ -338,7 +353,11 @@ export interface ListCaptionsOptions extends OutputOption, VerboseOption, VideoI
 
 export interface GetCaptionOptions extends OutputOption, VerboseOption, CaptionIdOption {
   download?: boolean;
-  format?: CaptionFormat;
+  // Raw user input, narrowed to CaptionFormat by the command after alias
+  // resolution. Typing this as CaptionFormat would claim commander validates
+  // it, which it does not, and hides retired values like `scc` from the
+  // client-side check.
+  format?: string;
 }
 
 export interface PutCaptionOptions extends OutputOption, VerboseOption, VideoIdOption {

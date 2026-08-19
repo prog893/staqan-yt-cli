@@ -1,6 +1,6 @@
 import { downloadCaption } from '../lib/youtube';
-import { debug, initCommand, createSpinner } from '../lib/utils';
-import { GetCaptionOptions, CAPTION_FORMATS } from '../types';
+import { debug, initCommand, createSpinner, writeStdout } from '../lib/utils';
+import { GetCaptionOptions, CAPTION_FORMATS, CAPTION_FORMAT_ALIASES, CaptionFormat } from '../types';
 
 async function getCaptionCommand(options: GetCaptionOptions): Promise<void> {
   initCommand(options);
@@ -11,13 +11,25 @@ async function getCaptionCommand(options: GetCaptionOptions): Promise<void> {
     throw new Error('Required: --caption-id');
   }
 
-  if (options.format && !(CAPTION_FORMATS as readonly string[]).includes(options.format)) {
+  // `scc` used to be advertised but the API rejects it with HTTP 404 on every
+  // track tried (manual, ASR, several languages), so name the reason instead
+  // of listing it as merely invalid.
+  if (options.format === 'scc') {
+    throw new Error(
+      "Format 'scc' is not supported: the YouTube API rejects scc conversion " +
+      'for caption tracks (HTTP 404).\n' +
+      `Valid formats: ${CAPTION_FORMATS.join(', ')}`
+    );
+  }
+
+  const requested = options.format || 'raw';
+  const format: CaptionFormat = CAPTION_FORMAT_ALIASES[requested] ?? (requested as CaptionFormat);
+
+  if (!(CAPTION_FORMATS as readonly string[]).includes(format)) {
     throw new Error(`Invalid format '${options.format}'. Valid: ${CAPTION_FORMATS.join(', ')}`);
   }
 
   // Note: For caption metadata, use list-captions --video-id <videoId>
-  // This command focuses on downloading caption content
-  const format = options.format || 'json';
   const spinner = createSpinner(`Downloading caption (${format})...`).start();
 
   try {
@@ -26,8 +38,17 @@ async function getCaptionCommand(options: GetCaptionOptions): Promise<void> {
 
     spinner.succeed('Caption downloaded');
 
-    // Output caption content to stdout (allows redirection)
-    console.log(content);
+    // The contract here is byte fidelity, not newline normalization: this
+    // output is a caption file. srt, vtt and sbv end with two newlines, and
+    // that trailing blank line terminates the final cue, so collapsing it to
+    // one would corrupt the format. The conditional only guards against
+    // leaving a shell prompt mid-line if a format ever returns no trailing
+    // newline; every format observed live returns at least one.
+    //
+    // Must be writeStdout, not console.log: redirecting to a file is this
+    // command's primary use, and console.log silently truncates piped output
+    // at 65536 bytes with exit 0 (issue #161). ttml on a long video crosses it.
+    await writeStdout(content.endsWith('\n') ? content : content + '\n');
   } catch (err) {
     spinner.fail('Failed to download caption');
     const errMessage = (err as Error).message;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { youtube_v3 } from 'googleapis';
 import { mapCaptionItem } from '../lib/youtube';
+import { CAPTION_FORMATS, CAPTION_TFMT_FORMATS, CAPTION_FORMAT_ALIASES } from '../types';
 
 function makeCaption(
   trackKind: string | undefined = 'standard',
@@ -162,5 +163,37 @@ describe('mapCaptionItem track state', () => {
     expect(mapCaptionItem(makeCaption('standard', 'unknown', { lastUpdated: '2026-07-12T09:27:27.554754Z' })).lastUpdated)
       .toBe('2026-07-12T09:27:27.554754Z');
     expect(mapCaptionItem(makeCaption('standard')).lastUpdated).toBeNull();
+  });
+});
+
+// Issue #167: --format was validated and then discarded, because tfmt was
+// never sent. These pin the format contract that makes the flag mean something.
+describe('caption format contract', () => {
+  it('offers only formats the API actually converts to, plus raw', () => {
+    expect([...CAPTION_FORMATS]).toEqual(['raw', 'srt', 'vtt', 'sbv', 'ttml']);
+  });
+
+  it('excludes scc, which the API rejects with 404 on every track type', () => {
+    expect(CAPTION_FORMATS as readonly string[]).not.toContain('scc');
+  });
+
+  it('excludes json, which is an HTTP 400 as a tfmt value', () => {
+    expect(CAPTION_FORMATS as readonly string[]).not.toContain('json');
+  });
+
+  it('keeps json working as an alias for raw, since it was the old default', () => {
+    expect(CAPTION_FORMAT_ALIASES.json).toBe('raw');
+  });
+
+  it('lists every tfmt format as an accepted format', () => {
+    for (const fmt of CAPTION_TFMT_FORMATS) {
+      expect(CAPTION_FORMATS as readonly string[]).toContain(fmt);
+    }
+  });
+
+  it('treats raw as the only non-tfmt format', () => {
+    const nonTfmt = (CAPTION_FORMATS as readonly string[])
+      .filter(f => !(CAPTION_TFMT_FORMATS as readonly string[]).includes(f));
+    expect(nonTfmt).toEqual(['raw']);
   });
 });
