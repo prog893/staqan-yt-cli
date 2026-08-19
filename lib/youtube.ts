@@ -2,7 +2,7 @@ import { google, youtube_v3 } from 'googleapis';
 import { promises as fs, createReadStream } from 'fs';
 import path from 'path';
 import { getAuthenticatedClient } from './auth';
-import { normalizeLanguage, getLanguageName } from './language';
+import { normalizeLanguage, getLanguageName, getAliasedLanguages } from './language';
 import { acquireLock, getLockPath } from './lock';
 import { VideoInfo, VideoListItem, VideoLocalization, VideoType, PrivacyStatus, PlaylistInfo, PlaylistListItem, CommentInfo, ChannelInfo, CaptionInfo, CaptionFormat, CaptionTrackStatus, CaptionAudioTrackType } from '../types';
 import { debug, warning, CACHE_DIR } from './utils';
@@ -545,7 +545,10 @@ async function getVideoLocalization(videoId: string, language?: string): Promise
   } else {
     const normalized = normalizeLanguage(language);
     if (!normalized) {
-      throw new Error(`Invalid language: ${language}`);
+      throw new Error(
+      `Invalid language: ${language}. Pass a BCP-47 tag (ja, ko, zh-Hans, pt-BR) ` +
+      `or one of the aliases: ${getAliasedLanguages().join(', ')}.`
+    );
     }
     langCode = normalized;
   }
@@ -594,7 +597,10 @@ async function getAllVideoLocalizations(videoId: string, languageFilter: string[
   if (languageFilter && languageFilter.length > 0) {
     filterCodes = languageFilter.map(lang => normalizeLanguage(lang)).filter((code): code is string => code !== null);
     if (filterCodes.length === 0) {
-      throw new Error('No valid languages provided in filter');
+      throw new Error(
+      `No valid languages in filter: ${languageFilter.join(', ')}. ` +
+      'Pass BCP-47 tags (ja, ko, zh-Hans, pt-BR).'
+    );
     }
   }
 
@@ -647,7 +653,10 @@ async function putVideoLocalization(videoId: string, language: string, title: st
   const langCode = normalizeLanguage(language);
 
   if (!langCode) {
-    throw new Error(`Invalid language: ${language}`);
+    throw new Error(
+      `Invalid language: ${language}. Pass a BCP-47 tag (ja, ko, zh-Hans, pt-BR) ` +
+      `or one of the aliases: ${getAliasedLanguages().join(', ')}.`
+    );
   }
 
   debug(`Normalized language code: ${langCode}`);
@@ -708,7 +717,10 @@ async function updateVideoLocalization(videoId: string, language: string, title:
   const langCode = normalizeLanguage(language);
 
   if (!langCode) {
-    throw new Error(`Invalid language: ${language}`);
+    throw new Error(
+      `Invalid language: ${language}. Pass a BCP-47 tag (ja, ko, zh-Hans, pt-BR) ` +
+      `or one of the aliases: ${getAliasedLanguages().join(', ')}.`
+    );
   }
 
   debug(`Normalized language code: ${langCode}`);

@@ -104,10 +104,25 @@ staqan-yt get-video-localization --video-id dQw4w9WgXcQ --language ja --output j
 
 ### Language Specification
 
-Accepts any of these formats:
-- Language code: `ja`, `en`, `ru`
-- Language name: `Japanese`, `English`, `Russian`
-- Full locale: `ja-JP`, `en-US`
+Any BCP-47 language tag is accepted:
+
+- Language code: `ja`, `ko`, `vi`, `ar`, `es`
+- Script or region subtags: `zh-Hans`, `pt-BR`, `en-US`
+- Language name, for the channel's three main languages only: `Japanese`,
+  `English`, `Russian` (plus short forms like `jp`, `eng`, `rus`)
+
+Tags are canonicalized, so `EN` becomes `en` and `zh-hans` becomes `zh-Hans`.
+
+A tag that is well-formed but names no actual language is rejected up front:
+
+```bash
+$ staqan-yt put-video-localization --video-id VIDEO_ID --language bogus ...
+✗ Invalid language: bogus. Pass a BCP-47 tag (ja, ko, zh-Hans, pt-BR) or one of the aliases: en, ja, ru.
+```
+
+> Before v2.1.x these commands accepted only `en`, `ja` and `ru` and rejected
+> everything else with `Invalid language`, which blocked localizing into
+> languages a channel might already publish captions in.
 
 ### What is a Localization?
 

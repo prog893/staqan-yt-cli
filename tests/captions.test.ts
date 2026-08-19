@@ -148,8 +148,13 @@ describe('mapCaptionItem track state', () => {
 
   it('resolves languageName to a human-readable name, falling back to the code', () => {
     expect(mapCaptionItem(makeCaption('standard', 'unknown', { language: 'ja' })).languageName).toBe('Japanese');
-    // getLanguageName only maps the localization languages (issue #105).
-    expect(mapCaptionItem(makeCaption('standard', 'unknown', { language: 'ko' })).languageName).toBe('ko');
+    // Every BCP-47 tag now resolves (issue #105). This previously fell back to
+    // the bare code for anything outside en/ja/ru, so the channel's real vi and
+    // ar caption tracks displayed as `vi (vi)` and `ar (ar)`.
+    expect(mapCaptionItem(makeCaption('standard', 'unknown', { language: 'ko' })).languageName).toBe('Korean');
+    expect(mapCaptionItem(makeCaption('standard', 'unknown', { language: 'vi' })).languageName).toBe('Vietnamese');
+    // The fallback still applies to codes that name no language, including the
+    // 'unknown' placeholder used when the API omits the field entirely.
     expect(mapCaptionItem(makeCaption('standard', 'unknown', { language: undefined })).languageName).toBe('unknown');
   });
 
