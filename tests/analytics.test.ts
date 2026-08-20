@@ -118,4 +118,22 @@ describe('dimension tables', () => {
       }
     }
   });
+
+  // Pinned rather than merely sanity-checked: reachability alone would still
+  // pass if a measured pair were dropped, or if an unmeasured one were added
+  // and started rejecting queries the API actually serves.
+  it('pins the measured combination matrix exactly', () => {
+    expect(INVALID_DIMENSION_COMBOS.map(c => c.join('+')).sort()).toEqual([
+      'country+day',
+      'country+deviceType',
+      'country+dma',
+      'country+insightPlaybackLocationType',
+      'country+insightTrafficSourceType',
+      'country+operatingSystem',
+      'day+month',
+      'insightPlaybackLocationType+deviceType',
+      'insightTrafficSourceType+deviceType',
+      'month+deviceType',
+    ].sort());
+  });
 });

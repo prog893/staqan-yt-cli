@@ -62,14 +62,17 @@ staqan-yt get-video-analytics --video-id dQw4w9WgXcQ --output json
 
 ### Default Metrics
 
-If no `--metrics` specified, fetches:
+If no `--metrics` specified, fetches these eight (`DEFAULT_VIDEO_METRICS` in `lib/analytics.ts`):
 - `views` - Total views
 - `estimatedMinutesWatched` - Total watch time
 - `averageViewDuration` - Average view duration (seconds)
-- `subscribersGained` - Subscribers gained
-- `subscribersLost` - Subscribers lost
+- `averageViewPercentage` - Average share of the video watched
 - `likes` - Total likes
 - `dislikes` - Total dislikes (if available)
+- `comments` - Total comments
+- `shares` - Total shares
+
+The last four are unavailable for most dimensions, so pass `--metrics views` when using `--dimensions`. See [Dimension Compatibility Guide](../dimension-compatibility.md#metrics-decide-more-than-dimensions-do).
 
 ### Available Metrics
 
