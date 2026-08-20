@@ -17,32 +17,56 @@ import { chunkDateRange, debug, parseChannelHandle, parseDuration, toLocalYmd, v
  * Allowlist of Analytics API dimensions valid for video-level queries.
  * See https://developers.google.com/youtube/v3/docs/analytics_api/dimensions/dims
  * and docs/dimension-compatibility.md for the live-tested combination matrix.
+ *
+ * Membership is decided by one question: does the API accept this dimension for
+ * the query this file actually sends (`filters: video==<id>`, no extra filters)?
+ * Dimensions that only work alongside a filter the CLI cannot express are
+ * excluded, because allowlisting them just defers the same failure to the API
+ * and returns the opaque "query is not supported" instead of a clear message.
  */
 export const VIDEO_DIMENSIONS: ReadonlySet<string> = new Set([
   'video',
   'day',
   'month',
   'insightTrafficSourceType',
-  'insightTrafficSourceDetail',
   'creatorContentType',
   'country',
-  'province',
-  'city',
+  'dma',
   'deviceType',
   'operatingSystem',
   'insightPlaybackLocationType',
-  'insightPlayerLocationType',
   'subscribedStatus',
+  'youtubeProduct',
+  'liveOrOnDemand',
 ]);
 
 /**
  * Known-bad dimension combinations the Analytics API rejects at runtime.
  * Checking up-front gives a clean error message instead of an API error.
+ *
+ * Measured, not exhaustive: pairs absent from this table are passed through and
+ * the API's own error surfaces if it dislikes them. Three structural conflicts
+ * account for every entry below.
+ *
+ * There is no arity limit to enforce alongside them. A 7-dimension query is
+ * accepted; the "max 4 dimensions" folklore came from a 5-dimension example
+ * that happened to contain `country,day`.
  */
 export const INVALID_DIMENSION_COMBOS: ReadonlyArray<ReadonlyArray<string>> = [
-  // creatorContentType is not a valid dimension for traffic-source detail reports
-  // (see PR #90 — original issue: get-channel-search-terms #88).
-  ['creatorContentType', 'insightTrafficSourceDetail'],
+  // 1. Geography does not cross with daily, device or insight breakdowns.
+  //    `country,month` is NOT here: it is accepted, given aligned dates.
+  ['country', 'day'],
+  ['country', 'deviceType'],
+  ['country', 'operatingSystem'],
+  ['country', 'insightTrafficSourceType'],
+  ['country', 'insightPlaybackLocationType'],
+  ['country', 'dma'],
+  // 2. Two time granularities cannot be requested at once.
+  ['day', 'month'],
+  // 3. Device breakdowns do not cross with monthly or insight breakdowns.
+  ['month', 'deviceType'],
+  ['insightTrafficSourceType', 'deviceType'],
+  ['insightPlaybackLocationType', 'deviceType'],
 ];
 
 /**
