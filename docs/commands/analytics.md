@@ -97,15 +97,21 @@ By default, queries aggregate by `video` (the only dimension when `--dimensions`
 
 Supported dimensions for video-level queries:
 
-- `day`, `month` — Time buckets
-- `insightTrafficSourceType`, `insightTrafficSourceDetail` — Traffic sources (aggregate and per-referrer)
-- `creatorContentType` — `SHORT`, `LONG_FORM`, `LIVE`
-- `country`, `province`, `city` — Geography
-- `deviceType`, `operatingSystem` — Device
-- `insightPlaybackLocationType`, `insightPlayerLocationType` — Where playback happened
-- `subscribedStatus` — Subscribed vs non-subscribed viewers
+- `day`, `month` - Time buckets (`month` needs first-of-month dates at both ends)
+- `insightTrafficSourceType` - Traffic sources
+- `creatorContentType` - `SHORT`, `LONG_FORM`, `LIVE`
+- `liveOrOnDemand` - Live vs on-demand playback
+- `country`, `dma` - Geography
+- `deviceType`, `operatingSystem` - Device
+- `youtubeProduct` - Core YouTube, Music, Kids, Gaming
+- `insightPlaybackLocationType` - Where playback happened
+- `subscribedStatus` - Subscribed vs non-subscribed viewers
 
-Combine multiple dimensions with commas (e.g. `--dimensions day,country`). The CLI rejects unknown dimensions and known-bad combinations (e.g. `creatorContentType + insightTrafficSourceDetail` — see #88, fixed in PR #90) with a clear error before any API call.
+Combine multiple dimensions with commas (e.g. `--dimensions day,deviceType`). The CLI rejects unknown dimensions and known-bad combinations (e.g. `country + day`) with a clear error before any API call.
+
+**Most dimensions need `--metrics` narrowed.** The default metric set includes `likes`, `dislikes`, `comments` and `shares`, which the API only offers for a few dimensions, so `--dimensions deviceType` fails until you pass something like `--metrics views`. This is the most common cause of `The query is not supported`.
+
+**→ See [Dimension Compatibility Guide](../dimension-compatibility.md)** for the measured dimension/metric matrix, the rejected combinations, and the `month` date rule.
 
 ---
 
