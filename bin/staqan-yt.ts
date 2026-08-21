@@ -488,6 +488,7 @@ program
   .option('--end-date <date>', 'End date (YYYY-MM-DD), defaults to today')
   .option('--dimensions <dims>', 'Custom dimensions (comma-separated, requires --metrics)')
   .option('--metrics <metrics>', 'Custom metrics (comma-separated, requires --dimensions)')
+  .option('--sort <field>', 'Sort custom query by a selected field, "-field" for descending (not valid with --report)')
   .option('--output <format>', 'Output format: json, table, text, pretty, csv')
   .option('-v, --verbose', 'Enable verbose output with debug information')
   .action(withHelpWrapper('get-channel-analytics', getChannelAnalyticsCommand));

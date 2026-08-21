@@ -228,6 +228,10 @@ const TOOLS: Tool[] = [
           type: 'string',
           description: 'Custom metrics (comma-separated, requires dimensions)',
         },
+        sort: {
+          type: 'string',
+          description: 'Sort a custom query by one of its selected dimensions or metrics, "-field" for descending. Not valid with report. Defaults to the first of views, engagedViews, estimatedMinutesWatched present in metrics; a query selecting none of those is returned in the API\'s own order unless sort is given.',
+        },
         startDate: {
           type: 'string',
           description: 'Start date in YYYY-MM-DD format (defaults to 30 days ago)',
@@ -670,6 +674,7 @@ async function handleToolCall(name: string, args: any) {
         report: args.report,
         dimensions: args.dimensions,
         metrics: args.metrics,
+        sort: args.sort,
       });
 
       if (result.rows.length === 0) {
