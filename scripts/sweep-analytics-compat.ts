@@ -79,6 +79,10 @@ const CANDIDATE_DIMENSIONS = [
 
 type Verdict = 'OK' | 'REJECT' | 'UNKNOWN_ID' | 'ALIGN' | 'OTHER';
 
+/** Raised when a probe cannot be resolved into a real verdict. Aborts the run,
+ *  because a guess here silently becomes a shipped table entry. */
+class UnresolvedProbeError extends Error {}
+
 interface Probe {
   dimensions: string;
   metrics: string;
@@ -103,6 +107,19 @@ export interface SweepReport {
 
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
+/** Retries per probe before the run aborts rather than guesses. */
+const MAX_ATTEMPTS = 4;
+
+/**
+ * Rate limits and server errors say nothing about compatibility. Detected by
+ * status code where available, since the message wording is not stable.
+ */
+function isTransient(status: number | undefined, message: string): boolean {
+  if (status === 429 || (status !== undefined && status >= 500 && status < 600)) return true;
+  return /rate limit|quota|backend error|internal error|timeout|ECONNRESET|ETIMEDOUT|socket hang up/i
+    .test(message);
+}
+
 /** Classify by cause. `Unknown identifier` means the name is not a dimension
  *  at all, which is a different finding from a real-but-incompatible one. */
 function classify(message: string): Verdict {
@@ -124,24 +141,51 @@ class Sweeper {
     return this.probes;
   }
 
+  /**
+   * A transient failure must never be recorded as an incompatibility. Every
+   * caller treats a non-OK verdict as "the API refuses this", so one 429 or 503
+   * in a 300-probe run would drop a valid dimension or invent an invalid pair,
+   * and that entry would ship in `lib/analytics.ts`. Retry those, and abort the
+   * run rather than guess when they persist.
+   */
   async probe(dimensions: string, metrics: string): Promise<Probe> {
     this.probes++;
-    try {
-      const res = await this.api.reports.query({
-        ids: 'channel==MINE',
-        startDate: START_DATE,
-        endDate: END_DATE,
-        metrics,
-        dimensions,
-        filters: `video==${this.videoId}`,
-      });
-      await sleep(220);
-      return { dimensions, metrics, verdict: 'OK', rows: res.data.rows?.length ?? 0 };
-    } catch (e) {
-      await sleep(220);
-      const message = ((e as { message?: string }).message ?? String(e)).split('\n')[0];
-      return { dimensions, metrics, verdict: classify(message), error: message.slice(0, 160) };
+    let lastMessage = '';
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const res = await this.api.reports.query({
+          ids: 'channel==MINE',
+          startDate: START_DATE,
+          endDate: END_DATE,
+          metrics,
+          dimensions,
+          filters: `video==${this.videoId}`,
+        });
+        await sleep(220);
+        return { dimensions, metrics, verdict: 'OK', rows: res.data.rows?.length ?? 0 };
+      } catch (e) {
+        const status = (e as { code?: number; status?: number }).code
+          ?? (e as { status?: number }).status;
+        lastMessage = ((e as { message?: string }).message ?? String(e)).split('\n')[0];
+        const verdict = classify(lastMessage);
+        if (!isTransient(status, lastMessage)) {
+          await sleep(220);
+          if (verdict === 'OTHER') {
+            throw new UnresolvedProbeError(
+              `Unrecognized API error for dimensions="${dimensions}" metrics="${metrics}": ${lastMessage}`,
+            );
+          }
+          return { dimensions, metrics, verdict, error: lastMessage.slice(0, 160) };
+        }
+        const backoff = 1000 * 2 ** (attempt - 1);
+        console.log(`  transient (${status ?? '?'}), retry ${attempt}/${MAX_ATTEMPTS} in ${backoff}ms`);
+        await sleep(backoff);
+      }
     }
+    throw new UnresolvedProbeError(
+      `Gave up after ${MAX_ATTEMPTS} transient failures for ` +
+      `dimensions="${dimensions}" metrics="${metrics}": ${lastMessage}`,
+    );
   }
 }
 
@@ -184,12 +228,12 @@ async function sweepPairs(s: Sweeper, valid: string[]): Promise<string[][]> {
   return invalid;
 }
 
-/** Phase C: allowed metrics per dimension. Probes the whole set first and only
- *  falls back to per-metric probing when that is rejected, which keeps the
- *  common "allows everything" case at one probe instead of fifteen. */
+/** Phase C: allowed metrics per dimension. Probes the whole set first and falls
+ *  back to probing each metric individually when that is rejected, which keeps
+ *  the common "allows everything" case at one probe instead of fifteen. */
 async function sweepMetrics(s: Sweeper, valid: string[]): Promise<Record<string, string[]>> {
   const table: Record<string, string[]> = {};
-  console.log(`\n=== Phase C: metrics per dimension (bisected) ===`);
+  console.log(`\n=== Phase C: metrics per dimension (all, then per-metric) ===`);
   for (const d of valid) {
     const all = await s.probe(d, CANDIDATE_METRICS.join(','));
     if (all.verdict === 'OK') {
@@ -382,18 +426,23 @@ async function main(): Promise<void> {
     lawChecks,
     probeCount: s.probeCount,
   };
-  writeFileSync(out, JSON.stringify(report, null, 2));
-
   console.log(`\n=== Summary ===`);
   console.log(`probes:            ${s.probeCount}`);
   console.log(`valid dimensions:  ${valid.length} -> ${valid.join(', ')}`);
   console.log(`invalid pairs:     ${invalidPairs.length}`);
   console.log(`law contradictions: ${lawChecks.failed}`);
-  console.log(`written to:        ${out}`);
+
+  // Gate the write on the laws holding. Emitting the snapshot first would leave
+  // a table on disk that looks authoritative and is known to be wrong, which no
+  // exit code prevents someone from copying out of.
   if (lawChecks.failed > 0) {
-    console.error('\nComposition laws contradicted. Do not generate tables from this run.');
+    console.error('\nComposition laws contradicted. No snapshot written.');
+    for (const c of lawChecks.contradictions) console.error(`  ${c}`);
     process.exit(2);
   }
+
+  writeFileSync(out, JSON.stringify(report, null, 2));
+  console.log(`written to:        ${out}`);
 }
 
 main().catch(e => {

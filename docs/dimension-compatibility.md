@@ -54,8 +54,8 @@ rows above. That is a measured law, not an assumption: `day` permits all eight,
 ### What the CLI does about it
 
 - **You did not pass `--metrics`:** the incompatible defaults are dropped and
-  the query runs. The dropped metrics are named on the progress line, never on
-  stdout, so piped output stays clean.
+  the query runs. The dropped metrics are named on stderr, never on stdout, so
+  piped output stays clean.
 - **You passed `--metrics` explicitly:** nothing is altered. An incompatible
   metric is an error naming the metric and listing what the dimensions allow,
   because quietly returning different data than you asked for is worse than
@@ -115,10 +115,13 @@ earlier revision of this guide advised and what the API rejects.
 
 ## Rejected combinations
 
-All 66 pairs among the supported dimensions were probed with `--metrics views`,
+Every pair among the supported dimensions was probed with `--metrics views`,
 the metric every dimension permits, so each rejection below is a genuine
-dimension conflict. **This list is complete, not a sample.** 24 of 66 are
-rejected, and all are refused client-side at no quota cost.
+dimension conflict. **This list is complete, not a sample.**
+
+`video` is excluded from pairing, since it is a filter-style passthrough rather
+than a breakdown, which leaves 12 pairable dimensions and 66 pairs. 24 of those
+66 are rejected, and all are refused client-side at no quota cost.
 
 **Geography does not cross with daily, device or insight breakdowns:**
 
@@ -261,7 +264,7 @@ inside the intersection of the per-dimension metric sets.
 
 The composition laws are not assumed. The final phase predicts higher-order
 cases from them and checks each prediction against the API, and the sweep
-**refuses to emit tables if any prediction is contradicted**. That is how the
+**writes no snapshot at all if any prediction is contradicted**. That is how the
 `dma` arity cap was found: the pairwise law alone predicted `day,dma,subscribedStatus`
 would work, the API disagreed, and the run failed rather than shipping a table
 that was quietly wrong.

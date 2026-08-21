@@ -314,9 +314,12 @@ export async function fetchVideoAnalytics(params: VideoAnalyticsParams): Promise
   );
   const metrics = reconciled.metrics.join(',');
   if (reconciled.dropped.length > 0) {
-    // Progress channel, not stdout: machine-readable output must stay clean.
-    params.onProgress?.(
-      `Dropped ${reconciled.dropped.join(', ')} (unavailable for ${dimensions})`,
+    // stderr, not `onProgress`: the progress hook drives the spinner text, and
+    // the chunk loop below overwrites it on the next line, so the notice would
+    // never survive to be read. stderr also keeps stdout clean for piping.
+    process.stderr.write(
+      `Note: dropped ${reconciled.dropped.join(', ')} from the default metrics; ` +
+      `not available for --dimensions ${dimensions}.\n`,
     );
     debug(`Dropped default metrics for ${dimensions}: ${reconciled.dropped.join(', ')}`);
   }
