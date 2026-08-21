@@ -299,6 +299,7 @@ staqan-yt get-channel-analytics [channelHandle]
 - `--end-date <date>` - End date (YYYY-MM-DD), defaults to today
 - `--dimensions <dims>` - Custom dimensions (comma-separated, requires `--metrics`)
 - `--metrics <metrics>` - Custom metrics (comma-separated, requires `--dimensions`)
+- `--sort <field>` - Sort a custom query by one of the fields it selects; prefix with `-` for descending. Not valid with `--report`
 - `--output <format>` - Output format: json, table, text, pretty, csv (default: pretty)
 - `-v, --verbose` - Enable verbose output with debug information
 - `-h, --help` - Show help
@@ -368,6 +369,40 @@ staqan-yt get-channel-analytics @yourchannel \
   --dimensions country \
   --metrics estimatedMinutesWatched
 ```
+
+#### Row order
+
+The Analytics API only sorts by a field the query itself selects, so a custom
+query is ranked by the first of these its `--metrics` contains:
+
+1. `views`
+2. `engagedViews`
+3. `estimatedMinutesWatched`
+
+descending. A query selecting none of them (`--metrics likes,shares`) comes
+back in whatever order the API returns unless you pass `--sort`.
+
+`--sort` overrides that choice and accepts any dimension or metric the query
+selects, `-field` for descending:
+
+```bash
+# Rank countries by engaged views, not by the post-2026-08-24 views count
+staqan-yt get-channel-analytics @yourchannel \
+  --dimensions country \
+  --metrics views,engagedViews \
+  --sort -engagedViews
+
+# Chronological instead of ranked
+staqan-yt get-channel-analytics @yourchannel \
+  --dimensions day \
+  --metrics views \
+  --sort day
+```
+
+Naming a field the query does not select fails before the request is sent, and
+the error lists what is available. Predefined `--report` types carry their own
+sort order, so combining them with `--sort` is rejected rather than silently
+ignored.
 
 ---
 

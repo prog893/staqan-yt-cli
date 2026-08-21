@@ -129,7 +129,7 @@ export function getCommandOptions(command: string): string[] {
     'get-search-terms': ['--limit', '-l', ...outputOptions, ...verboseOption],
     'get-traffic-sources': [...outputOptions, ...verboseOption],
     'get-video-retention': [...outputOptions, ...verboseOption],
-    'get-channel-analytics': ['--report', '--start-date', '--end-date', '--dimensions', '--metrics', ...outputOptions, ...verboseOption],
+    'get-channel-analytics': ['--report', '--start-date', '--end-date', '--dimensions', '--metrics', '--sort', ...outputOptions, ...verboseOption],
     'get-channel-search-terms': ['--channel', '--limit', '-l', '--content-type', '--start-date', '--end-date', ...outputOptions, ...verboseOption],
     'list-comments': ['--limit', '-l', '--sort', '-s', ...outputOptions, ...verboseOption],
     'get-video-tags': [...outputOptions, ...verboseOption],
@@ -327,7 +327,7 @@ _staqa_nyt_completion() {
       COMPREPLY=( \$(compgen -W "--video-id --start-date --end-date --metrics --dimensions --output --verbose" -- "\${cur}") )
       ;;
     get-channel-analytics)
-      COMPREPLY=( \$(compgen -W "--channel --report --start-date --end-date --dimensions --metrics --output --verbose" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--channel --report --start-date --end-date --dimensions --metrics --sort --output --verbose" -- "\${cur}") )
       ;;
     get-search-terms|get-traffic-sources|get-video-retention|get-video-tags|list-captions)
       COMPREPLY=( \$(compgen -W "--video-id --output --verbose" -- "\${cur}") )

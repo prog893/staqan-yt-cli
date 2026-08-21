@@ -31,6 +31,7 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
         report: options.report,
         dimensions: options.dimensions,
         metrics: options.metrics,
+        sort: options.sort,
         onProgress: (message) => { spinner.text = message; },
       });
     } catch (analyticsErr) {

@@ -375,6 +375,7 @@ export interface ChannelAnalyticsOptions extends ChannelOption, OutputOption, Ve
   endDate?: string;
   dimensions?: string;
   metrics?: string;
+  sort?: string;
 }
 
 // Channel search terms command options

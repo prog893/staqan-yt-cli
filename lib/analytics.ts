@@ -547,6 +547,13 @@ export async function fetchVideoRetention(params: { videoId: string }): Promise<
  * accepts for ageGroup/gender reports (live-verified 2026-07-17: the old
  * views,estimatedMinutesWatched pair was rejected with "not supported",
  * so the report type never worked on either surface).
+ *
+ * These metric sets deliberately do NOT carry engagedViews (#179). Each
+ * report is a fixed output shape that existing consumers parse by column, so
+ * widening one silently changes their input. engagedViews is reachable today
+ * through a custom --dimensions/--metrics query, and whether it is accepted
+ * for each of these dimensions has not been swept the way #173 swept the
+ * rest, so adding it here would ship an unverified claim. Revisit under #175.
  */
 export const CHANNEL_REPORT_TYPES: Record<string, { dimensions: string; metrics: string; sort: string }> = {
   demographics: {
@@ -609,6 +616,67 @@ async function lookupChannel(youtube: youtube_v3.Youtube, channel: string): Prom
   };
 }
 
+/**
+ * Metrics a custom query is ranked by when the caller does not say, in
+ * preference order (#179).
+ *
+ * `views` stays first so every query that sorted before this existed sorts
+ * identically after it. `engagedViews` follows: it carries the pre-2026-08-24
+ * view semantics, so a caller selecting it is asking the same question
+ * `views` used to answer, and it is the figure tied to monetization.
+ * `estimatedMinutesWatched` is the fallback for metric sets that select no
+ * view metric at all.
+ */
+export const SORTABLE_METRIC_PREFERENCE = ['views', 'engagedViews', 'estimatedMinutesWatched'] as const;
+
+/** Split a comma-separated API field list into trimmed, non-empty entries. */
+function splitFields(raw: string): string[] {
+  return raw.split(',').map(f => f.trim()).filter(Boolean);
+}
+
+/**
+ * Resolve the sort field for a custom dimensions+metrics query (#179).
+ *
+ * The API rejects a sort field absent from the query's own metrics and
+ * dimensions, so the axis can only be chosen from what the caller selected.
+ * The previous rule looked for the literal string `views` and fell through to
+ * no sort at all otherwise, which left every other metric set in whatever
+ * order the API happened to return (live-verified 2026-08-21: `--dimensions
+ * day --metrics engagedViews` came back in raw date order, so a top-days
+ * query was silently unranked).
+ *
+ * `explicit` is the caller's `--sort`. It is validated against the selected
+ * fields, so an unsortable axis is named here rather than surfacing as the
+ * API's opaque 400, but it is never second-guessed. Returns undefined only
+ * when nothing rankable was selected and the caller named no axis, which is
+ * the one case where the API's own row order stands.
+ */
+export function resolveCustomSort(
+  dimensions: string,
+  metrics: string,
+  explicit?: string,
+): string | undefined {
+  const metricList = splitFields(metrics);
+
+  if (explicit !== undefined) {
+    const field = explicit.replace(/^-/, '').trim();
+    if (field.length === 0) {
+      throw new Error('--sort cannot be empty');
+    }
+    const selectable = [...splitFields(dimensions), ...metricList];
+    if (!selectable.includes(field)) {
+      throw new Error(
+        `Invalid --sort value: "${field}". The Analytics API only sorts by a field the ` +
+        `query itself selects. Available: ${selectable.join(', ')}.`,
+      );
+    }
+    return explicit.trim();
+  }
+
+  const preferred = SORTABLE_METRIC_PREFERENCE.find(m => metricList.includes(m));
+  return preferred ? `-${preferred}` : undefined;
+}
+
 export interface ChannelAnalyticsParams {
   /** Channel handle (@name) or ID (callers run requireChannel first). */
   channel: string;
@@ -622,6 +690,11 @@ export interface ChannelAnalyticsParams {
   dimensions?: string;
   /** Custom metrics; requires dimensions. */
   metrics?: string;
+  /**
+   * Explicit sort field for a custom query, `-field` for descending. Only
+   * valid alongside dimensions/metrics: predefined reports carry their own.
+   */
+  sort?: string;
   /** Progress hook — commands wire this to the spinner; MCP omits it. */
   onProgress?: (message: string) => void;
 }
@@ -648,6 +721,13 @@ export async function fetchChannelAnalytics(params: ChannelAnalyticsParams): Pro
     throw new Error('Cannot combine --report with --dimensions or --metrics. Use one or the other.');
   }
 
+  // Same reasoning as the check above: a predefined report already fixes its
+  // own sort, so honoring --sort here would mean silently redefining the
+  // report, and ignoring it would mean silently discarding the flag.
+  if (params.report !== undefined && params.sort !== undefined) {
+    throw new Error('Cannot combine --report with --sort. Predefined reports carry their own sort order.');
+  }
+
   let dimensions: string;
   let metrics: string;
   let reportName: string;
@@ -665,9 +745,7 @@ export async function fetchChannelAnalytics(params: ChannelAnalyticsParams): Pro
   } else if (params.dimensions && params.metrics) {
     dimensions = params.dimensions;
     metrics = params.metrics;
-    // The API rejects a sort field that isn't in metrics/dimensions, so only
-    // sort custom queries that actually select views.
-    sort = params.metrics.split(',').map(m => m.trim()).includes('views') ? '-views' : undefined;
+    sort = resolveCustomSort(dimensions, metrics, params.sort);
     reportName = 'custom';
   } else {
     throw new Error(
