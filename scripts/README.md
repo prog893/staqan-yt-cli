@@ -24,3 +24,28 @@ bun run sync-version
 
 **Note:** You rarely need to run this manually. Use `bun run version`
 instead, which handles everything automatically.
+
+## sweep-analytics-compat.ts
+
+Rebuilds the video-level Analytics compatibility tables in `lib/analytics.ts`
+from the live API (issue #173).
+
+**Usage:**
+```bash
+bun scripts/sweep-analytics-compat.ts --video-id <id> [--out snapshot.json]
+```
+
+**What it does:**
+1. Probes every candidate dimension singly, with `views` as the carrier metric
+2. Probes all pairs among the survivors
+3. Probes which metrics each dimension permits, bisected
+4. Discovers per-dimension arity caps
+5. Predicts higher-order cases from the composition laws and verifies each one
+
+**When to use:** when the API's behavior may have changed, or when
+`tests/analytics.test.ts` fails on a pinned table. Exits non-zero and refuses to
+emit tables if any composition-law prediction is contradicted, since a
+contradicted law means the generated tables would be wrong.
+
+**Cost:** around 300 read-only queries. Requires a video the authenticated
+channel owns.

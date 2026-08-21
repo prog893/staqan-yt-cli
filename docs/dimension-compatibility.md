@@ -25,29 +25,49 @@ likes, dislikes, comments, shares
 ```
 
 The four engagement metrics (`likes`, `dislikes`, `comments`, `shares`) are only
-available for a few dimensions. Measured on 2026-08-20, one metric at a time,
-against a video-level query:
+available for a few dimensions. The API rejects the **entire query** when any
+requested metric is unavailable for the requested dimensions, using the same
+opaque "query is not supported" it uses for dimension conflicts.
 
-| dimension | views | estimatedMinutesWatched | averageViewDuration | averageViewPercentage | likes | dislikes | comments | shares |
+Which of the eight default metrics each dimension permits:
+
+| dimension | views | minutes | avgDur | avgPct | likes | dislikes | comments | shares |
 |---|---|---|---|---|---|---|---|---|
+| `video` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `day` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `month` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `country` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `creatorContentType` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `subscribedStatus` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| `dma` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | `deviceType` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `operatingSystem` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | `youtubeProduct` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `insightTrafficSourceType` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `insightPlaybackLocationType` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `liveOrOnDemand` | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
-Because the default set contains all eight, `--dimensions deviceType` fails
-with the default metrics even though `deviceType` is a perfectly valid
-dimension. Pass a compatible metric set:
+For a multi-dimension query the permitted set is the **intersection** of the
+rows above. That is a measured law, not an assumption: `day` permits all eight,
+`deviceType` permits four, and `day,deviceType` permits exactly those four.
+
+### What the CLI does about it
+
+- **You did not pass `--metrics`:** the incompatible defaults are dropped and
+  the query runs. The dropped metrics are named on the progress line, never on
+  stdout, so piped output stays clean.
+- **You passed `--metrics` explicitly:** nothing is altered. An incompatible
+  metric is an error naming the metric and listing what the dimensions allow,
+  because quietly returning different data than you asked for is worse than
+  failing.
+
+So `--dimensions deviceType` now works and returns the four view and watch-time
+columns. To choose the columns yourself, pass them:
 
 ```bash
 staqan-yt get-video-analytics --video-id VIDEO_ID \
-  --dimensions deviceType,operatingSystem --metrics views
+  --dimensions deviceType,operatingSystem --metrics views,estimatedMinutesWatched
 ```
-
-The client-side allowlist deliberately does **not** model this. It answers only
-"can this dimension ever work", so it is validated with the most permissive
-metric set (`views`). A dimension rejected there is rejected for every metric
-set; one accepted there may still need `--metrics` narrowed.
 
 ## Supported dimensions
 
@@ -95,12 +115,14 @@ earlier revision of this guide advised and what the API rejects.
 
 ## Rejected combinations
 
-These are refused client-side, so they cost no quota. Each was measured as
-rejected with `--metrics views`, meaning no metric set can rescue them.
+All 66 pairs among the supported dimensions were probed with `--metrics views`,
+the metric every dimension permits, so each rejection below is a genuine
+dimension conflict. **This list is complete, not a sample.** 24 of 66 are
+rejected, and all are refused client-side at no quota cost.
 
 **Geography does not cross with daily, device or insight breakdowns:**
 
-- `country` + `day`
+- `day` + `country`
 - `country` + `deviceType`
 - `country` + `operatingSystem`
 - `country` + `insightTrafficSourceType`
@@ -111,14 +133,50 @@ rejected with `--metrics views`, meaning no metric set can rescue them.
 
 - `day` + `month`
 
-**Device breakdowns do not cross with monthly or insight breakdowns:**
+**`month` does not cross with device or insight breakdowns:**
 
 - `month` + `deviceType`
-- `insightTrafficSourceType` + `deviceType`
-- `insightPlaybackLocationType` + `deviceType`
+- `month` + `operatingSystem`
+- `month` + `insightTrafficSourceType`
+- `month` + `insightPlaybackLocationType`
 
-This table is measured, not exhaustive. A pair that is absent is passed through,
-and the API's own error surfaces if it dislikes the request.
+**Device breakdowns do not cross with insight breakdowns:**
+
+- `deviceType` + `insightTrafficSourceType`
+- `deviceType` + `insightPlaybackLocationType`
+- `operatingSystem` + `insightTrafficSourceType`
+- `operatingSystem` + `insightPlaybackLocationType`
+- `youtubeProduct` + `insightTrafficSourceType`
+- `youtubeProduct` + `insightPlaybackLocationType`
+
+**The two insight breakdowns do not cross with each other:**
+
+- `insightTrafficSourceType` + `insightPlaybackLocationType`
+
+**`dma` does not cross with device, platform or insight breakdowns:**
+
+- `dma` + `deviceType`
+- `dma` + `operatingSystem`
+- `dma` + `youtubeProduct`
+- `dma` + `liveOrOnDemand`
+- `dma` + `insightTrafficSourceType`
+- `dma` + `insightPlaybackLocationType`
+
+## `dma` is capped at two dimensions
+
+`dma` is accepted alone and in any pair it does not conflict with, but **every**
+three-dimension query containing it is rejected, including ones whose pairs are
+all individually valid:
+
+```text
+dma                        OK        day,dma,subscribedStatus         REJECT
+day,dma                    OK        day,dma,creatorContentType       REJECT
+dma,subscribedStatus       OK        dma,subscribedStatus,creatorC..  REJECT
+dma,creatorContentType     OK        day,dma,month                    REJECT
+```
+
+This is the one case a pairwise table cannot express, so it is enforced as a
+per-dimension arity cap instead. No other dimension has one.
 
 ### `country` + `month` is allowed
 
@@ -144,7 +202,8 @@ staqan-yt get-video-analytics --video-id VIDEO_ID --metrics views \
   --dimensions day,deviceType,operatingSystem,subscribedStatus,youtubeProduct,creatorContentType,liveOrOnDemand
 ```
 
-Measured: 465 rows. No arity limit was found, so none is enforced.
+Measured: 465 rows. No *global* arity limit was found, so none is enforced. The
+only arity rule is the per-dimension `dma` cap described above.
 
 ## Useful combinations
 
@@ -184,7 +243,33 @@ staqan-yt get-video-analytics --video-id VIDEO_ID --dimensions day
 
 ---
 
-**Last updated:** 2026-08-20
-**Method:** live queries against the Analytics API v2, video-level
-(`filters: video==<id>`), verifying each dimension singly, the pairs above, and
-each default metric in isolation.
+## How this guide is produced
+
+Everything above is generated by a live sweep, not maintained by hand:
+
+```bash
+bun scripts/sweep-analytics-compat.ts --video-id <id> --out snapshot.json
+```
+
+The sweep avoids the intractable dimension-set by metric-set cross product by
+measuring two independent axes and composing them. Dimension validity is probed
+with `views` only, which every dimension permits, so a rejection is always a
+dimension conflict. Metric validity is probed one dimension at a time, so a
+rejection is always a metric conflict. A query is then valid when every pair of
+its dimensions is valid, no dimension exceeds its arity cap, and its metrics sit
+inside the intersection of the per-dimension metric sets.
+
+The composition laws are not assumed. The final phase predicts higher-order
+cases from them and checks each prediction against the API, and the sweep
+**refuses to emit tables if any prediction is contradicted**. That is how the
+`dma` arity cap was found: the pairwise law alone predicted `day,dma,subscribedStatus`
+would work, the API disagreed, and the run failed rather than shipping a table
+that was quietly wrong.
+
+The previous matrix went stale because nothing ever re-checked it, which is what
+produced #143. Re-running the sweep is now the maintenance procedure, and
+`tests/analytics.test.ts` pins the shipped tables so drift fails CI instead of
+going unnoticed.
+
+**Last swept:** 2026-08-21, 296 probes, 35 predictions verified, 0 contradictions.
+Raw output: [`analytics-compat-snapshot.json`](analytics-compat-snapshot.json).
