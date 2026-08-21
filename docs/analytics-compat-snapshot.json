@@ -1,0 +1,341 @@
+{
+  "generatedAt": "2026-08-21T01:38:25.393Z",
+  "videoId": "eQICyHf3hsY",
+  "dateRange": {
+    "startDate": "2026-06-01",
+    "endDate": "2026-08-01"
+  },
+  "validDimensions": [
+    "video",
+    "day",
+    "month",
+    "country",
+    "dma",
+    "deviceType",
+    "operatingSystem",
+    "subscribedStatus",
+    "youtubeProduct",
+    "liveOrOnDemand",
+    "creatorContentType",
+    "insightTrafficSourceType",
+    "insightPlaybackLocationType"
+  ],
+  "rejectedDimensions": [
+    {
+      "dimension": "province",
+      "verdict": "REJECT"
+    },
+    {
+      "dimension": "city",
+      "verdict": "REJECT"
+    },
+    {
+      "dimension": "continent",
+      "verdict": "REJECT"
+    },
+    {
+      "dimension": "subContinent",
+      "verdict": "REJECT"
+    },
+    {
+      "dimension": "insightTrafficSourceDetail",
+      "verdict": "REJECT"
+    },
+    {
+      "dimension": "insightPlaybackLocationDetail",
+      "verdict": "REJECT"
+    },
+    {
+      "dimension": "insightPlayerLocationType",
+      "verdict": "UNKNOWN_ID"
+    },
+    {
+      "dimension": "ageGroup",
+      "verdict": "REJECT"
+    },
+    {
+      "dimension": "gender",
+      "verdict": "REJECT"
+    },
+    {
+      "dimension": "sharingService",
+      "verdict": "REJECT"
+    },
+    {
+      "dimension": "channel",
+      "verdict": "REJECT"
+    },
+    {
+      "dimension": "playlist",
+      "verdict": "REJECT"
+    },
+    {
+      "dimension": "group",
+      "verdict": "REJECT"
+    },
+    {
+      "dimension": "uploaderType",
+      "verdict": "REJECT"
+    },
+    {
+      "dimension": "elapsedVideoTimeRatio",
+      "verdict": "REJECT"
+    },
+    {
+      "dimension": "audienceType",
+      "verdict": "REJECT"
+    }
+  ],
+  "invalidPairs": [
+    [
+      "day",
+      "month"
+    ],
+    [
+      "day",
+      "country"
+    ],
+    [
+      "month",
+      "deviceType"
+    ],
+    [
+      "month",
+      "operatingSystem"
+    ],
+    [
+      "month",
+      "insightTrafficSourceType"
+    ],
+    [
+      "month",
+      "insightPlaybackLocationType"
+    ],
+    [
+      "country",
+      "dma"
+    ],
+    [
+      "country",
+      "deviceType"
+    ],
+    [
+      "country",
+      "operatingSystem"
+    ],
+    [
+      "country",
+      "insightTrafficSourceType"
+    ],
+    [
+      "country",
+      "insightPlaybackLocationType"
+    ],
+    [
+      "dma",
+      "deviceType"
+    ],
+    [
+      "dma",
+      "operatingSystem"
+    ],
+    [
+      "dma",
+      "youtubeProduct"
+    ],
+    [
+      "dma",
+      "liveOrOnDemand"
+    ],
+    [
+      "dma",
+      "insightTrafficSourceType"
+    ],
+    [
+      "dma",
+      "insightPlaybackLocationType"
+    ],
+    [
+      "deviceType",
+      "insightTrafficSourceType"
+    ],
+    [
+      "deviceType",
+      "insightPlaybackLocationType"
+    ],
+    [
+      "operatingSystem",
+      "insightTrafficSourceType"
+    ],
+    [
+      "operatingSystem",
+      "insightPlaybackLocationType"
+    ],
+    [
+      "youtubeProduct",
+      "insightTrafficSourceType"
+    ],
+    [
+      "youtubeProduct",
+      "insightPlaybackLocationType"
+    ],
+    [
+      "insightTrafficSourceType",
+      "insightPlaybackLocationType"
+    ]
+  ],
+  "arityCaps": {
+    "dma": 2
+  },
+  "dimensionMetrics": {
+    "video": [
+      "views",
+      "estimatedMinutesWatched",
+      "averageViewDuration",
+      "averageViewPercentage",
+      "likes",
+      "dislikes",
+      "comments",
+      "shares",
+      "subscribersGained",
+      "subscribersLost",
+      "videosAddedToPlaylists",
+      "redViews",
+      "estimatedRedMinutesWatched",
+      "annotationClickThroughRate",
+      "cardClickRate"
+    ],
+    "day": [
+      "views",
+      "estimatedMinutesWatched",
+      "averageViewDuration",
+      "averageViewPercentage",
+      "likes",
+      "dislikes",
+      "comments",
+      "shares",
+      "subscribersGained",
+      "subscribersLost",
+      "videosAddedToPlaylists",
+      "redViews",
+      "estimatedRedMinutesWatched",
+      "annotationClickThroughRate",
+      "cardClickRate"
+    ],
+    "month": [
+      "views",
+      "estimatedMinutesWatched",
+      "averageViewDuration",
+      "averageViewPercentage",
+      "likes",
+      "dislikes",
+      "comments",
+      "shares",
+      "subscribersGained",
+      "subscribersLost",
+      "videosAddedToPlaylists",
+      "redViews",
+      "estimatedRedMinutesWatched",
+      "annotationClickThroughRate",
+      "cardClickRate"
+    ],
+    "country": [
+      "views",
+      "estimatedMinutesWatched",
+      "averageViewDuration",
+      "averageViewPercentage",
+      "likes",
+      "dislikes",
+      "comments",
+      "shares",
+      "subscribersGained",
+      "subscribersLost",
+      "videosAddedToPlaylists",
+      "redViews",
+      "estimatedRedMinutesWatched",
+      "annotationClickThroughRate",
+      "cardClickRate"
+    ],
+    "dma": [
+      "views",
+      "estimatedMinutesWatched",
+      "averageViewDuration",
+      "averageViewPercentage"
+    ],
+    "deviceType": [
+      "views",
+      "estimatedMinutesWatched",
+      "averageViewDuration",
+      "averageViewPercentage"
+    ],
+    "operatingSystem": [
+      "views",
+      "estimatedMinutesWatched",
+      "averageViewDuration",
+      "averageViewPercentage"
+    ],
+    "subscribedStatus": [
+      "views",
+      "estimatedMinutesWatched",
+      "averageViewDuration",
+      "averageViewPercentage",
+      "likes",
+      "dislikes",
+      "shares",
+      "videosAddedToPlaylists",
+      "redViews",
+      "estimatedRedMinutesWatched",
+      "annotationClickThroughRate",
+      "cardClickRate"
+    ],
+    "youtubeProduct": [
+      "views",
+      "estimatedMinutesWatched",
+      "averageViewDuration",
+      "averageViewPercentage",
+      "redViews",
+      "estimatedRedMinutesWatched"
+    ],
+    "liveOrOnDemand": [
+      "views",
+      "estimatedMinutesWatched",
+      "averageViewDuration",
+      "redViews",
+      "estimatedRedMinutesWatched"
+    ],
+    "creatorContentType": [
+      "views",
+      "estimatedMinutesWatched",
+      "averageViewDuration",
+      "averageViewPercentage",
+      "likes",
+      "dislikes",
+      "comments",
+      "shares",
+      "subscribersGained",
+      "subscribersLost",
+      "redViews",
+      "estimatedRedMinutesWatched",
+      "cardClickRate"
+    ],
+    "insightTrafficSourceType": [
+      "views",
+      "estimatedMinutesWatched",
+      "averageViewDuration",
+      "averageViewPercentage"
+    ],
+    "insightPlaybackLocationType": [
+      "views",
+      "estimatedMinutesWatched",
+      "averageViewDuration",
+      "averageViewPercentage"
+    ]
+  },
+  "lawChecks": {
+    "law": "pairwise + intersection",
+    "passed": 35,
+    "failed": 0,
+    "contradictions": []
+  },
+  "probeCount": 296
+}

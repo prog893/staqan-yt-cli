@@ -2,7 +2,12 @@ import { describe, it, expect } from 'bun:test';
 import {
   VIDEO_DIMENSIONS,
   INVALID_DIMENSION_COMBOS,
+  DIMENSION_MAX_ARITY,
+  VIEW_METRICS,
   validateVideoDimensions,
+  allowedMetricsFor,
+  reconcileMetrics,
+  DEFAULT_VIDEO_METRICS,
 } from '../lib/analytics';
 
 /**
@@ -119,21 +124,109 @@ describe('dimension tables', () => {
     }
   });
 
-  // Pinned rather than merely sanity-checked: reachability alone would still
-  // pass if a measured pair were dropped, or if an unmeasured one were added
-  // and started rejecting queries the API actually serves.
-  it('pins the measured combination matrix exactly', () => {
+  // Pinned to the full pairwise sweep: all 66 pairs among the allowlist were
+  // probed and these 24 rejected. Reachability alone would still pass if a
+  // measured pair were dropped, or if an unmeasured one were added and began
+  // rejecting queries the API actually serves. Regenerate with
+  // `bun scripts/sweep-analytics-compat.ts` if the API's behavior changes.
+  it('pins the swept combination matrix exactly', () => {
     expect(INVALID_DIMENSION_COMBOS.map(c => c.join('+')).sort()).toEqual([
-      'country+day',
       'country+deviceType',
       'country+dma',
       'country+insightPlaybackLocationType',
       'country+insightTrafficSourceType',
       'country+operatingSystem',
+      'day+country',
       'day+month',
-      'insightPlaybackLocationType+deviceType',
-      'insightTrafficSourceType+deviceType',
+      'deviceType+insightPlaybackLocationType',
+      'deviceType+insightTrafficSourceType',
+      'dma+deviceType',
+      'dma+insightPlaybackLocationType',
+      'dma+insightTrafficSourceType',
+      'dma+liveOrOnDemand',
+      'dma+operatingSystem',
+      'dma+youtubeProduct',
+      'insightTrafficSourceType+insightPlaybackLocationType',
       'month+deviceType',
+      'month+insightPlaybackLocationType',
+      'month+insightTrafficSourceType',
+      'month+operatingSystem',
+      'operatingSystem+insightPlaybackLocationType',
+      'operatingSystem+insightTrafficSourceType',
+      'youtubeProduct+insightPlaybackLocationType',
+      'youtubeProduct+insightTrafficSourceType',
     ].sort());
+  });
+});
+
+/**
+ * Issue #173: the API rejects the whole query when a requested metric is
+ * unavailable for the requested dimensions, and returns the same opaque error
+ * it uses for dimension conflicts. All expectations below come from the sweep
+ * in scripts/sweep-analytics-compat.ts.
+ */
+describe('metric compatibility (#173)', () => {
+  it('reports what a single dimension permits', () => {
+    expect(allowedMetricsFor(['day'])).toContain('comments');
+    expect(allowedMetricsFor(['deviceType'])).toEqual([...VIEW_METRICS]);
+    expect(allowedMetricsFor(['youtubeProduct'])).toContain('redViews');
+    expect(allowedMetricsFor(['youtubeProduct'])).not.toContain('likes');
+  });
+
+  // Verified against the API rather than assumed: a combination permits exactly
+  // the metrics every one of its dimensions permits.
+  it('composes by intersection across dimensions', () => {
+    expect(allowedMetricsFor(['day', 'deviceType'])).toEqual([...VIEW_METRICS]);
+    expect(allowedMetricsFor(['day', 'subscribedStatus'])).toContain('likes');
+    expect(allowedMetricsFor(['day', 'subscribedStatus'])).not.toContain('comments');
+    expect(allowedMetricsFor(['day', 'creatorContentType'])).toContain('comments');
+  });
+
+  it('imposes no restriction for dimensions with no swept row', () => {
+    expect(allowedMetricsFor(['somethingNew'])).toContain('likes');
+  });
+
+  it('narrows a defaulted metric list instead of failing', () => {
+    const r = reconcileMetrics(['deviceType'], DEFAULT_VIDEO_METRICS.split(','), false);
+    expect(r.metrics).toEqual([...VIEW_METRICS]);
+    expect(r.dropped).toEqual(['likes', 'dislikes', 'comments', 'shares']);
+  });
+
+  it('leaves a defaulted list alone when every metric is permitted', () => {
+    const r = reconcileMetrics(['day'], DEFAULT_VIDEO_METRICS.split(','), false);
+    expect(r.metrics).toEqual(DEFAULT_VIDEO_METRICS.split(','));
+    expect(r.dropped).toEqual([]);
+  });
+
+  // An explicitly requested metric is never silently swapped for another:
+  // returning different data than asked for is worse than an error.
+  it('errors rather than narrowing an explicit metric list', () => {
+    expect(() => reconcileMetrics(['deviceType'], ['views', 'likes'], true)).toThrow(
+      /Metrics not available for --dimensions deviceType: likes/,
+    );
+  });
+
+  it('passes through metrics outside the swept vocabulary', () => {
+    const r = reconcileMetrics(['deviceType'], ['views', 'someFutureMetric'], true);
+    expect(r.metrics).toEqual(['views', 'someFutureMetric']);
+  });
+});
+
+describe('arity caps (#173)', () => {
+  it('rejects a capped dimension in an oversized query', () => {
+    expect(() => validateVideoDimensions('day,dma,subscribedStatus')).toThrow(
+      /cannot be combined with more than 1 other dimension/,
+    );
+  });
+
+  it('allows a capped dimension alone and in a pair', () => {
+    expect(validateVideoDimensions('dma')).toBe('dma');
+    expect(validateVideoDimensions('day,dma')).toBe('day,dma');
+  });
+
+  it('leaves uncapped dimensions unbounded', () => {
+    expect(DIMENSION_MAX_ARITY.day).toBeUndefined();
+    const seven = 'day,deviceType,operatingSystem,subscribedStatus,youtubeProduct,creatorContentType,liveOrOnDemand';
+    expect(validateVideoDimensions(seven)).toBe(seven);
   });
 });

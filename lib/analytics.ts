@@ -14,6 +14,23 @@ import { getAuthenticatedClient } from './auth';
 import { chunkDateRange, debug, parseChannelHandle, parseDuration, toLocalYmd, validateDateRange, withRateLimitRetry } from './utils';
 
 /**
+ * The metric vocabulary the compatibility sweep covers. A metric outside this
+ * list is passed through to the API unchecked, since the tables below say
+ * nothing about it.
+ */
+export const ALL_SWEPT_METRICS: readonly string[] = [
+  'views', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage',
+  'likes', 'dislikes', 'comments', 'shares', 'subscribersGained', 'subscribersLost',
+  'videosAddedToPlaylists', 'redViews', 'estimatedRedMinutesWatched',
+  'annotationClickThroughRate', 'cardClickRate',
+];
+
+/** The four view and watch-time metrics every valid dimension permits. */
+export const VIEW_METRICS: readonly string[] = [
+  'views', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage',
+];
+
+/**
  * Allowlist of Analytics API dimensions valid for video-level queries.
  * See https://developers.google.com/youtube/v3/docs/analytics_api/dimensions/dims
  * and docs/dimension-compatibility.md for the live-tested combination matrix.
@@ -41,33 +58,107 @@ export const VIDEO_DIMENSIONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Known-bad dimension combinations the Analytics API rejects at runtime.
- * Checking up-front gives a clean error message instead of an API error.
+ * Every dimension pair the Analytics API rejects, from the full pairwise sweep
+ * in `scripts/sweep-analytics-compat.ts`. Complete for the allowlist above, not
+ * a sample: all 66 pairs were probed and these 24 were rejected.
  *
- * Measured, not exhaustive: pairs absent from this table are passed through and
- * the API's own error surfaces if it dislikes them. Three structural conflicts
- * account for every entry below.
- *
- * There is no arity limit to enforce alongside them. A 7-dimension query is
- * accepted; the "max 4 dimensions" folklore came from a 5-dimension example
- * that happened to contain `country,day`.
+ * Probed with `metrics=views`, which every dimension permits, so each entry is
+ * a genuine dimension conflict rather than a metric one. `country,month` is
+ * deliberately absent: it is accepted, given first-of-month dates.
  */
 export const INVALID_DIMENSION_COMBOS: ReadonlyArray<ReadonlyArray<string>> = [
-  // 1. Geography does not cross with daily, device or insight breakdowns.
-  //    `country,month` is NOT here: it is accepted, given aligned dates.
-  ['country', 'day'],
   ['country', 'deviceType'],
-  ['country', 'operatingSystem'],
-  ['country', 'insightTrafficSourceType'],
-  ['country', 'insightPlaybackLocationType'],
   ['country', 'dma'],
-  // 2. Two time granularities cannot be requested at once.
+  ['country', 'insightPlaybackLocationType'],
+  ['country', 'insightTrafficSourceType'],
+  ['country', 'operatingSystem'],
+  ['day', 'country'],
   ['day', 'month'],
-  // 3. Device breakdowns do not cross with monthly or insight breakdowns.
+  ['deviceType', 'insightPlaybackLocationType'],
+  ['deviceType', 'insightTrafficSourceType'],
+  ['dma', 'deviceType'],
+  ['dma', 'insightPlaybackLocationType'],
+  ['dma', 'insightTrafficSourceType'],
+  ['dma', 'liveOrOnDemand'],
+  ['dma', 'operatingSystem'],
+  ['dma', 'youtubeProduct'],
+  ['insightTrafficSourceType', 'insightPlaybackLocationType'],
   ['month', 'deviceType'],
-  ['insightTrafficSourceType', 'deviceType'],
-  ['insightPlaybackLocationType', 'deviceType'],
+  ['month', 'insightPlaybackLocationType'],
+  ['month', 'insightTrafficSourceType'],
+  ['month', 'operatingSystem'],
+  ['operatingSystem', 'insightPlaybackLocationType'],
+  ['operatingSystem', 'insightTrafficSourceType'],
+  ['youtubeProduct', 'insightPlaybackLocationType'],
+  ['youtubeProduct', 'insightTrafficSourceType'],
 ];
+
+/**
+ * Dimensions valid in any pair but rejected in any larger query, which the
+ * pairwise table above cannot express. `dma` is accepted alone and with every
+ * dimension it does not conflict with, yet every three-dimension query
+ * containing it is rejected.
+ *
+ * There is no global arity limit: seven dimensions in one query is accepted.
+ * The "max 4 dimensions" folklore came from a 5-dimension example that happened
+ * to contain `day,country`.
+ */
+export const DIMENSION_MAX_ARITY: Readonly<Record<string, number>> = {
+  dma: 2,
+};
+
+/**
+ * Metrics each dimension permits. The API rejects the whole query when any
+ * requested metric is unavailable for the requested dimension, which is why
+ * most dimensions appear broken under the default metric set (issue #173).
+ *
+ * For a multi-dimension query the permitted set is the **intersection** of the
+ * entries below. That composition law was verified against the API rather than
+ * assumed: see Phase D of `scripts/sweep-analytics-compat.ts`.
+ */
+export const DIMENSION_METRICS: Readonly<Record<string, readonly string[]>> = {
+  video: ALL_SWEPT_METRICS,
+  day: ALL_SWEPT_METRICS,
+  month: ALL_SWEPT_METRICS,
+  country: ALL_SWEPT_METRICS,
+  dma: VIEW_METRICS,
+  deviceType: VIEW_METRICS,
+  operatingSystem: VIEW_METRICS,
+  subscribedStatus: [
+    'views', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage',
+    'likes', 'dislikes', 'shares', 'videosAddedToPlaylists', 'redViews',
+    'estimatedRedMinutesWatched', 'annotationClickThroughRate', 'cardClickRate',
+  ],
+  youtubeProduct: [
+    'views', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage',
+    'redViews', 'estimatedRedMinutesWatched',
+  ],
+  liveOrOnDemand: [
+    'views', 'estimatedMinutesWatched', 'averageViewDuration', 'redViews',
+    'estimatedRedMinutesWatched',
+  ],
+  creatorContentType: [
+    'views', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage',
+    'likes', 'dislikes', 'comments', 'shares', 'subscribersGained', 'subscribersLost',
+    'redViews', 'estimatedRedMinutesWatched', 'cardClickRate',
+  ],
+  insightTrafficSourceType: VIEW_METRICS,
+  insightPlaybackLocationType: VIEW_METRICS,
+};
+
+/**
+ * Metrics permitted by every dimension in `dims`. Unknown dimensions impose no
+ * restriction, so a dimension added to the allowlist without a swept metric row
+ * fails open to the API rather than silently rejecting valid metrics.
+ */
+export function allowedMetricsFor(dims: readonly string[]): string[] {
+  const known = dims.map(d => DIMENSION_METRICS[d]).filter((m): m is readonly string[] => m !== undefined);
+  if (known.length === 0) return [...ALL_SWEPT_METRICS];
+  return known.reduce<string[]>(
+    (acc, cur) => acc.filter(m => cur.includes(m)),
+    [...known[0]],
+  );
+}
 
 /**
  * Validate a comma-separated dimensions string against the allowlist and
@@ -97,7 +188,58 @@ export function validateVideoDimensions(raw: string): string {
     }
   }
 
+  for (const d of dims) {
+    const cap = DIMENSION_MAX_ARITY[d];
+    if (cap !== undefined && dims.length > cap) {
+      throw new Error(
+        `Invalid --dimensions combination: "${d}" cannot be combined with more than ` +
+        `${cap - 1} other dimension(s). Got ${dims.length}: ${dims.join(', ')}.`,
+      );
+    }
+  }
+
   return dims.join(',');
+}
+
+/**
+ * Reconcile a metric list with what the requested dimensions permit (#173).
+ *
+ * The API rejects the entire query when any requested metric is unavailable for
+ * the requested dimensions, and answers with the same opaque "query is not
+ * supported" it uses for dimension conflicts. Resolving it here means the
+ * failure names the metric instead.
+ *
+ * `explicit` distinguishes the two cases that deserve different handling. A
+ * metric list the caller typed is never silently altered, because returning
+ * different data than asked for is worse than an error. A defaulted list is
+ * narrowed, because the caller expressed no preference and the alternative is
+ * failing at a request they never made.
+ */
+export function reconcileMetrics(
+  dims: readonly string[],
+  metrics: readonly string[],
+  explicit: boolean,
+): { metrics: string[]; dropped: string[] } {
+  const allowed = allowedMetricsFor(dims);
+  // Metrics outside the swept vocabulary carry no verdict, so leave them alone.
+  const unsupported = metrics.filter(m => ALL_SWEPT_METRICS.includes(m) && !allowed.includes(m));
+  if (unsupported.length === 0) return { metrics: [...metrics], dropped: [] };
+
+  if (explicit) {
+    throw new Error(
+      `Metrics not available for --dimensions ${dims.join(',')}: ${unsupported.join(', ')}. ` +
+      `Available for these dimensions: ${allowed.join(', ') || '(none)'}.`,
+    );
+  }
+
+  const kept = metrics.filter(m => !unsupported.includes(m));
+  if (kept.length === 0) {
+    throw new Error(
+      `No default metric is available for --dimensions ${dims.join(',')}. ` +
+      `Pass --metrics explicitly from: ${allowed.join(', ') || '(none)'}.`,
+    );
+  }
+  return { metrics: kept, dropped: unsupported };
 }
 
 export interface VideoAnalyticsParams {
@@ -164,8 +306,23 @@ export async function fetchVideoAnalytics(params: VideoAnalyticsParams): Promise
   validateDateRange(startDate, endDate);
   debug(`Date range: ${startDate} to ${endDate}`);
 
-  const metrics = params.metrics || DEFAULT_VIDEO_METRICS;
   const dimensions = validateVideoDimensions(params.dimensions ?? 'video');
+  const reconciled = reconcileMetrics(
+    dimensions.split(','),
+    (params.metrics || DEFAULT_VIDEO_METRICS).split(',').map(m => m.trim()).filter(Boolean),
+    Boolean(params.metrics),
+  );
+  const metrics = reconciled.metrics.join(',');
+  if (reconciled.dropped.length > 0) {
+    // stderr, not `onProgress`: the progress hook drives the spinner text, and
+    // the chunk loop below overwrites it on the next line, so the notice would
+    // never survive to be read. stderr also keeps stdout clean for piping.
+    process.stderr.write(
+      `Note: dropped ${reconciled.dropped.join(', ')} from the default metrics; ` +
+      `not available for --dimensions ${dimensions}.\n`,
+    );
+    debug(`Dropped default metrics for ${dimensions}: ${reconciled.dropped.join(', ')}`);
+  }
 
   const dateChunks = chunkDateRange(startDate, endDate);
   debug(`Split into ${dateChunks.length} chunk(s) of 90 days`);
