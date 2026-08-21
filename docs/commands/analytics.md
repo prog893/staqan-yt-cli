@@ -386,7 +386,7 @@ back in whatever order the API returns unless you pass `--sort`.
 selects, `-field` for descending:
 
 ```bash
-# Rank countries by engaged views, not by the post-2026-08-24 views count
+# Rank countries by engaged views rather than by views
 staqan-yt get-channel-analytics @yourchannel \
   --dimensions country \
   --metrics views,engagedViews \
@@ -403,6 +403,12 @@ Naming a field the query does not select fails before the request is sent, and
 the error lists what is available. Predefined `--report` types carry their own
 sort order, so combining them with `--sort` is rejected rather than silently
 ignored.
+
+`engagedViews` is accepted by the Analytics API today and is the metric that
+keeps the stricter view definition once YouTube's view-counting change takes
+effect on 2026-08-24. Which of the two belongs on the ranking axis is a
+question about the analysis, not about the date, which is why `--sort` exists
+rather than a rule that switches on its own.
 
 ---
 

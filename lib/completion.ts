@@ -296,7 +296,15 @@ _staqa_nyt_completion() {
     --privacy)
       COMPREPLY=( \$(compgen -W "public private unlisted" -- "\${cur}") ); return ;;
     --sort|-s)
-      COMPREPLY=( \$(compgen -W "top new" -- "\${cur}") ); return ;;
+      # Scoped to the command, like --type above: "top"/"new" are list-comments
+      # values. get-channel-analytics --sort takes a field the query itself
+      # selects, which is only knowable from the --dimensions/--metrics typed
+      # so far, so its values stay unenumerated rather than wrong.
+      case "$cmd" in
+        list-comments)
+          COMPREPLY=( \$(compgen -W "top new" -- "\${cur}") ); return ;;
+      esac
+      ;;
     --format)
       COMPREPLY=( \$(compgen -W "raw srt vtt sbv ttml" -- "\${cur}") ); return ;;
     --dimensions)
@@ -847,6 +855,7 @@ ${commandList}
         '--end-date[End date (YYYY-MM-DD)]:date:' \\
         '--dimensions[Custom dimensions (comma-separated)]:dims:' \\
         '--metrics[Custom metrics (comma-separated)]:metrics:' \\
+        '--sort[Sort by a selected field, -field for descending]:field:' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
