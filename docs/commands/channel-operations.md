@@ -2,6 +2,14 @@
 
 Commands for working with YouTube channels and their content.
 
+> **`statistics.viewCount` (shown as `Total Views`) changed meaning on 2026-08-24.** From
+> that date the Data API counts a view from the first frame of playback, with
+> no minimum watch time. A channel total spanning the cutoff is therefore a sum
+> over two different definitions, and comparing today's total against one
+> stored earlier measures the methodology change as well as the channel. The
+> previous definition survives only as `engagedViews` in the Analytics API.
+> See [The 2026-08-24 view-counting change](analytics.md#the-2026-08-24-view-counting-change).
+
 ## get-channel
 
 Get detailed metadata for a YouTube channel.
@@ -44,12 +52,16 @@ staqan-yt get-channel @mkbhd --output json
 - `id` - Channel ID
 - `title` - Channel name
 - `handle` - Channel handle (@username)
+- `customUrl` - Custom channel URL
 - `description` - Channel description
+- `country` - Channel country code
 - `publishedAt` - Channel creation date
-- `thumbnail` - Channel thumbnail URL
-- `subscriberCount` - Subscriber count
-- `videoCount` - Total video count
-- `viewCount` - Total lifetime view count
+- `brandingSettings` - Channel branding (banner, keywords, etc.)
+- `topicDetails` - Topic categories
+- `statistics` - Object containing `subscriberCount`, `videoCount`, `viewCount`, `hiddenSubscriberCount`
+
+The counts are **nested under `statistics`**, so the jq path for the lifetime
+total is `.statistics.viewCount`, not `.viewCount`.
 
 ### Related Commands
 
@@ -109,14 +121,15 @@ staqan-yt list-videos @yourchannel --output json > videos.json
 - `id` - Video ID
 - `title` - Video title
 - `description` - Video description (truncated)
-- `channelId` - Channel ID
-- `channelTitle` - Channel name
 - `publishedAt` - Publication date
-- `thumbnail` - Thumbnail URL
-- `viewCount` - View count
-- `likeCount` - Like count
-- `commentCount` - Comment count
-- `duration` - Video duration (ISO 8601)
+- `thumbnail` - Thumbnail URL (default quality)
+- `videoType` - `short` or `regular`
+- `privacyStatus` - `public`, `unlisted` or `private`
+
+**No statistics.** `list-videos` does not return view, like or comment counts.
+It is a listing call; fetching counts for every video would cost an extra
+`videos.list` request per page. Pass the IDs to `get-videos --video-ids` when
+you need counts.
 
 ### Filtering by Video Type
 
@@ -219,8 +232,11 @@ staqan-yt list-videos @yourchannel --limit 20 --output table
 
 ```bash
 # Export video stats for analysis
-staqan-yt list-videos @yourchannel --output json | \
-  jq '.[] | {title, viewCount: .viewCount | tonumber, likeCount: .likeCount | tonumber}' | \
+# Counts come from get-videos: list-videos returns no statistics.
+# Collect the IDs first, then fetch them in one batch.
+staqan-yt list-videos @yourchannel --output json | jq -r '.[].id' | \
+  xargs staqan-yt get-videos --output json --video-ids | \
+  jq '.[] | {title, viewCount: .statistics.viewCount, likeCount: .statistics.likeCount}' | \
   jq -s 'sort_by(.viewCount) | reverse'
 ```
 

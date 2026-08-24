@@ -2,6 +2,15 @@
 
 Commands for finding and retrieving video information.
 
+> **`viewCount` changed meaning on 2026-08-24.** From that date the Data API
+> counts a view from the first frame of playback, with no minimum watch time.
+> The field name and type did not change, so nothing in the payload marks the
+> boundary. A `viewCount` you stored before the cutoff and one you fetch now
+> answer different questions, and the difference is large on Shorts. The
+> previous definition is not available from the Data API at all: it survives
+> only as `engagedViews` in the Analytics API.
+> See [The 2026-08-24 view-counting change](analytics.md#the-2026-08-24-view-counting-change).
+
 ## get-video
 
 Get detailed metadata for a single video.
@@ -51,15 +60,18 @@ staqan-yt get-video --video-id dQw4w9WgXcQ --output table
 - `id` - Video ID
 - `title` - Video title
 - `description` - Video description
-- `channelId` - Channel ID
 - `channelTitle` - Channel name
 - `publishedAt` - Publication date
-- `thumbnail` - Thumbnail URL (default quality)
-- `viewCount` - View count
-- `likeCount` - Like count
-- `commentCount` - Comment count
+- `thumbnails` - Object keyed by size: `default`, `medium`, `high`, `standard`, `maxres`
+- `videoType` - `short` or `regular`
+- `privacyStatus` - `public`, `unlisted` or `private`
+- `categoryId` - YouTube category ID
 - `duration` - Video duration (ISO 8601)
 - `tags` - Video tags
+- `statistics` - Object containing `viewCount`, `likeCount`, `commentCount` (numbers)
+
+The counts are **nested under `statistics`**, not top level, so the jq path is
+`.[].statistics.viewCount`. The result is an array even for a single video.
 
 ### Related Commands
 
@@ -170,6 +182,9 @@ staqan-yt search-videos --query "Python" --output csv > results.csv
 - `channelTitle` - Channel name
 - `publishedAt` - Publication date
 - `thumbnail` - Thumbnail URL
+- `videoType` - `short` or `regular`
+
+No statistics here either; `search-videos` returns metadata only.
 
 ### Search Behavior
 
@@ -223,8 +238,10 @@ staqan-yt search-videos --query "keyword" --output json | \
 
 ```bash
 # List and sort by view count
-staqan-yt list-videos @yourchannel --limit 50 --output json | \
-  jq 'sort_by(.viewCount | tonumber) | reverse | .[0:10]'
+# list-videos has no statistics, so pull the counts with get-videos first.
+staqan-yt list-videos @yourchannel --limit 50 --output json | jq -r '.[].id' | \
+  xargs staqan-yt get-videos --output json --video-ids | \
+  jq 'sort_by(.statistics.viewCount) | reverse | .[0:10] | .[] | {title, views: .statistics.viewCount}'
 ```
 
 ## Tips
