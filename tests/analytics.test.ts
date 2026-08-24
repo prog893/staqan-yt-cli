@@ -395,6 +395,44 @@ describe('view-counting change notice (#178)', () => {
 });
 
 /**
+ * The fixed-shape reports send metric sets the caller cannot override, so the
+ * notice has to be derived from what each one hardcodes rather than from a
+ * user-supplied `--metrics` (#185's sites, but not #185's decision).
+ *
+ * `get-traffic-sources` is the sharpest case: it exposes no date flags at all
+ * and hardcodes a rolling 30-day window, so for the first 30 days after
+ * 2026-08-24 its one and only behaviour straddles the change.
+ */
+describe('view-counting notice for fixed-metric reports', () => {
+  it('fires for the traffic-source and per-video search-term metric set', () => {
+    // Both send exactly `views`.
+    expect(viewCountingNoticeFor('2026-07-26', '2026-08-25', 'views')).toBeDefined();
+  });
+
+  it('fires for the channel search-terms metric set', () => {
+    // SEARCH_TERMS_METRICS is 'views,estimatedMinutesWatched'; only the first
+    // is affected, and the note must not claim the watch-time metric moved.
+    const n = viewCountingNoticeFor('2026-05-01', '2026-09-05', 'views,estimatedMinutesWatched');
+    expect(n?.affectedMetrics).toEqual(['views']);
+    expect(n?.message).not.toContain('estimatedMinutesWatched');
+  });
+
+  it('reports a rolling window that straddles the change as mixing definitions', () => {
+    // A 30-day window ending after the change, which is what
+    // get-traffic-sources produces unattended.
+    const n = viewCountingNoticeFor('2026-07-26', '2026-08-25', 'views');
+    expect(n?.spansChange).toBe(true);
+    expect(n?.affectedRange).toEqual({ startDate: '2026-07-26', endDate: '2026-08-23' });
+    expect(n?.message).toContain('mix the two');
+  });
+
+  it('goes quiet once the rolling window clears the change date', () => {
+    // 30 days after the change these commands stop warning on their own.
+    expect(viewCountingNoticeFor('2026-09-24', '2026-10-24', 'views')).toBeUndefined();
+  });
+});
+
+/**
  * engagedViews support (#175), from the live sweep on 2026-08-24 (the day the
  * view-counting change took effect, which is the first day the metric could be
  * measured post-cutoff). Snapshot: docs/analytics-compat-snapshot.json.

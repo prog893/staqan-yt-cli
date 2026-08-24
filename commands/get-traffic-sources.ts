@@ -32,6 +32,20 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
     console.log('');
 
     const outputFormat = await getOutputFormat(options.output);
+    // #178 view-counting caveat. These reports send a fixed `views` metric
+    // set the caller cannot widen, so unlike the custom-query commands there
+    // is no way to ask for `engagedViews` instead and sidestep the ambiguity.
+    // Whether they should also return `engagedViews` is #185; that decision
+    // changes the output shape, while this note does not, so it is not
+    // blocked on it.
+    //
+    // Human-facing formats only, on stderr, matching get-video-analytics and
+    // get-channel-analytics: json/csv/table are what scripts read and a note
+    // they cannot parse is noise there. MCP callers read `viewCountingNotice`
+    // off the result instead.
+    if (result.viewCountingNotice && (outputFormat === 'pretty' || outputFormat === 'text')) {
+      process.stderr.write(`${result.viewCountingNotice.message}\n`);
+    }
 
     // Traffic source labels
     const sourceLabels: { [key: string]: string } = {

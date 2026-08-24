@@ -411,6 +411,12 @@ export interface VideoReportResult {
   dateRange: { startDate: string; endDate: string };
   columnHeaders: { name?: string | null }[];
   rows: unknown[][];
+  /**
+   * Set when the range reaches back before the 2026-08-24 view-counting
+   * change. These reports send a fixed `views` metric set, so the caveat
+   * applies to every row they return.
+   */
+  viewCountingNotice?: ViewCountingNotice;
 }
 
 /**
@@ -487,6 +493,7 @@ export async function fetchTrafficSources(params: {
     dateRange: { startDate: params.startDate, endDate: params.endDate },
     columnHeaders: response.data.columnHeaders || [],
     rows: response.data.rows || [],
+    viewCountingNotice: viewCountingNoticeFor(params.startDate, params.endDate, 'views'),
   };
 }
 
@@ -525,6 +532,7 @@ export async function fetchSearchTerms(params: {
     dateRange: { startDate: params.startDate, endDate: params.endDate },
     columnHeaders: response.data.columnHeaders || [],
     rows: response.data.rows || [],
+    viewCountingNotice: viewCountingNoticeFor(params.startDate, params.endDate, 'views'),
   };
 }
 
@@ -1034,6 +1042,12 @@ export interface ChannelSearchTermsResult {
   dateRange: { startDate: string; endDate: string };
   columnHeaders: { name?: string | null }[];
   rows: unknown[][];
+  /**
+   * Set when the range reaches back before the 2026-08-24 view-counting
+   * change. `SEARCH_TERMS_METRICS` always sends `views`, so the caveat
+   * applies to every row this returns.
+   */
+  viewCountingNotice?: ViewCountingNotice;
 }
 
 // Metrics for insightTrafficSourceDetail with insightTrafficSourceType==YT_SEARCH.
@@ -1128,5 +1142,6 @@ export async function fetchChannelSearchTerms(params: ChannelSearchTermsParams):
     dateRange: { startDate, endDate },
     columnHeaders: response.data.columnHeaders || [],
     rows: response.data.rows || [],
+    viewCountingNotice: viewCountingNoticeFor(startDate, endDate, SEARCH_TERMS_METRICS),
   };
 }
