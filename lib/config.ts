@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { Config, ConfigKey, OutputFormat } from '../types';
-import { CONFIG_DIR, warning } from './utils';
+import { CONFIG_DIR, warning, loadJsonIfPresent } from './utils';
 
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 
@@ -48,13 +48,12 @@ async function ensureConfigDir(): Promise<void> {
  * Returns null if the file doesn't exist or is invalid.
  */
 async function loadRawConfig(): Promise<Config | null> {
-  try {
-    await ensureConfigDir();
-    const data = await fs.readFile(CONFIG_PATH, 'utf-8');
-    return JSON.parse(data) as Config;
-  } catch {
-    return null;
-  }
+  await ensureConfigDir();
+  // Damaged config throws rather than reading as "no config set" (#195). That
+  // silent fallback was the worst of the six: a stray comma from a hand-edit
+  // made default.channel and default.output stop applying, with the CLI
+  // behaving exactly as though they had never been set.
+  return loadJsonIfPresent<Config>(CONFIG_PATH, 'config');
 }
 
 /**
@@ -62,30 +61,31 @@ async function loadRawConfig(): Promise<Config | null> {
  * Returns default config if file doesn't exist
  */
 export async function loadConfig(): Promise<Config> {
-  try {
-    await ensureConfigDir();
-    const data = await fs.readFile(CONFIG_PATH, 'utf-8');
-    const config = JSON.parse(data) as Config;
+  await ensureConfigDir();
 
-    // Merge with defaults to ensure all keys exist
-    return {
-      cache: {
-        ...DEFAULT_CONFIG.cache,
-        ...config.cache,
-      },
-      default: {
-        ...DEFAULT_CONFIG.default,
-        ...config.default,
-      },
-      lock: {
-        ...DEFAULT_CONFIG.lock,
-        ...config.lock,
-      },
-    };
-  } catch {
-    // File doesn't exist or is invalid - return defaults
-    return { ...DEFAULT_CONFIG };
-  }
+  // Throws on a damaged config rather than returning defaults (#195). This is
+  // the function that decides what every command actually does, so the old
+  // catch-all was the most consequential of the six: a malformed config.json
+  // made default.channel and default.output stop applying with no message,
+  // which looks exactly like never having set them.
+  const config = await loadJsonIfPresent<Config>(CONFIG_PATH, 'config');
+  if (!config) return { ...DEFAULT_CONFIG };
+
+  // Merge with defaults to ensure all keys exist
+  return {
+    cache: {
+      ...DEFAULT_CONFIG.cache,
+      ...config.cache,
+    },
+    default: {
+      ...DEFAULT_CONFIG.default,
+      ...config.default,
+    },
+    lock: {
+      ...DEFAULT_CONFIG.lock,
+      ...config.lock,
+    },
+  };
 }
 
 /**

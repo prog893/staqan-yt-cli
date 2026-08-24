@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { CONFIG_DIR, debug, warning } from './utils';
+import { CONFIG_DIR, debug, warning, loadJsonIfPresent } from './utils';
 import { CacheIndex, CacheIndexEntry, ReportMetadata, CacheCoverage } from '../types';
 
 // Base data directory
@@ -74,8 +74,18 @@ export async function loadCacheIndex(channelId: string, channelHandle?: string):
     }
 
     return index;
-  } catch {
-    debug(`Cache index not found or invalid for channel ${channelId}, creating new one`);
+  } catch (err) {
+    // A damaged index is not the same as no index (#195), and the difference
+    // is expensive here: the archive files stay on disk, but an empty index
+    // makes every one of them invisible, so the next fetch re-downloads work
+    // already held locally and then writes an index that no longer references
+    // the old files. Reported with the same recovery guidance the version
+    // mismatch above uses, rather than a debug line nobody sees.
+    const indexPath = getChannelCacheIndexPath(channelId);
+    const channelArg = channelHandle ?? channelId;
+    warning(`Cache index unreadable, treating the archive as empty: ${(err as Error).message}`);
+    warning(`  To rebuild: staqan-yt fetch-reports --channel ${channelArg}`);
+    warning(`  Index file: ${indexPath}`);
     return {
       version: CACHE_INDEX_VERSION,
       lastUpdated: new Date().toISOString(),
@@ -277,10 +287,15 @@ export async function loadReportMetadata(
 ): Promise<ReportMetadata | null> {
   const { metadata: metadataPath } = getReportPaths(channelId, reportId, reportTypeId);
 
+  // A damaged sidecar is reported, not silently treated as absent (#195).
+  // Both still return null here, because the caller's recovery is the same
+  // either way today, but the two are no longer indistinguishable in the
+  // output. Rebuilding a damaged sidecar from the index is #192, and it
+  // depends on exactly this split existing.
   try {
-    const data = await fs.readFile(metadataPath, 'utf-8');
-    return JSON.parse(data) as ReportMetadata;
-  } catch {
+    return await loadJsonIfPresent<ReportMetadata>(metadataPath, 'report metadata');
+  } catch (err) {
+    warning(`Ignoring unreadable report metadata: ${(err as Error).message}`);
     return null;
   }
 }
