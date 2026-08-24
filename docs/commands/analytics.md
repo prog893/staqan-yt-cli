@@ -454,17 +454,21 @@ staqan-yt get-channel-analytics @yourchannel --output csv > demographics.csv
 
 #### Columns
 
-Every report except `demographics` returns the same metric columns, in this
-order (#185):
+Every **predefined** report except `demographics` returns the same metric
+columns, in this order (#185):
 
-```
+```text
 <dimension...>, views, engagedViews, estimatedMinutesWatched
 ```
 
 `demographics` returns `viewerPercentage` instead, a share rather than a
 count, so the view-counting distinction does not apply to it.
 
-Rows are ranked by `views`. `engagedViews` applies the stricter pre-2026-08-24
+This describes `--report` only. A custom `--dimensions`/`--metrics` query
+returns whatever metrics it selects, in the order it selects them, sorted by
+`--sort` (see [Custom Queries](#custom-queries) below).
+
+Rows of a predefined report are ranked by `views`. `engagedViews` applies the stricter pre-2026-08-24
 definition and is the column to read when comparing across that date, or when
 the question is engagement rather than reach. The two differ substantially on
 a channel with Shorts: measured over 2026-05-01 to 2026-08-25, `geography`

@@ -45,12 +45,10 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
     console.log('');
 
     const outputFormat = await getOutputFormat(options.output);
-    // #178 view-counting caveat. These reports send a fixed `views` metric
-    // set the caller cannot widen, so unlike the custom-query commands there
-    // is no way to ask for `engagedViews` instead and sidestep the ambiguity.
-    // Whether they should also return `engagedViews` is #185; that decision
-    // changes the output shape, while this note does not, so it is not
-    // blocked on it.
+    // #178 view-counting caveat. SEARCH_TERMS_METRICS is fixed and the caller
+    // cannot widen it, so the notice is the only flag on the ambiguity. Since
+    // #185 that set carries `engagedViews`, so the metric the notice points at
+    // is present in the output.
     //
     // Human-facing formats only, on stderr, matching get-video-analytics and
     // get-channel-analytics: json/csv/table are what scripts read and a note
@@ -114,8 +112,8 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
         // Header and rows in one write so the whole payload is flushed together.
         await writeStdout(
           [
-            ['rank', 'searchTerm', 'views', 'watchTimeMinutes'].join('\t'),
-            ...structuredRows.map(r => [r.rank, r.searchTerm, r.views, r.watchTimeMinutes].join('\t')),
+            ['rank', 'searchTerm', 'views', 'engagedViews', 'watchTimeMinutes'].join('\t'),
+            ...structuredRows.map(r => [r.rank, r.searchTerm, r.views, r.engagedViews, r.watchTimeMinutes].join('\t')),
           ].join('\n') + '\n'
         );
         break;
@@ -176,8 +174,10 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
           console.log('');
         });
 
-        console.log(chalk.bold('Total views from search: ') + chalk.cyan(formatNumber(totalViews)));
-        console.log(chalk.bold('Total engaged views from search: ') + chalk.cyan(formatNumber(totalEngagedViews)));
+        // Scoped to the returned terms. The API caps this report at
+        // CHANNEL_SEARCH_TERMS_MAX_RESULTS, so these are not channel totals.
+        console.log(chalk.bold(`Views from these ${structuredRows.length} terms: `) + chalk.cyan(formatNumber(totalViews)));
+        console.log(chalk.bold(`Engaged views from these ${structuredRows.length} terms: `) + chalk.cyan(formatNumber(totalEngagedViews)));
         console.log('');
         break;
       }

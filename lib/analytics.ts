@@ -413,8 +413,12 @@ export interface VideoReportResult {
   rows: unknown[][];
   /**
    * Set when the range reaches back before the 2026-08-24 view-counting
-   * change. These reports send a fixed `views` metric set, so the caveat
-   * applies to every row they return.
+   * change.
+   *
+   * These reports send `VIDEO_BREAKDOWN_METRICS` (`views,engagedViews`), a
+   * fixed set the caller cannot widen, so the caveat applies to the `views`
+   * column of every row they return. `engagedViews` is returned alongside it
+   * precisely so the caveat has an answer (#185).
    */
   viewCountingNotice?: ViewCountingNotice;
 }

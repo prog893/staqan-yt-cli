@@ -72,7 +72,7 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
         break;
 
       case 'text':
-        await writeStdout(searchTermsData.map(item => [item.rank, item.searchTerm, item.views].join('\t')).join('\n') + '\n');
+        await writeStdout(searchTermsData.map(item => [item.rank, item.searchTerm, item.views, item.engagedViews].join('\t')).join('\n') + '\n');
         break;
 
       case 'csv':
@@ -85,7 +85,7 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
         break;
 
       case 'pretty':
-      default:
+      default: {
         console.log(chalk.bold.cyan(title));
         console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
         console.log(chalk.gray('Date Range: ') + `${startDate} to ${endDate}`);
@@ -116,10 +116,13 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
         });
 
         console.log('');
-        console.log(chalk.bold('Total views from search: ') + chalk.cyan(formatNumber(totalViews)));
-        console.log(chalk.bold('Total engaged views from search: ') + chalk.cyan(formatNumber(totalEngagedViews)));
+        // Scoped to the returned terms, not all search traffic: the query is
+        // capped by --limit, so these sums cover only the rows above.
+        console.log(chalk.bold(`Views from these ${searchTermsData.length} terms: `) + chalk.cyan(formatNumber(totalViews)));
+        console.log(chalk.bold(`Engaged views from these ${searchTermsData.length} terms: `) + chalk.cyan(formatNumber(totalEngagedViews)));
         console.log('');
         break;
+      }
     }
   });
 }
