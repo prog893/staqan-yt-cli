@@ -60,15 +60,18 @@ staqan-yt get-video --video-id dQw4w9WgXcQ --output table
 - `id` - Video ID
 - `title` - Video title
 - `description` - Video description
-- `channelId` - Channel ID
 - `channelTitle` - Channel name
 - `publishedAt` - Publication date
-- `thumbnail` - Thumbnail URL (default quality)
-- `viewCount` - View count
-- `likeCount` - Like count
-- `commentCount` - Comment count
+- `thumbnails` - Object keyed by size: `default`, `medium`, `high`, `standard`, `maxres`
+- `videoType` - `short` or `regular`
+- `privacyStatus` - `public`, `unlisted` or `private`
+- `categoryId` - YouTube category ID
 - `duration` - Video duration (ISO 8601)
 - `tags` - Video tags
+- `statistics` - Object containing `viewCount`, `likeCount`, `commentCount` (numbers)
+
+The counts are **nested under `statistics`**, not top level, so the jq path is
+`.[].statistics.viewCount`. The result is an array even for a single video.
 
 ### Related Commands
 
@@ -179,6 +182,9 @@ staqan-yt search-videos --query "Python" --output csv > results.csv
 - `channelTitle` - Channel name
 - `publishedAt` - Publication date
 - `thumbnail` - Thumbnail URL
+- `videoType` - `short` or `regular`
+
+No statistics here either; `search-videos` returns metadata only.
 
 ### Search Behavior
 
