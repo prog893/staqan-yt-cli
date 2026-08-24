@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { parseVideoId, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, daysAgoYmd, runOrExit, writeStdout } from '../lib/utils';
-import { fetchSearchTerms } from '../lib/analytics';
+import { fetchSearchTerms, emitViewCountingNotice } from '../lib/analytics';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { SearchTermsOptions } from '../types';
@@ -33,6 +33,18 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
     console.log('');
 
     const outputFormat = await getOutputFormat(options.output);
+    // #178 view-counting caveat. These reports send a fixed `views` metric
+    // set the caller cannot widen, so unlike the custom-query commands there
+    // is no way to ask for `engagedViews` instead and sidestep the ambiguity.
+    // Whether they should also return `engagedViews` is #185; that decision
+    // changes the output shape, while this note does not, so it is not
+    // blocked on it.
+    //
+    // Human-facing formats only, on stderr, matching get-video-analytics and
+    // get-channel-analytics: json/csv/table are what scripts read and a note
+    // they cannot parse is noise there. MCP callers read `viewCountingNotice`
+    // off the result instead.
+    emitViewCountingNotice(result.viewCountingNotice, outputFormat);
     const searchTermsData = rows.map((row, index) => ({
       rank: index + 1,
       searchTerm: row[0] as string,

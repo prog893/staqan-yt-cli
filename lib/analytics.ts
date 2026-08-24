@@ -411,6 +411,12 @@ export interface VideoReportResult {
   dateRange: { startDate: string; endDate: string };
   columnHeaders: { name?: string | null }[];
   rows: unknown[][];
+  /**
+   * Set when the range reaches back before the 2026-08-24 view-counting
+   * change. These reports send a fixed `views` metric set, so the caveat
+   * applies to every row they return.
+   */
+  viewCountingNotice?: ViewCountingNotice;
 }
 
 /**
@@ -487,6 +493,7 @@ export async function fetchTrafficSources(params: {
     dateRange: { startDate: params.startDate, endDate: params.endDate },
     columnHeaders: response.data.columnHeaders || [],
     rows: response.data.rows || [],
+    viewCountingNotice: viewCountingNoticeFor(params.startDate, params.endDate, 'views'),
   };
 }
 
@@ -525,6 +532,7 @@ export async function fetchSearchTerms(params: {
     dateRange: { startDate: params.startDate, endDate: params.endDate },
     columnHeaders: response.data.columnHeaders || [],
     rows: response.data.rows || [],
+    viewCountingNotice: viewCountingNoticeFor(params.startDate, params.endDate, 'views'),
   };
 }
 
@@ -752,6 +760,41 @@ export function viewCountingNoticeFor(
   metrics: string,
 ): ViewCountingNotice | undefined {
   return buildViewCountingNotice(startDate, endDate, splitFields(metrics), ANALYTICS_VOCABULARY);
+}
+
+/**
+ * Output formats the notice is written for. `json`, `csv` and `table` are what
+ * scripts parse, and a prose note they cannot read is noise there.
+ */
+const NOTICE_OUTPUT_FORMATS = new Set(['pretty', 'text']);
+
+/**
+ * Write a view-counting notice for the human-facing output formats, and
+ * report whether it was written.
+ *
+ * Extracted because five commands had reimplemented the same two conditions
+ * (`get-video-analytics`, `get-channel-analytics`, `get-traffic-sources`,
+ * `get-search-terms`, `get-channel-search-terms`). Five copies of a rule about
+ * which stream carries what is five chances for one of them to drift onto
+ * stdout and corrupt a piped result.
+ *
+ * `get-report-data` deliberately does NOT use this: it prints its notice for
+ * every format, alongside its unconditional Incomplete Data warning. That is a
+ * different rule, so it stays a separate call rather than a flag here.
+ *
+ * `stream` exists so tests can assert both the content and the routing without
+ * capturing the real process streams. It defaults to stderr, never stdout,
+ * because stdout carries the machine-readable output.
+ */
+export function emitViewCountingNotice(
+  notice: ViewCountingNotice | undefined,
+  outputFormat: string,
+  stream: { write(chunk: string): unknown } = process.stderr,
+): boolean {
+  if (!notice) return false;
+  if (!NOTICE_OUTPUT_FORMATS.has(outputFormat)) return false;
+  stream.write(`${notice.message}\n`);
+  return true;
 }
 
 /**
@@ -1106,6 +1149,12 @@ export interface ChannelSearchTermsResult {
   dateRange: { startDate: string; endDate: string };
   columnHeaders: { name?: string | null }[];
   rows: unknown[][];
+  /**
+   * Set when the range reaches back before the 2026-08-24 view-counting
+   * change. `SEARCH_TERMS_METRICS` always sends `views`, so the caveat
+   * applies to every row this returns.
+   */
+  viewCountingNotice?: ViewCountingNotice;
 }
 
 // Metrics for insightTrafficSourceDetail with insightTrafficSourceType==YT_SEARCH.
@@ -1200,5 +1249,6 @@ export async function fetchChannelSearchTerms(params: ChannelSearchTermsParams):
     dateRange: { startDate, endDate },
     columnHeaders: response.data.columnHeaders || [],
     rows: response.data.rows || [],
+    viewCountingNotice: viewCountingNoticeFor(startDate, endDate, SEARCH_TERMS_METRICS),
   };
 }

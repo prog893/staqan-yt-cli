@@ -14,6 +14,7 @@ import {
   SORTABLE_METRIC_PREFERENCE,
   CHANNEL_REPORT_TYPES,
   viewCountingNoticeFor,
+  emitViewCountingNotice,
   viewCountingNoticeForColumns,
   VIEW_COUNTING_CHANGE_DATE,
   VIEW_COUNTING_CHANGE_URL,
@@ -469,6 +470,119 @@ describe('view-counting change notice for report columns (#177)', () => {
     expect(n?.affectedMetrics).toEqual(['red_views']);
     // `red_views` contains "views", so the check has to exclude that match.
     expect(n?.message).not.toMatch(/(^|[^_])\bviews\b/);
+  });
+});
+
+/**
+ * The fixed-shape reports send metric sets the caller cannot override, so the
+ * notice has to be derived from what each one hardcodes rather than from a
+ * user-supplied `--metrics` (#185's sites, but not #185's decision).
+ *
+ * `get-traffic-sources` is the sharpest case: it exposes no date flags at all
+ * and hardcodes a rolling 30-day window, so for the first 30 days after
+ * 2026-08-24 its one and only behaviour straddles the change.
+ */
+/**
+ * Which stream carries the notice, and for which output formats (#178, #190).
+ *
+ * This is the rule five commands had each reimplemented inline before it was
+ * extracted: get-video-analytics, get-channel-analytics, get-traffic-sources,
+ * get-search-terms and get-channel-search-terms. Five copies of a decision
+ * about stream routing is five chances for one to drift onto stdout, which
+ * would corrupt any piped result rather than merely annoy the reader.
+ *
+ * A fake stream is injected so both the content and the routing are asserted
+ * without touching the real process streams.
+ */
+describe('emitViewCountingNotice routing', () => {
+  const notice = viewCountingNoticeFor('2026-05-01', '2026-09-05', 'views')!;
+  const sink = () => {
+    const written: string[] = [];
+    return { written, write(c: string) { written.push(c); return true; } };
+  };
+
+  it('writes for the human-facing formats', () => {
+    for (const fmt of ['pretty', 'text']) {
+      const s = sink();
+      expect(emitViewCountingNotice(notice, fmt, s)).toBe(true);
+      expect(s.written).toHaveLength(1);
+      expect(s.written[0]).toBe(`${notice.message}\n`);
+    }
+  });
+
+  it('writes nothing for the machine-readable formats', () => {
+    // These are what scripts parse. A prose note they cannot read is noise,
+    // and on stdout it would be corruption.
+    for (const fmt of ['json', 'csv', 'table']) {
+      const s = sink();
+      expect(emitViewCountingNotice(notice, fmt, s)).toBe(false);
+      expect(s.written).toEqual([]);
+    }
+  });
+
+  it('writes nothing when there is no notice', () => {
+    // The undefined case is the common one: any range starting on or after
+    // the change date produces no notice at all.
+    const s = sink();
+    expect(emitViewCountingNotice(undefined, 'pretty', s)).toBe(false);
+    expect(s.written).toEqual([]);
+  });
+
+  it('does not treat an unknown format as human-facing', () => {
+    // Fails closed: a format added later stays out of stdout's way until
+    // someone opts it in deliberately.
+    const s = sink();
+    expect(emitViewCountingNotice(notice, 'yaml', s)).toBe(false);
+    expect(s.written).toEqual([]);
+  });
+
+  it('defaults to stderr, never stdout', () => {
+    // The default argument is the actual routing decision, so pin it.
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const origOut = process.stdout.write;
+    const origErr = process.stderr.write;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdout as any).write = (c: string) => { stdout.push(String(c)); return true; };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stderr as any).write = (c: string) => { stderr.push(String(c)); return true; };
+    try {
+      emitViewCountingNotice(notice, 'pretty');
+    } finally {
+      process.stdout.write = origOut;
+      process.stderr.write = origErr;
+    }
+    expect(stderr.join('')).toContain(notice.message);
+    expect(stdout).toEqual([]);
+  });
+});
+
+describe('view-counting notice for fixed-metric reports', () => {
+  it('fires for the traffic-source and per-video search-term metric set', () => {
+    // Both send exactly `views`.
+    expect(viewCountingNoticeFor('2026-07-26', '2026-08-25', 'views')).toBeDefined();
+  });
+
+  it('fires for the channel search-terms metric set', () => {
+    // SEARCH_TERMS_METRICS is 'views,estimatedMinutesWatched'; only the first
+    // is affected, and the note must not claim the watch-time metric moved.
+    const n = viewCountingNoticeFor('2026-05-01', '2026-09-05', 'views,estimatedMinutesWatched');
+    expect(n?.affectedMetrics).toEqual(['views']);
+    expect(n?.message).not.toContain('estimatedMinutesWatched');
+  });
+
+  it('reports a rolling window that straddles the change as mixing definitions', () => {
+    // A 30-day window ending after the change, which is what
+    // get-traffic-sources produces unattended.
+    const n = viewCountingNoticeFor('2026-07-26', '2026-08-25', 'views');
+    expect(n?.spansChange).toBe(true);
+    expect(n?.affectedRange).toEqual({ startDate: '2026-07-26', endDate: '2026-08-23' });
+    expect(n?.message).toContain('mix the two');
+  });
+
+  it('goes quiet once the rolling window clears the change date', () => {
+    // 30 days after the change these commands stop warning on their own.
+    expect(viewCountingNoticeFor('2026-09-24', '2026-10-24', 'views')).toBeUndefined();
   });
 });
 
