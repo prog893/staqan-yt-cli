@@ -450,6 +450,33 @@ staqan-yt get-channel-analytics @yourchannel \
   --metrics estimatedMinutesWatched
 ```
 
+#### `--dimensions video` is not supported here
+
+A per-video breakdown is a top-N report, and the Analytics API requires
+`maxResults` for it. This command does not send one, so
+`--dimensions video` is rejected with the opaque `The query is not supported`
+**for every metric set**, including `--metrics views`. Measured 2026-08-24:
+
+| query | result |
+|---|---|
+| `dimensions=video` + metrics, no sort | rejected |
+| `+ sort=-engagedViews` | rejected |
+| `+ sort=-engagedViews` **+ `maxResults`** | accepted |
+| `+ sort=engagedViews` (ascending) + `maxResults` | rejected |
+
+That report also accepts **descending sort only**, so it would need more than a
+passthrough flag to support properly.
+
+For per-video numbers, use `get-video-analytics` on each video ID:
+
+```bash
+staqan-yt list-videos @yourchannel --limit 20 --output json | jq -r '.[].id' | \
+  while read id; do
+    staqan-yt get-video-analytics --video-id "$id" \
+      --metrics views,engagedViews --output csv | tail -1
+  done
+```
+
 #### Row order
 
 The Analytics API only sorts by a field the query itself selects, so a custom
