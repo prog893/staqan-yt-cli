@@ -41,6 +41,7 @@ import {
 import { getAuthenticatedChannelId, assertChannelMatchesAuthenticated } from './youtube';
 import { getConfigValue } from './config';
 import { acquireLock, getLockPath } from './lock';
+import { viewCountingNoticeForColumns, ViewCountingNotice } from './analytics';
 import { CacheIndexEntry } from '../types';
 
 /**
@@ -573,6 +574,16 @@ export type ReportDataResult =
        * consumers read this, so gaps are reported from one source of truth.
        */
       uncoveredRanges: { startDate: string; endDate: string }[];
+      /**
+       * Set when the rows reach back before the 2026-08-24 view-counting
+       * change and carry a column the change moved (#177).
+       *
+       * The bulk path is where this bites hardest: an archive accumulates for
+       * months, so one call routinely merges reports from both sides of the
+       * date, and the CSV gives no sign of it. The header row is identical on
+       * both sides and `views` keeps its name while changing its meaning.
+       */
+      viewCountingNotice?: ViewCountingNotice;
       cachedReports: CacheIndexEntry[];
       fetchedReports: FetchedReportInfo[];
     };
@@ -819,6 +830,18 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
   const cachedData: Record<string, string>[] = [];
   const cachedReports: CacheIndexEntry[] = [];
 
+  /**
+   * Header row of every report that contributed rows, cached or freshly
+   * downloaded (#177).
+   *
+   * Used only to decide whether the merged result carries a view column at
+   * all, which is what the view-counting notice keys on. Both sources already
+   * parse their headers for their own reasons (`readCachedReport` validates
+   * them against the sidecar metadata, `downloadReport` returns them
+   * alongside the rows), so collecting them costs no extra reads.
+   */
+  const contributingColumns: string[][] = [];
+
   const overlappingCached = await findCachedReports(channelId, params.type, adjustedStart, adjustedEnd);
 
   // Collapse reissues before loading. YouTube publishes several reportIds for
@@ -840,6 +863,7 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
     if (reportData) {
       cachedData.push(...reportData.data);
       cachedReports.push(cachedReport);
+      contributingColumns.push(reportData.headers);
       debug(`Loaded from cache: ${cachedReport.reportId}`);
     }
   }
@@ -957,6 +981,7 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
     }
 
     fetchedData.push(...data);
+    contributingColumns.push(headers);
     if (dataMinDate && dataMaxDate) {
       fetchedWindows.push({ min: dataMinDate, max: dataMaxDate });
       fetchedCoverage.push({ min: dataMinDate, max: dataMaxDate });
@@ -1033,6 +1058,21 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
   const uncoveredRanges = findDateGaps(coveredRanges, adjustedStart, adjustedEnd)
     .map((gap) => ({ startDate: gap.start, endDate: gap.end }));
 
+  // View-counting caveat (#177), keyed on the range the rows actually cover
+  // rather than the requested one: `adjustedRange` is what was clamped to
+  // available data, so it is what a consumer will be summing.
+  //
+  // The union of contributing columns, not the intersection: if any report in
+  // the merge carries `views`, the merged result carries a `views` column and
+  // the caveat applies to it.
+  const allColumns = new Set<string>();
+  for (const cols of contributingColumns) for (const col of cols) allColumns.add(col);
+  const viewCountingNotice = viewCountingNoticeForColumns(
+    adjustedStart,
+    adjustedEnd,
+    [...allColumns],
+  );
+
   return {
     status: 'ok',
     jobId,
@@ -1042,6 +1082,7 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
     adjustedRange: { startDate: adjustedStart, endDate: adjustedEnd },
     availableRange: { startDate: effectiveMinDate, endDate: effectiveMaxDate },
     uncoveredRanges,
+    viewCountingNotice,
     cachedReports,
     fetchedReports: reportsToFetch,
   };

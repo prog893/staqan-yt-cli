@@ -25,6 +25,64 @@ The YouTube Reporting API provides bulk reports that:
 
 ---
 
+## The 2026-08-24 view-counting change
+
+On **2026-08-24** YouTube aligned view counting across formats: a view is
+counted from the first frame of playback, with no minimum watch time. Dates
+from that day onward are measured that way, earlier dates are not. The stricter
+previous definition survives as the **`engaged_views`** column.
+
+This affects the Reporting API more than the Analytics API, for one reason:
+a local archive accumulates for months, and `get-report-data` merges every
+archived report overlapping the requested range into a single result. A range
+spanning the change therefore mixes both definitions in one `views` column,
+and the CSV gives no sign of it. The header row is identical either side of
+the date, and `views` keeps its name while changing its meaning.
+
+- **`views` is not one series.** A range starting before 2026-08-24 and ending
+  on or after it carries both definitions in the same column, so summing that
+  column produces a figure that is not a count of anything.
+- **Older data is not comparable to newer data.** A range lying entirely before
+  the change is internally consistent, but its `views` cannot be compared
+  against `views` for later dates.
+- **`engaged_views` is consistent across the boundary.** Use it when comparing
+  across the change date, or against anything archived before it.
+- `red_views` is affected the same way as `views`.
+
+`engaged_views` is not new. YouTube added it on 2025-06-24, shipping it as a
+report-type version bump (`channel_basic_a2` to `channel_basic_a3`) rather than
+altering the existing type in place, so every archived report of the current
+version already carries it. Report types whose columns change always get a new
+ID this way, which is why a single `--type` never returns mixed schemas.
+
+`get-report-data` prints a note on stderr when the returned rows reach back
+before the change. Unlike the analytics commands, which restrict their
+equivalent note to `--output pretty` and `--output text`, this one appears for
+every output format: it sits alongside the Incomplete Data warning, which is
+the same class of caveat and is likewise unconditional. stderr keeps stdout
+parseable either way.
+
+```console
+$ staqan-yt get-report-data --type channel_basic_a3 \
+    --start-date 2026-05-01 --end-date 2026-08-24 --output csv > rows.csv
+⚠️  Note: views, red_views for 2026-05-01 to 2026-08-22 is counted under the
+definition used before 2026-08-24, so it is not comparable to views, red_views
+for dates from 2026-08-24 onward, which counts every playback from the first
+frame. engaged_views keeps the stricter definition throughout.
+https://support.google.com/youtube/answer/2991785
+```
+
+Report types carrying no view column (`channel_demographics_a1`, for instance,
+which reports `views_percentage`) never produce the note.
+
+MCP callers get the same signal as a `viewCountingNotice` object on the result,
+carrying `changeDate`, `affectedMetrics`, `affectedRange` and `spansChange`, so
+the date does not have to be hardcoded downstream.
+
+**Reference:** [How YouTube counts views](https://support.google.com/youtube/answer/2991785)
+
+---
+
 ## list-report-types
 
 List all available YouTube Reporting API report types.

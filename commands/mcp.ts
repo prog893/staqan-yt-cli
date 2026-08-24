@@ -465,7 +465,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: 'youtube_get_report_data',
-    description: 'Get YouTube Reporting API report data including thumbnail impressions, CTR, and other metrics. IMPORTANT: Thumbnail CTR data is ONLY available through the Reporting API, not regular analytics. Check `uncoveredRanges` in the result before treating the rows as complete: `availableRange` is only an outer bound, and any dates listed there had no source data (expired from the API and never archived locally).',
+    description: 'Get YouTube Reporting API report data including thumbnail impressions, CTR, and other metrics. IMPORTANT: Thumbnail CTR data is ONLY available through the Reporting API, not regular analytics. Check `uncoveredRanges` in the result before treating the rows as complete: `availableRange` is only an outer bound, and any dates listed there had no source data (expired from the API and never archived locally). When the result carries `viewCountingNotice`, the returned rows reach back before the 2026-08-24 view-counting change, so the CSV columns named in its `affectedMetrics` (`views` and/or `red_views`) are not measured consistently across the rows; do not sum or compare that column across the change date, and report the caveat rather than presenting a total. The `engaged_views` column keeps the stricter pre-change definition throughout and is the one to use for a comparison spanning that date.',
     inputSchema: {
       type: 'object',
       properties: {
