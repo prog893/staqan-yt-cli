@@ -112,8 +112,9 @@ staqan-yt get-video-analytics --video-id dQw4w9WgXcQ --output json
 
 ### Default Metrics
 
-If no `--metrics` specified, fetches these eight (`DEFAULT_VIDEO_METRICS` in `lib/analytics.ts`):
-- `views` - Total views
+If no `--metrics` specified, fetches these nine (`DEFAULT_VIDEO_METRICS` in `lib/analytics.ts`):
+- `views` - Every playback, counted from the first frame
+- `engagedViews` - Views under the stricter pre-2026-08-24 definition
 - `estimatedMinutesWatched` - Total watch time
 - `averageViewDuration` - Average view duration (seconds)
 - `averageViewPercentage` - Average share of the video watched
@@ -122,18 +123,41 @@ If no `--metrics` specified, fetches these eight (`DEFAULT_VIDEO_METRICS` in `li
 - `comments` - Total comments
 - `shares` - Total shares
 
-The last four are unavailable for most dimensions, so pass `--metrics views` when using `--dimensions`. See [Dimension Compatibility Guide](../dimension-compatibility.md#metrics-decide-more-than-dimensions-do).
+`likes`, `dislikes`, `comments` and `shares` are unavailable for most
+dimensions and get dropped automatically when you pass `--dimensions`.
+`views` and `engagedViews` are permitted by every valid dimension, so neither
+is ever dropped. See [Dimension Compatibility Guide](../dimension-compatibility.md#metrics-decide-more-than-dimensions-do).
 
 ### Available Metrics
 
 Common metrics:
-- `views` - Total views
+- `views` - Every playback, counted from the first frame
+- `engagedViews` - Views under the stricter pre-2026-08-24 definition; the figure tied to monetization
 - `estimatedMinutesWatched` - Total watch time (minutes)
 - `averageViewDuration` - Average view duration (seconds)
 - `subscribersGained` / `subscribersLost` - Subscriber changes
 - `likes` / `dislikes` - Likes/dislikes
 - `shares` - Number of shares
 - `annotationClicks` - Annotation clicks
+
+#### views vs engagedViews
+
+The gap is not cosmetic, and it is concentrated in Shorts. Measured on one
+channel over 2026-07-13..2026-08-23:
+
+| video | type | `views` | `engagedViews` |
+|---|---|---:|---:|
+| a Short | short | 197 | **8** |
+| a Short | short | 245 | **23** |
+| a Short | short | 196 | **13** |
+| long-form | regular | 548 | 548 |
+
+Long-form is identical because a long-form view already counted from the
+start. The 2026-08-24 alignment removed a minimum-watch-time rule that only
+ever applied to Shorts, so that is where the two diverge.
+
+Read `views` for reach and `engagedViews` for engagement and monetization.
+Both are accepted by every valid dimension.
 
 Full list: [YouTube Analytics Metrics](https://developers.google.com/youtube/analytics/v3/dimsmets/mets)
 

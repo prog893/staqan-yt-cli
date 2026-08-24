@@ -264,7 +264,7 @@ const TOOLS: Tool[] = [
         },
         metrics: {
           type: 'string',
-          description: 'Comma-separated list of metrics (default: views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares)',
+          description: 'Comma-separated list of metrics (default: views,engagedViews,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares). `views` counts every playback from the first frame; `engagedViews` applies the stricter pre-2026-08-24 definition and is the figure tied to monetization. On Shorts the two differ sharply (measured: 197 views against 8 engagedViews), so report the one the question calls for rather than assuming they agree. Both are accepted by every valid dimension.',
         },
         dimensions: {
           type: 'string',
