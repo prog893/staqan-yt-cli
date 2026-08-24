@@ -183,6 +183,23 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       process.stderr.write('\n');
     }
 
+    // View-counting caveat (#177). Printed for every output format, unlike
+    // get-video-analytics and get-channel-analytics, which restrict their
+    // copy of this notice to pretty/text.
+    //
+    // The difference is deliberate and follows this command rather than those
+    // two. The Incomplete Data warning immediately above is the same class of
+    // signal ("these numbers are not what they look like") and is already
+    // unconditional here, so gating this one on the format would make
+    // the weaker caveat the more visible of the two. It is also more likely
+    // to apply here than there: an archive accumulates for months, so the
+    // default range on a bulk report reaches back past the change far more
+    // often than an Analytics query does. stderr keeps stdout parseable.
+    if (result.viewCountingNotice) {
+      process.stderr.write(chalk.yellow('⚠️  ') + result.viewCountingNotice.message + '\n');
+      process.stderr.write('\n');
+    }
+
     // Show expiration warning for the reports used
     const now = new Date();
     const jobCreated = new Date(result.jobCreateTime);

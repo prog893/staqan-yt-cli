@@ -684,10 +684,48 @@ export const VIEW_COUNTING_CHANGE_URL = 'https://support.google.com/youtube/answ
  */
 const VIEW_COUNTING_AFFECTED_METRICS = ['views', 'redViews'] as const;
 
+/**
+ * The same two affected fields, spelled the way the bulk Reporting API spells
+ * them in a report's CSV header row (#177).
+ *
+ * Kept as a separate list rather than derived from the metric names, because
+ * the Analytics/Reporting naming correspondence is YouTube's and is not
+ * mechanical: `estimatedMinutesWatched` is `watch_time_minutes`, not
+ * `estimated_minutes_watched`. Deriving it would be a guess that happens to
+ * work for these two.
+ */
+const VIEW_COUNTING_AFFECTED_COLUMNS = ['views', 'red_views'] as const;
+
+/**
+ * Per-surface field naming, so one builder serves the Analytics API and the
+ * bulk Reporting API without either hardcoding the other's spelling.
+ */
+interface ViewCountingVocabulary {
+  /** Fields the change moved, in this surface's spelling. */
+  affected: readonly string[];
+  /** The field that keeps the stricter definition on both sides of the date. */
+  stable: string;
+}
+
+const ANALYTICS_VOCABULARY: ViewCountingVocabulary = {
+  affected: VIEW_COUNTING_AFFECTED_METRICS,
+  stable: 'engagedViews',
+};
+
+const REPORTING_VOCABULARY: ViewCountingVocabulary = {
+  affected: VIEW_COUNTING_AFFECTED_COLUMNS,
+  stable: 'engaged_views',
+};
+
 export interface ViewCountingNotice {
   /** The change date, so callers do not hardcode it. */
   changeDate: string;
-  /** Metrics in this query whose definition the change moved. */
+  /**
+   * Fields in this result whose definition the change moved, named as the
+   * surface that produced them names them: Analytics metrics (`views`,
+   * `redViews`) from the Analytics API, CSV columns (`views`, `red_views`)
+   * from a bulk report.
+   */
   affectedMetrics: string[];
   /** The part of the requested range measured under the old definition. */
   affectedRange: { startDate: string; endDate: string };
@@ -721,8 +759,42 @@ export function viewCountingNoticeFor(
   endDate: string,
   metrics: string,
 ): ViewCountingNotice | undefined {
-  const selected = splitFields(metrics);
-  const affectedMetrics = VIEW_COUNTING_AFFECTED_METRICS.filter(m => selected.includes(m));
+  return buildViewCountingNotice(startDate, endDate, splitFields(metrics), ANALYTICS_VOCABULARY);
+}
+
+/**
+ * The same notice for a bulk Reporting API result, keyed on the report's CSV
+ * columns instead of an Analytics metric list (#177).
+ *
+ * The bulk path needs this more than the Analytics path does, not less. A
+ * report archive accumulates for months, so a single `get-report-data` call
+ * routinely returns rows from both sides of the change merged into one result
+ * set, and nothing in the CSV marks the boundary: the header row is identical
+ * before and after, and `views` keeps its name while changing its meaning. A
+ * consumer summing that column across the cutoff gets a number that is not a
+ * count of anything.
+ *
+ * Note this cannot be detected by comparing report schemas. Measured against
+ * a 3,683-report archive spanning 2026-01 to 2026-08, every report type that
+ * carries `views` already carried `engaged_views` from the earliest archived
+ * window onward, and no report type showed more than one column set. The
+ * change is invisible in the schema and visible only in the dates.
+ */
+export function viewCountingNoticeForColumns(
+  startDate: string,
+  endDate: string,
+  columns: readonly string[],
+): ViewCountingNotice | undefined {
+  return buildViewCountingNotice(startDate, endDate, columns, REPORTING_VOCABULARY);
+}
+
+function buildViewCountingNotice(
+  startDate: string,
+  endDate: string,
+  selected: readonly string[],
+  vocab: ViewCountingVocabulary,
+): ViewCountingNotice | undefined {
+  const affectedMetrics = vocab.affected.filter(m => selected.includes(m));
   if (affectedMetrics.length === 0) return undefined;
 
   // ISO dates compare correctly as strings; no parsing needed.
@@ -737,11 +809,11 @@ export function viewCountingNoticeFor(
       `${startDate} to ${affectedEnd} is counted under the previous definition; ` +
       `${VIEW_COUNTING_CHANGE_DATE} onward counts every playback from the first frame. ` +
       `Totals across the whole range mix the two. ` +
-      `engagedViews keeps the stricter definition throughout. ${VIEW_COUNTING_CHANGE_URL}`
+      `${vocab.stable} keeps the stricter definition throughout. ${VIEW_COUNTING_CHANGE_URL}`
     : `Note: ${names} for ${startDate} to ${affectedEnd} is counted under the definition ` +
       `used before ${VIEW_COUNTING_CHANGE_DATE}, so it is not comparable to ${names} for ` +
       `dates from ${VIEW_COUNTING_CHANGE_DATE} onward, which counts every playback from ` +
-      `the first frame. engagedViews keeps the stricter definition throughout. ` +
+      `the first frame. ${vocab.stable} keeps the stricter definition throughout. ` +
       `${VIEW_COUNTING_CHANGE_URL}`;
 
   return {

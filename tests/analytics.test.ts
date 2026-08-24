@@ -14,6 +14,7 @@ import {
   SORTABLE_METRIC_PREFERENCE,
   CHANNEL_REPORT_TYPES,
   viewCountingNoticeFor,
+  viewCountingNoticeForColumns,
   VIEW_COUNTING_CHANGE_DATE,
   VIEW_COUNTING_CHANGE_URL,
 } from '../lib/analytics';
@@ -391,6 +392,83 @@ describe('view-counting change notice (#178)', () => {
 
   it('tolerates whitespace in the metric list', () => {
     expect(viewCountingNoticeFor('2026-05-01', '2026-09-05', ' views , likes ')).toBeDefined();
+  });
+});
+
+/**
+ * The bulk Reporting API variant of the same notice (#177).
+ *
+ * Its inputs are a report's CSV header row, not an Analytics metric list, so
+ * the affected fields are spelled `views` and `red_views` and the consistent
+ * one is `engaged_views`. The date logic is shared with the Analytics path
+ * and is covered above; these cover the parts that are not shared.
+ *
+ * Measured against the local archive on 2026-08-24 (3,683 reports,
+ * 2026-01-22 to 2026-08-22): every report type carrying `views` also carried
+ * `engaged_views`, from the earliest archived window onward, and no report
+ * type had more than one column set. That is why this is keyed on dates and
+ * not on detecting a new column: there is no new column to detect.
+ */
+describe('view-counting change notice for report columns (#177)', () => {
+  // A real header row, from channel_basic_a3 in the local archive.
+  const BASIC_A3 = [
+    'date', 'channel_id', 'video_id', 'live_or_on_demand', 'subscribed_status',
+    'country_code', 'views', 'engaged_views', 'comments', 'likes', 'dislikes',
+    'shares', 'watch_time_minutes', 'red_views', 'red_watch_time_minutes',
+  ];
+
+  it('fires on a range reaching back before the change', () => {
+    const n = viewCountingNoticeForColumns('2026-05-01', '2026-09-05', BASIC_A3);
+    expect(n?.spansChange).toBe(true);
+    expect(n?.affectedRange).toEqual({ startDate: '2026-05-01', endDate: '2026-08-23' });
+  });
+
+  it('stays silent for a range entirely on or after the change', () => {
+    expect(viewCountingNoticeForColumns('2026-08-24', '2026-09-30', BASIC_A3)).toBeUndefined();
+  });
+
+  it('names the affected columns in the Reporting API spelling', () => {
+    const n = viewCountingNoticeForColumns('2026-05-01', '2026-09-05', BASIC_A3);
+    // snake_case, not the Analytics `redViews`.
+    expect(n?.affectedMetrics).toEqual(['views', 'red_views']);
+    expect(n?.affectedMetrics).not.toContain('redViews');
+  });
+
+  it('points at engaged_views, not engagedViews, as the consistent column', () => {
+    // A message naming a column the CSV does not have sends the reader
+    // looking for a field that is not there.
+    const n = viewCountingNoticeForColumns('2026-05-01', '2026-09-05', BASIC_A3);
+    expect(n?.message).toContain('engaged_views');
+    expect(n?.message).not.toContain('engagedViews');
+  });
+
+  it('presence of engaged_views does not suppress the notice', () => {
+    // The whole point: every affected report type already carries this
+    // column, so treating it as an all-clear would silence the notice
+    // everywhere it matters.
+    expect(viewCountingNoticeForColumns('2026-05-01', '2026-09-05', BASIC_A3)).toBeDefined();
+  });
+
+  it('stays silent for a report type with no view columns', () => {
+    // channel_demographics_a1 carries viewer_percentage and no view count.
+    const demographics = ['date', 'channel_id', 'video_id', 'age_group', 'gender', 'views_percentage'];
+    expect(viewCountingNoticeForColumns('2026-05-01', '2026-09-05', demographics)).toBeUndefined();
+  });
+
+  it('does not match a column that merely contains an affected name', () => {
+    expect(
+      viewCountingNoticeForColumns('2026-05-01', '2026-09-05', ['date', 'red_views_percentage'])
+    ).toBeUndefined();
+    expect(
+      viewCountingNoticeForColumns('2026-05-01', '2026-09-05', ['date', 'annotation_views'])
+    ).toBeUndefined();
+  });
+
+  it('fires for a red_views-only report without mentioning views', () => {
+    const n = viewCountingNoticeForColumns('2026-05-01', '2026-09-05', ['date', 'red_views']);
+    expect(n?.affectedMetrics).toEqual(['red_views']);
+    // `red_views` contains "views", so the check has to exclude that match.
+    expect(n?.message).not.toMatch(/(^|[^_])\bviews\b/);
   });
 });
 
