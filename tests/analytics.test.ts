@@ -8,6 +8,9 @@ import {
   allowedMetricsFor,
   reconcileMetrics,
   DEFAULT_VIDEO_METRICS,
+  resolveCustomSort,
+  SORTABLE_METRIC_PREFERENCE,
+  CHANNEL_REPORT_TYPES,
 } from '../lib/analytics';
 
 /**
@@ -228,5 +231,75 @@ describe('arity caps (#173)', () => {
     expect(DIMENSION_MAX_ARITY.day).toBeUndefined();
     const seven = 'day,deviceType,operatingSystem,subscribedStatus,youtubeProduct,creatorContentType,liveOrOnDemand';
     expect(validateVideoDimensions(seven)).toBe(seven);
+  });
+});
+
+/**
+ * The unsorted-output failure was measured against the live Analytics API on
+ * 2026-08-21: `--dimensions day --metrics views` came back ranked by views,
+ * while `--dimensions day --metrics engagedViews` over the identical range
+ * came back in raw date order.
+ */
+describe('custom query sort (#179)', () => {
+  it('keeps -views for any metric set selecting views', () => {
+    expect(resolveCustomSort('country', 'views')).toBe('-views');
+    expect(resolveCustomSort('country', 'views,estimatedMinutesWatched')).toBe('-views');
+    // The pre-#179 rule already produced this; widening the preference list
+    // must not move an existing query's ranking axis.
+    expect(resolveCustomSort('country', 'views,engagedViews')).toBe('-views');
+  });
+
+  it('ranks a view metric the old literal check missed', () => {
+    expect(resolveCustomSort('day', 'engagedViews')).toBe('-engagedViews');
+    expect(resolveCustomSort('day', 'engagedViews,estimatedMinutesWatched')).toBe('-engagedViews');
+    expect(resolveCustomSort('day', 'estimatedMinutesWatched')).toBe('-estimatedMinutesWatched');
+  });
+
+  it('does not match a metric that merely contains a sortable name', () => {
+    expect(resolveCustomSort('day', 'redViews')).toBeUndefined();
+    expect(resolveCustomSort('day', 'estimatedRedMinutesWatched')).toBeUndefined();
+  });
+
+  it('tolerates whitespace and empty entries in the metric list', () => {
+    expect(resolveCustomSort('country', ' views , likes ')).toBe('-views');
+    expect(resolveCustomSort('country', 'engagedViews,,')).toBe('-engagedViews');
+  });
+
+  it('leaves a query selecting nothing rankable to the API order', () => {
+    expect(resolveCustomSort('ageGroup,gender', 'viewerPercentage')).toBeUndefined();
+    expect(resolveCustomSort('country', 'likes,shares')).toBeUndefined();
+  });
+
+  it('honors an explicit sort over the preference order', () => {
+    expect(resolveCustomSort('country', 'views,likes', 'likes')).toBe('likes');
+    expect(resolveCustomSort('country', 'views,likes', '-likes')).toBe('-likes');
+    // A dimension is a valid sort field too.
+    expect(resolveCustomSort('day', 'views', 'day')).toBe('day');
+  });
+
+  it('rejects an explicit sort the query does not select', () => {
+    expect(() => resolveCustomSort('country', 'views', 'likes')).toThrow(
+      /Invalid --sort value: "likes"/,
+    );
+    // The message names what is actually available, per the #173 convention.
+    expect(() => resolveCustomSort('country', 'views', '-shares')).toThrow(
+      /Available: country, views/,
+    );
+    expect(() => resolveCustomSort('country', 'views', '-')).toThrow(/--sort cannot be empty/);
+  });
+
+  it('keeps engagedViews out of the predefined reports (#179 item 3)', () => {
+    for (const [name, config] of Object.entries(CHANNEL_REPORT_TYPES)) {
+      expect(config.metrics, `${name} metrics`).not.toContain('engagedViews');
+      // Each predefined report carries its own sort, so it never reaches
+      // resolveCustomSort and is unaffected by the preference order.
+      expect(config.sort, `${name} sort`).toBeTruthy();
+    }
+  });
+
+  it('lists the preference order most-specific first', () => {
+    expect([...SORTABLE_METRIC_PREFERENCE]).toEqual([
+      'views', 'engagedViews', 'estimatedMinutesWatched',
+    ]);
   });
 });

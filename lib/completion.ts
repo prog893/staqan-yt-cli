@@ -129,7 +129,7 @@ export function getCommandOptions(command: string): string[] {
     'get-search-terms': ['--limit', '-l', ...outputOptions, ...verboseOption],
     'get-traffic-sources': [...outputOptions, ...verboseOption],
     'get-video-retention': [...outputOptions, ...verboseOption],
-    'get-channel-analytics': ['--report', '--start-date', '--end-date', '--dimensions', '--metrics', ...outputOptions, ...verboseOption],
+    'get-channel-analytics': ['--report', '--start-date', '--end-date', '--dimensions', '--metrics', '--sort', ...outputOptions, ...verboseOption],
     'get-channel-search-terms': ['--channel', '--limit', '-l', '--content-type', '--start-date', '--end-date', ...outputOptions, ...verboseOption],
     'list-comments': ['--limit', '-l', '--sort', '-s', ...outputOptions, ...verboseOption],
     'get-video-tags': [...outputOptions, ...verboseOption],
@@ -296,7 +296,15 @@ _staqa_nyt_completion() {
     --privacy)
       COMPREPLY=( \$(compgen -W "public private unlisted" -- "\${cur}") ); return ;;
     --sort|-s)
-      COMPREPLY=( \$(compgen -W "top new" -- "\${cur}") ); return ;;
+      # Scoped to the command, like --type above: "top"/"new" are list-comments
+      # values. get-channel-analytics --sort takes a field the query itself
+      # selects, which is only knowable from the --dimensions/--metrics typed
+      # so far, so its values stay unenumerated rather than wrong.
+      case "$cmd" in
+        list-comments)
+          COMPREPLY=( \$(compgen -W "top new" -- "\${cur}") ); return ;;
+      esac
+      ;;
     --format)
       COMPREPLY=( \$(compgen -W "raw srt vtt sbv ttml" -- "\${cur}") ); return ;;
     --dimensions)
@@ -327,7 +335,7 @@ _staqa_nyt_completion() {
       COMPREPLY=( \$(compgen -W "--video-id --start-date --end-date --metrics --dimensions --output --verbose" -- "\${cur}") )
       ;;
     get-channel-analytics)
-      COMPREPLY=( \$(compgen -W "--channel --report --start-date --end-date --dimensions --metrics --output --verbose" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--channel --report --start-date --end-date --dimensions --metrics --sort --output --verbose" -- "\${cur}") )
       ;;
     get-search-terms|get-traffic-sources|get-video-retention|get-video-tags|list-captions)
       COMPREPLY=( \$(compgen -W "--video-id --output --verbose" -- "\${cur}") )
@@ -847,6 +855,7 @@ ${commandList}
         '--end-date[End date (YYYY-MM-DD)]:date:' \\
         '--dimensions[Custom dimensions (comma-separated)]:dims:' \\
         '--metrics[Custom metrics (comma-separated)]:metrics:' \\
+        '--sort[Sort by a selected field, -field for descending]:field:' \\
         '--output[Output format]:format:(json table text pretty csv)' \\
         '--verbose[Enable verbose output]'
       ;;
