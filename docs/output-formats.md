@@ -2,7 +2,8 @@
 
 All staqan-yt-cli commands support multiple output formats via the `--output` flag.
 
-> **`viewCount` is not comparable across 2026-08-24.** The Data API changed
+> **`viewCount` from before 2026-08-24 is not comparable with `viewCount` from
+> on or after it.** The Data API changed
 > what counts as a view on that date (first frame, no minimum watch time). The
 > field name, type and position are unchanged, so a payload gives no signal
 > either way. Recipes below that **aggregate or compare** it are affected;
@@ -343,8 +344,8 @@ Need to process data programmatically?
 ### Combining Formats
 
 ```bash
-# Get JSON, convert to CSV
-staqan-yt list-videos @yourchannel --output json | \
+# Get JSON, convert to CSV (get-videos, since list-videos carries no statistics)
+staqan-yt get-videos --video-ids ID1 ID2 --output json | \
   jq -r '.[] | [.id, .title, .statistics.viewCount] | @csv' > videos.csv
 
 # Get CSV, process with awk

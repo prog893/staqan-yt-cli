@@ -227,8 +227,11 @@ staqan-yt list-videos @yourchannel --limit 20 --output table
 
 ```bash
 # Export video stats for analysis
-staqan-yt list-videos @yourchannel --output json | \
-  jq '.[] | {title, viewCount: .viewCount | tonumber, likeCount: .likeCount | tonumber}' | \
+# Counts come from get-videos: list-videos returns no statistics.
+# Collect the IDs first, then fetch them in one batch.
+staqan-yt list-videos @yourchannel --output json | jq -r '.[].id' | \
+  xargs staqan-yt get-videos --output json --video-ids | \
+  jq '.[] | {title, viewCount: .statistics.viewCount, likeCount: .statistics.likeCount}' | \
   jq -s 'sort_by(.viewCount) | reverse'
 ```
 

@@ -232,8 +232,10 @@ staqan-yt search-videos --query "keyword" --output json | \
 
 ```bash
 # List and sort by view count
-staqan-yt list-videos @yourchannel --limit 50 --output json | \
-  jq 'sort_by(.viewCount | tonumber) | reverse | .[0:10]'
+# list-videos has no statistics, so pull the counts with get-videos first.
+staqan-yt list-videos @yourchannel --limit 50 --output json | jq -r '.[].id' | \
+  xargs staqan-yt get-videos --output json --video-ids | \
+  jq 'sort_by(.statistics.viewCount) | reverse | .[0:10] | .[] | {title, views: .statistics.viewCount}'
 ```
 
 ## Tips
