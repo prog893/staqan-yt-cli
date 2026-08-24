@@ -295,12 +295,44 @@ describe('custom query sort (#179)', () => {
     expect(() => resolveCustomSort('country', 'views', '-')).toThrow(/--sort cannot be empty/);
   });
 
-  it('keeps engagedViews out of the predefined reports (#179 item 3)', () => {
+  // #179 originally pinned the opposite of this: engagedViews was kept OUT of
+  // the predefined reports because its compatibility there was unmeasured.
+  // #185 measured it (every dimension accepts it) and reversed the decision,
+  // so the guard is inverted rather than deleted.
+  it('carries engagedViews in every predefined report that counts views (#185)', () => {
     for (const [name, config] of Object.entries(CHANNEL_REPORT_TYPES)) {
-      expect(config.metrics, `${name} metrics`).not.toContain('engagedViews');
+      if (config.metrics.split(',').includes('views')) {
+        expect(config.metrics, `${name} metrics`).toContain('engagedViews');
+      } else {
+        // demographics reports viewerPercentage, a share rather than a count,
+        // so there is no view metric for the counting change to have moved.
+        expect(config.metrics, `${name} metrics`).toBe('viewerPercentage');
+      }
       // Each predefined report carries its own sort, so it never reaches
       // resolveCustomSort and is unaffected by the preference order.
       expect(config.sort, `${name} sort`).toBeTruthy();
+    }
+  });
+
+  it('ranks the predefined reports by views, not engagedViews (#185)', () => {
+    // Row order is part of a predefined report's shape. Adding a column is one
+    // break; silently reordering every row would be a second, and nothing
+    // forces it. Same reasoning #179 applied to the custom-query default.
+    for (const [name, config] of Object.entries(CHANNEL_REPORT_TYPES)) {
+      if (config.metrics.split(',').includes('views')) {
+        expect(config.sort, `${name} sort`).toBe('-views');
+      }
+    }
+  });
+
+  it('puts engagedViews immediately after views (#185)', () => {
+    // Consumers reading by column position break on an inserted column; those
+    // reading by name do not. Matching #175's placement keeps one convention
+    // across every surface that gained the metric.
+    for (const [name, config] of Object.entries(CHANNEL_REPORT_TYPES)) {
+      const cols = config.metrics.split(',');
+      const i = cols.indexOf('views');
+      if (i >= 0) expect(cols[i + 1], `${name} metrics`).toBe('engagedViews');
     }
   });
 

@@ -67,15 +67,17 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
     const colIndex = (name: string) =>
       columnHeaders.findIndex(h => h.name === name);
 
-    const idxTerm  = colIndex('insightTrafficSourceDetail');
-    const idxViews = colIndex('views');
-    const idxWatch = colIndex('estimatedMinutesWatched');
+    const idxTerm    = colIndex('insightTrafficSourceDetail');
+    const idxViews   = colIndex('views');
+    const idxEngaged = colIndex('engagedViews');
+    const idxWatch   = colIndex('estimatedMinutesWatched');
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const structuredRows = rows.map((row: any[]) => ({
       rank: 0,           // filled below
       searchTerm:        row[idxTerm]  as string,
       views:             row[idxViews] as number,
+      engagedViews:      idxEngaged >= 0 ? row[idxEngaged] as number : 0,
       watchTimeMinutes:  idxWatch >= 0 ? row[idxWatch] as number : 0,
     }));
 
@@ -153,7 +155,8 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
         console.log('');
 
         let totalViews = 0;
-        structuredRows.forEach(r => { totalViews += r.views; });
+        let totalEngagedViews = 0;
+        structuredRows.forEach(r => { totalViews += r.views; totalEngagedViews += r.engagedViews; });
 
         structuredRows.forEach(r => {
           const pct = totalViews > 0 ? ((r.views / totalViews) * 100).toFixed(1) : '0.0';
@@ -163,6 +166,9 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
             chalk.gray('      Views:      ') + chalk.cyan(formatNumber(r.views)) +
             chalk.gray(` (${pct}% of search traffic)`)
           );
+          console.log(
+            chalk.gray('      Engaged:    ') + chalk.cyan(formatNumber(r.engagedViews))
+          );
           if (r.watchTimeMinutes > 0) {
             const watchHours = (r.watchTimeMinutes / 60).toFixed(0);
             console.log(chalk.gray('      Watch time:  ') + chalk.cyan(`${formatNumber(parseInt(watchHours, 10))}h`));
@@ -171,6 +177,7 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
         });
 
         console.log(chalk.bold('Total views from search: ') + chalk.cyan(formatNumber(totalViews)));
+        console.log(chalk.bold('Total engaged views from search: ') + chalk.cyan(formatNumber(totalEngagedViews)));
         console.log('');
         break;
       }

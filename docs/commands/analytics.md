@@ -290,9 +290,16 @@ staqan-yt get-search-terms --video-id dQw4w9WgXcQ --output csv > search_terms.cs
 
 ### Output Fields
 
-- `search_term` - The search query
-- `views` - Number of views from this search term
-- `estimated_minutes_watched` - Watch time from this search term
+Column names come from the Analytics API, so `--output json` and `--output
+csv` carry the API's own spelling:
+
+- `insightTrafficSourceDetail` - the search query
+- `views` - views from this search term
+- `engagedViews` - views under the stricter pre-2026-08-24 definition (#185)
+
+There is no watch-time column here. `estimatedMinutesWatched` is not valid
+alongside `insightTrafficSourceDetail` filtered to `YT_SEARCH` for a single
+video, and was previously documented in error.
 
 ### Use Cases
 
@@ -339,6 +346,17 @@ staqan-yt get-traffic-sources --video-id dQw4w9WgXcQ
 # Export to CSV
 staqan-yt get-traffic-sources --video-id dQw4w9WgXcQ --output csv > traffic_sources.csv
 ```
+
+### Output Fields
+
+Column names come from the Analytics API:
+
+- `insightTrafficSourceType` - the traffic source category
+- `views` - views from this source
+- `engagedViews` - views under the stricter pre-2026-08-24 definition (#185)
+
+Rows are ranked by `views`. There is no watch-time column: this report sends
+only the two view metrics.
 
 ### Common Traffic Sources
 
@@ -433,6 +451,28 @@ staqan-yt get-channel-analytics @yourchannel --output csv > demographics.csv
 **subscription-status**:
 - Subscribed vs not subscribed viewers
 - Performance by subscription status
+
+#### Columns
+
+Every report except `demographics` returns the same metric columns, in this
+order (#185):
+
+```
+<dimension...>, views, engagedViews, estimatedMinutesWatched
+```
+
+`demographics` returns `viewerPercentage` instead, a share rather than a
+count, so the view-counting distinction does not apply to it.
+
+Rows are ranked by `views`. `engagedViews` applies the stricter pre-2026-08-24
+definition and is the column to read when comparing across that date, or when
+the question is engagement rather than reach. The two differ substantially on
+a channel with Shorts: measured over 2026-05-01 to 2026-08-25, `geography`
+returned 1485 `views` against 883 `engagedViews`.
+
+Read these columns **by name**. `engagedViews` was inserted after `views`, so
+`estimatedMinutesWatched` moved one position to the right. See
+[BREAKING-CHANGES.md](../../BREAKING-CHANGES.md).
 
 ### Custom Queries
 
@@ -539,9 +579,16 @@ staqan-yt get-channel-search-terms @yourchannel --output csv > search_terms.csv
 
 ### Output Fields
 
-- `search_term` - The search query
-- `views` - Number of views from this search term
-- `estimated_minutes_watched` - Watch time from this search term
+Column names come from the Analytics API:
+
+- `insightTrafficSourceDetail` - the search query
+- `views` - views from this search term
+- `engagedViews` - views under the stricter pre-2026-08-24 definition (#185)
+- `estimatedMinutesWatched` - watch time from this search term
+
+Rows are ranked by `views`. Measured channel-wide over 2026-05-01 to
+2026-08-25 this report returned 189 `views` against 115 `engagedViews`, so
+ranking by `views` alone overstates how much of that search traffic engaged.
 
 ### Content Type Filtering
 
