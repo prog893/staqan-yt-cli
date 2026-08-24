@@ -4,6 +4,56 @@ Commands for retrieving YouTube Analytics data and performance metrics.
 
 > **Important:** These commands require the `https://www.googleapis.com/auth/yt-analytics.readonly` OAuth scope. Re-authenticate if needed: `staqan-yt auth`
 
+## The 2026-08-24 view-counting change
+
+On **2026-08-24** YouTube aligned view counting across formats: a view is
+counted from the first frame of playback, with no minimum watch time. Dates
+from that day onward are measured that way, earlier dates are not. The stricter
+previous definition survives as **`engagedViews`**, which is also the metric
+tied to monetization and YPP eligibility.
+
+What this means in practice:
+
+- **`views` is not one series.** A range that starts before 2026-08-24 and ends
+  on or after it carries both definitions in the same column, so a total across
+  it mixes them.
+- **Older data is not comparable to newer data.** A range lying entirely before
+  the change is internally consistent, but its `views` cannot be compared
+  against `views` pulled for later dates.
+- **`engagedViews` is consistent across the boundary.** Use it when you need
+  one definition throughout, or when comparing against anything archived
+  before the change.
+- `redViews` is affected the same way as `views`.
+
+`get-video-analytics` and `get-channel-analytics` print a note on stderr when
+the requested range reaches back before the change, naming the dates affected.
+It appears for `--output pretty` and `--output text` only, so `json`, `csv` and
+`table` stay clean for piping. Ranges lying entirely on or after 2026-08-24 get
+no note, because nothing about them is ambiguous.
+
+```console
+$ staqan-yt get-channel-analytics --dimensions day --metrics views \
+    --start-date 2026-08-01 --end-date 2026-09-05
+Note: views changes definition inside this date range. 2026-08-01 to
+2026-08-23 is counted under the previous definition; 2026-08-24 onward counts
+every playback from the first frame. Totals across the whole range mix the two.
+engagedViews keeps the stricter definition throughout.
+https://support.google.com/youtube/answer/2991785
+```
+
+MCP callers get the same signal as a `viewCountingNotice` object on the result,
+carrying `changeDate`, `affectedMetrics`, `affectedRange` and `spansChange`, so
+the date does not have to be hardcoded downstream.
+
+Note that `views` and `engagedViews` were already returning different totals
+for the same range before 2026-08-24, so the change date is not a clean
+before/after split between the two metrics. The note states only which dates
+were measured under which definition.
+
+**Reference:** [How YouTube counts views](https://support.google.com/youtube/answer/2991785)
+
+---
+
 ## get-video-analytics
 
 Get video performance analytics (views, watch time, CTR, etc.).

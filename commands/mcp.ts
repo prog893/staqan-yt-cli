@@ -207,7 +207,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: 'youtube_get_channel_analytics',
-    description: 'Get channel-level analytics reports from YouTube Analytics API (demographics, devices, geography, traffic sources, subscription status, etc.)',
+    description: 'Get channel-level analytics reports from YouTube Analytics API (demographics, devices, geography, traffic sources, subscription status, etc.). When the result carries `viewCountingNotice`, the requested range reaches back before the 2026-08-24 view-counting change, so the metrics named in its `affectedMetrics` (`views` and/or `redViews`) are not measured consistently across the range (or against later data); report that caveat rather than presenting a total as comparable. `engagedViews` keeps the stricter pre-change definition throughout.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -246,7 +246,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: 'youtube_get_video_analytics',
-    description: 'Get video performance analytics including views, watch time, average view duration, likes, comments, and more',
+    description: 'Get video performance analytics including views, watch time, average view duration, likes, comments, and more. When the result carries `viewCountingNotice`, the requested range reaches back before the 2026-08-24 view-counting change, so the metrics named in its `affectedMetrics` (`views` and/or `redViews`) are not measured consistently across the range (or against later data); report that caveat rather than presenting a total as comparable. `engagedViews` keeps the stricter pre-change definition throughout. Note the default start date is the video\'s upload date, so all-time queries on older videos always reach back past the change.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -678,11 +678,19 @@ async function handleToolCall(name: string, args: any) {
       });
 
       if (result.rows.length === 0) {
+        // The notice describes the requested date range, not the rows, so it
+        // still applies when nothing came back: a caller comparing this empty
+        // result against pre-cutoff archived data needs the same caveat. The
+        // CLI already emits its notice before its own empty-rows branch, and
+        // dropping it here was the one place the two surfaces disagreed.
+        const noData = 'No analytics data available for this channel and time period.';
         return {
           content: [
             {
               type: 'text',
-              text: 'No analytics data available for this channel and time period.',
+              text: result.viewCountingNotice
+                ? `${noData}\n\n${JSON.stringify({ viewCountingNotice: result.viewCountingNotice }, null, 2)}`
+                : noData,
             },
           ],
         };
