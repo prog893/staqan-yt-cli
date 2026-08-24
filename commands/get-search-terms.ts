@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { parseVideoId, parsePositiveInt, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, daysAgoYmd, runOrExit, writeStdout } from '../lib/utils';
-import { fetchSearchTerms } from '../lib/analytics';
+import { fetchSearchTerms, emitViewCountingNotice } from '../lib/analytics';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { SearchTermsOptions } from '../types';
@@ -44,9 +44,7 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
     // get-channel-analytics: json/csv/table are what scripts read and a note
     // they cannot parse is noise there. MCP callers read `viewCountingNotice`
     // off the result instead.
-    if (result.viewCountingNotice && (outputFormat === 'pretty' || outputFormat === 'text')) {
-      process.stderr.write(`${result.viewCountingNotice.message}\n`);
-    }
+    emitViewCountingNotice(result.viewCountingNotice, outputFormat);
     const searchTermsData = rows.map((row, index) => ({
       rank: index + 1,
       searchTerm: row[0] as string,

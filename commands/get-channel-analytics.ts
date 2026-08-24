@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import { debug, formatNumber, initCommand, withSpinner, validateDateOption, validateDateRange, runOrExit, writeStdout } from '../lib/utils';
 import { requireChannel, getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
-import { fetchChannelAnalytics, ChannelAnalyticsResult } from '../lib/analytics';
+import { fetchChannelAnalytics, ChannelAnalyticsResult, emitViewCountingNotice } from '../lib/analytics';
 import { ChannelAnalyticsOptions } from '../types';
 
 async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Promise<void> {
@@ -75,9 +75,7 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
     // and a note they cannot parse is noise there; the same signal reaches
     // those callers as `viewCountingNotice` in the MCP result. stderr, not
     // stdout, so even here it never lands in a redirected file.
-    if (result.viewCountingNotice && (outputFormat === 'pretty' || outputFormat === 'text')) {
-      process.stderr.write(`${result.viewCountingNotice.message}\n`);
-    }
+    emitViewCountingNotice(result.viewCountingNotice, outputFormat);
 
     if (rows.length === 0) {
       console.log('');

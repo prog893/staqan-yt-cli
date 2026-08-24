@@ -763,6 +763,41 @@ export function viewCountingNoticeFor(
 }
 
 /**
+ * Output formats the notice is written for. `json`, `csv` and `table` are what
+ * scripts parse, and a prose note they cannot read is noise there.
+ */
+const NOTICE_OUTPUT_FORMATS = new Set(['pretty', 'text']);
+
+/**
+ * Write a view-counting notice for the human-facing output formats, and
+ * report whether it was written.
+ *
+ * Extracted because five commands had reimplemented the same two conditions
+ * (`get-video-analytics`, `get-channel-analytics`, `get-traffic-sources`,
+ * `get-search-terms`, `get-channel-search-terms`). Five copies of a rule about
+ * which stream carries what is five chances for one of them to drift onto
+ * stdout and corrupt a piped result.
+ *
+ * `get-report-data` deliberately does NOT use this: it prints its notice for
+ * every format, alongside its unconditional Incomplete Data warning. That is a
+ * different rule, so it stays a separate call rather than a flag here.
+ *
+ * `stream` exists so tests can assert both the content and the routing without
+ * capturing the real process streams. It defaults to stderr, never stdout,
+ * because stdout carries the machine-readable output.
+ */
+export function emitViewCountingNotice(
+  notice: ViewCountingNotice | undefined,
+  outputFormat: string,
+  stream: { write(chunk: string): unknown } = process.stderr,
+): boolean {
+  if (!notice) return false;
+  if (!NOTICE_OUTPUT_FORMATS.has(outputFormat)) return false;
+  stream.write(`${notice.message}\n`);
+  return true;
+}
+
+/**
  * The same notice for a bulk Reporting API result, keyed on the report's CSV
  * columns instead of an Analytics metric list (#177).
  *

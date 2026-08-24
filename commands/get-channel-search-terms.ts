@@ -7,6 +7,7 @@ import {
   validateContentType,
   ALL_TIME_START_DATE,
   CHANNEL_SEARCH_TERMS_MAX_VIDEOS,
+  emitViewCountingNotice,
 } from '../lib/analytics';
 import { ChannelSearchTermsOptions } from '../types';
 
@@ -55,9 +56,7 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
     // get-channel-analytics: json/csv/table are what scripts read and a note
     // they cannot parse is noise there. MCP callers read `viewCountingNotice`
     // off the result instead.
-    if (result.viewCountingNotice && (outputFormat === 'pretty' || outputFormat === 'text')) {
-      process.stderr.write(`${result.viewCountingNotice.message}\n`);
-    }
+    emitViewCountingNotice(result.viewCountingNotice, outputFormat);
     const { channelId, channelTitle, videosAnalyzed, columnHeaders, rows } = result;
     const { startDate, endDate } = result.dateRange;
     const isLifetime = startDate === ALL_TIME_START_DATE;

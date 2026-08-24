@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { parseVideoId, debug, formatNumber, convertToCSV, initCommand, withSpinner, validateDateOption, validateDateRange, runOrExit, writeStdout } from '../lib/utils';
-import { fetchVideoAnalytics } from '../lib/analytics';
+import { fetchVideoAnalytics, emitViewCountingNotice } from '../lib/analytics';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable } from '../lib/formatters';
 import { AnalyticsOptions } from '../types';
@@ -45,9 +45,7 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
     // for the reasoning. This command is the more exposed of the two, since
     // the default start date is the upload date, so every all-time query on a
     // video published before the change reaches back past it.
-    if (result.viewCountingNotice && (outputFormat === 'pretty' || outputFormat === 'text')) {
-      process.stderr.write(`${result.viewCountingNotice.message}\n`);
-    }
+    emitViewCountingNotice(result.viewCountingNotice, outputFormat);
 
     // Prepare aggregated data for structured formats
     const aggregated: { [key: string]: number } = {};

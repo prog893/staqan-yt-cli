@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { parseVideoId, debug, formatNumber, convertToCSV, initCommand, withSpinner, toLocalYmd, daysAgoYmd, writeStdout } from '../lib/utils';
-import { fetchTrafficSources } from '../lib/analytics';
+import { fetchTrafficSources, emitViewCountingNotice } from '../lib/analytics';
 import { getOutputFormat } from '../lib/config';
 import { formatJson, formatTable, formatCsv } from '../lib/formatters';
 import { TrafficSourcesOptions } from '../types';
@@ -43,9 +43,7 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
     // get-channel-analytics: json/csv/table are what scripts read and a note
     // they cannot parse is noise there. MCP callers read `viewCountingNotice`
     // off the result instead.
-    if (result.viewCountingNotice && (outputFormat === 'pretty' || outputFormat === 'text')) {
-      process.stderr.write(`${result.viewCountingNotice.message}\n`);
-    }
+    emitViewCountingNotice(result.viewCountingNotice, outputFormat);
 
     // Traffic source labels
     const sourceLabels: { [key: string]: string } = {
