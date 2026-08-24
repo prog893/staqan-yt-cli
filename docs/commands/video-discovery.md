@@ -2,6 +2,15 @@
 
 Commands for finding and retrieving video information.
 
+> **`viewCount` changed meaning on 2026-08-24.** From that date the Data API
+> counts a view from the first frame of playback, with no minimum watch time.
+> The field name and type did not change, so nothing in the payload marks the
+> boundary. A `viewCount` you stored before the cutoff and one you fetch now
+> answer different questions, and the difference is large on Shorts. The
+> previous definition is not available from the Data API at all: it survives
+> only as `engagedViews` in the Analytics API.
+> See [The 2026-08-24 view-counting change](analytics.md#the-2026-08-24-view-counting-change).
+
 ## get-video
 
 Get detailed metadata for a single video.

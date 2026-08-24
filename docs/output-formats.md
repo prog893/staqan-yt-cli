@@ -2,6 +2,22 @@
 
 All staqan-yt-cli commands support multiple output formats via the `--output` flag.
 
+> **`viewCount` is not comparable across 2026-08-24.** The Data API changed
+> what counts as a view on that date (first frame, no minimum watch time). The
+> field name, type and position are unchanged, so a payload gives no signal
+> either way. Recipes below that **aggregate or compare** it are affected;
+> recipes that just display it are not. The field is `statistics.viewCount` in
+> `json` and the `views` column in `csv`/`table`, and only `get-video`,
+> `get-videos` and `get-channel` return it at all.
+>
+> There is deliberately no methodology marker in the payload. Post-cutoff it
+> would be a constant carrying no information, and a fetch timestamp would make
+> every payload differ from every other, breaking the diff and checksum
+> workflows this page recommends. Use the fetch date you already control, or
+> query `engagedViews` through the Analytics API for a series with one
+> definition throughout. See
+> [The 2026-08-24 view-counting change](commands/analytics.md#the-2026-08-24-view-counting-change).
+
 ## Global Options
 
 ### Quiet Mode (`-q, --quiet`)
@@ -101,29 +117,37 @@ staqan-yt get-video dQw4w9WgXcQ
 - Nested objects and arrays
 - Easy to parse with `jq`
 
-**Example:**
+**Example** (`get-video`; counts are numbers, and live under `statistics`):
 ```json
 [
   {
     "id": "dQw4w9WgXcQ",
     "title": "Never Gonna Give You Up",
-    "viewCount": "1400000000"
+    "statistics": {
+      "viewCount": 1400000000,
+      "likeCount": 18000000,
+      "commentCount": 2400000
+    }
   }
 ]
 ```
 
+Note `list-videos` carries **no** statistics at all: it returns `id`, `title`,
+`description`, `publishedAt`, `thumbnail`, `videoType` and `privacyStatus`. Use
+`get-videos --video-ids` when you need counts for several videos.
+
 **Common Usage:**
 ```bash
-# Pipe to jq for filtering
-staqan-yt --quiet list-videos @yourchannel --output json | \
-  jq '.[] | select(.viewCount | tonumber > 1000000)'
+# Pipe to jq for filtering (get-videos, not list-videos: it has the counts)
+staqan-yt --quiet get-videos --video-ids ID1 ID2 --output json | \
+  jq '.[] | select(.statistics.viewCount > 1000000)'
 
 # Save to file
-staqan-yt --quiet get-video VIDEO_ID --output json > video.json
+staqan-yt --quiet get-video --video-id VIDEO_ID --output json > video.json
 
-# Parse with scripts
-data=$(staqan-yt --quiet get-video VIDEO_ID --output json)
-title=$(echo "$data" | jq -r '.title')
+# Parse with scripts (top-level result is an array)
+data=$(staqan-yt --quiet get-video --video-id VIDEO_ID --output json)
+title=$(echo "$data" | jq -r '.[0].title')
 ```
 
 ---
@@ -140,22 +164,25 @@ title=$(echo "$data" | jq -r '.title')
 - Doubles internal quotes for proper escaping
 - Handles nested objects by JSON-encoding them
 
-**Example:**
+**Example** (`get-videos`; the view column is named `views`):
 ```csv
-id,title,viewCount,publishedAt
-dQw4w9WgXcQ,"Never Gonna Give You Up",1400000000,2009-10-25T06:57:33Z
+id,title,channel,published,duration,views,likes,comments,type
+dQw4w9WgXcQ,"Never Gonna Give You Up",RickAstleyVEVO,2009-10-25T06:57:33Z,PT3M33S,1400000000,18000000,2400000,regular
 ```
+
+`list-videos --output csv` is a lighter shape with **no counts**:
+`id,title,published,privacy,type`.
 
 **Common Usage:**
 ```bash
-# Export to Excel
-staqan-yt list-videos @yourchannel --output csv > videos.csv
+# Export to Excel (get-videos carries the counts; list-videos does not)
+staqan-yt get-videos --video-ids ID1 ID2 --output csv > videos.csv
 
 # Open in Excel (macOS)
 open videos.csv
 
 # Process with csvkit
-csvsort --columns viewCount videos.csv > sorted.csv
+csvsort --columns views videos.csv > sorted.csv
 
 # Load into pandas (Python)
 python -c "import pandas as pd; df = pd.read_csv('videos.csv')"
@@ -212,9 +239,9 @@ staqan-yt get-video-analytics VIDEO_ID --output table
 - Raw data output
 - Easy to parse with Unix tools
 
-**Example:**
+**Example** (`list-videos`: id, title, date, privacy, type; no counts):
 ```text
-dQw4w9WgXcQ	Never Gonna Give You Up	1400000000
+dQw4w9WgXcQ	Never Gonna Give You Up	Oct 25, 2009	public	regular
 ```
 
 **Common Usage:**
@@ -318,7 +345,7 @@ Need to process data programmatically?
 ```bash
 # Get JSON, convert to CSV
 staqan-yt list-videos @yourchannel --output json | \
-  jq -r '.[] | [.id, .title, .viewCount] | @csv' > videos.csv
+  jq -r '.[] | [.id, .title, .statistics.viewCount] | @csv' > videos.csv
 
 # Get CSV, process with awk
 staqan-yt get-video-analytics VIDEO_ID --output csv | \
@@ -334,12 +361,15 @@ staqan-yt list-videos @yourchannel --output table | \
 
 ```bash
 # Create custom report
-staqan-yt list-videos @yourchannel --output json | \
-  jq -r '.[] | "\(.title)\t\(.viewCount) views\t\(.likeCount) likes"'
+staqan-yt get-videos --video-ids ID1 ID2 --output json | \
+  jq -r '.[] | "\(.title)\t\(.statistics.viewCount) views\t\(.statistics.likeCount) likes"'
 
 # Calculate totals
-staqan-yt list-videos @yourchannel --output json | \
-  jq '[.[].viewCount | tonumber] | add'
+# Sums views under whichever definition applied when each video accrued them.
+# Fine as a snapshot of now; not comparable to a total stored before
+# 2026-08-24. For a consistent series use engagedViews via get-video-analytics.
+staqan-yt get-videos --video-ids ID1 ID2 --output json | \
+  jq '[.[].statistics.viewCount] | add'
 
 # Format for presentation
 staqan-yt get-channel-analytics @yourchannel --output json | \

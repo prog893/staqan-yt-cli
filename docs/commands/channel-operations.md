@@ -2,6 +2,14 @@
 
 Commands for working with YouTube channels and their content.
 
+> **`viewCount` (shown as `Total Views`) changed meaning on 2026-08-24.** From
+> that date the Data API counts a view from the first frame of playback, with
+> no minimum watch time. A channel total spanning the cutoff is therefore a sum
+> over two different definitions, and comparing today's total against one
+> stored earlier measures the methodology change as well as the channel. The
+> previous definition survives only as `engagedViews` in the Analytics API.
+> See [The 2026-08-24 view-counting change](analytics.md#the-2026-08-24-view-counting-change).
+
 ## get-channel
 
 Get detailed metadata for a YouTube channel.

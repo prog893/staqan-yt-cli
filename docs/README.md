@@ -173,9 +173,24 @@ cat video_ids.txt | \
 ### Find Underperforming Videos
 
 ```bash
-# Get videos with low views
-staqan-yt list-videos @mychannel --limit 100 --output json | \
-  jq '.[] | select(.viewCount | tonumber < 1000) | {title, viewCount}'
+# Get videos with low views.
+# Counts come from get-videos, not list-videos: list-videos returns no
+# statistics at all. Pass the IDs you want, or collect them from list-videos.
+staqan-yt get-videos --video-ids ID1 ID2 ID3 --output json | \
+  jq '.[] | select(.statistics.viewCount < 1000) | {title, views: .statistics.viewCount}'
+```
+
+Since 2026-08-24 `viewCount` counts every playback from the first frame, which
+inflates Shorts relative to a threshold chosen before that date. To judge a
+video by engagement instead, pull `engagedViews`, which keeps the stricter
+definition:
+
+```bash
+staqan-yt get-video-analytics --video-id VIDEO_ID \
+  --metrics views,engagedViews --output csv
+
+# video,views,engagedViews
+# BpesXOddpVc,197,8      <- a Short: 197 reached, 8 engaged
 ```
 
 ### Archive Thumbnail CTR Data
