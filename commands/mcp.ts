@@ -207,7 +207,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: 'youtube_get_channel_analytics',
-    description: 'Get channel-level analytics reports from YouTube Analytics API (demographics, devices, geography, traffic sources, subscription status, etc.). When the result carries `viewCountingNotice`, the requested range reaches back before the 2026-08-24 view-counting change, so `views` in these rows is not measured consistently across the range (or against later data); report that caveat rather than presenting a total as comparable. `engagedViews` keeps the stricter pre-change definition throughout.',
+    description: 'Get channel-level analytics reports from YouTube Analytics API (demographics, devices, geography, traffic sources, subscription status, etc.). When the result carries `viewCountingNotice`, the requested range reaches back before the 2026-08-24 view-counting change, so the metrics named in its `affectedMetrics` (`views` and/or `redViews`) are not measured consistently across the range (or against later data); report that caveat rather than presenting a total as comparable. `engagedViews` keeps the stricter pre-change definition throughout.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -246,7 +246,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: 'youtube_get_video_analytics',
-    description: 'Get video performance analytics including views, watch time, average view duration, likes, comments, and more. When the result carries `viewCountingNotice`, the requested range reaches back before the 2026-08-24 view-counting change, so `views` in these rows is not measured consistently across the range (or against later data); report that caveat rather than presenting a total as comparable. Note the default start date is the video\'s upload date, so all-time queries on older videos always reach back past the change.',
+    description: 'Get video performance analytics including views, watch time, average view duration, likes, comments, and more. When the result carries `viewCountingNotice`, the requested range reaches back before the 2026-08-24 view-counting change, so the metrics named in its `affectedMetrics` (`views` and/or `redViews`) are not measured consistently across the range (or against later data); report that caveat rather than presenting a total as comparable. `engagedViews` keeps the stricter pre-change definition throughout. Note the default start date is the video\'s upload date, so all-time queries on older videos always reach back past the change.',
     inputSchema: {
       type: 'object',
       properties: {

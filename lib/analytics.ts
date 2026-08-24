@@ -631,7 +631,16 @@ const LAST_PRE_CHANGE_DATE = '2026-08-23';
 
 export const VIEW_COUNTING_CHANGE_URL = 'https://support.google.com/youtube/answer/2991785';
 
-/** Metrics whose meaning depends on which side of the change a date falls. */
+/**
+ * Metrics whose meaning depends on which side of the change a date falls.
+ *
+ * `views` is affected by definition. `redViews` is included because it counts
+ * the same playback event, restricted to Premium members, so a change to what
+ * counts as a view necessarily moves it too. That is an inference from the
+ * announcement rather than a separately documented statement about `redViews`,
+ * and it is the conservative direction: a notice on a series that turned out
+ * to be stable is a smaller error than silence on one that moved.
+ */
 const VIEW_COUNTING_AFFECTED_METRICS = ['views', 'redViews'] as const;
 
 export interface ViewCountingNotice {

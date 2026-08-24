@@ -365,6 +365,15 @@ describe('view-counting change notice (#178)', () => {
     expect(n?.affectedMetrics).not.toContain('engagedViews');
   });
 
+  it('names only redViews for a redViews-only query', () => {
+    // The message must not talk about `views` when the query never selected
+    // it, which is what a hardcoded metric name in the wording would do.
+    const n = viewCountingNoticeFor('2026-05-01', '2026-09-05', 'redViews');
+    expect(n?.affectedMetrics).toEqual(['redViews']);
+    expect(n?.message).toContain('redViews');
+    expect(n?.message).not.toMatch(/(^|[^d])\bviews\b/);
+  });
+
   it('does not match a metric that merely contains an affected name', () => {
     expect(viewCountingNoticeFor('2026-05-01', '2026-09-05', 'redViewsPercentage')).toBeUndefined();
     expect(viewCountingNoticeFor('2026-05-01', '2026-09-05', 'estimatedRedMinutesWatched')).toBeUndefined();
