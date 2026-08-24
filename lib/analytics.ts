@@ -265,6 +265,8 @@ export interface VideoAnalyticsResult {
   metrics: string;
   columnHeaders: { name?: string | null }[];
   rows: unknown[][];
+  /** Set when the range reaches before the view-counting change (#178). */
+  viewCountingNotice?: ViewCountingNotice;
 }
 
 export const DEFAULT_VIDEO_METRICS =
@@ -363,6 +365,7 @@ export async function fetchVideoAnalytics(params: VideoAnalyticsParams): Promise
     metrics,
     columnHeaders,
     rows: allRows,
+    viewCountingNotice: viewCountingNoticeFor(startDate, endDate, metrics),
   };
 }
 
@@ -617,6 +620,91 @@ async function lookupChannel(youtube: youtube_v3.Youtube, channel: string): Prom
 }
 
 /**
+ * The date YouTube aligned view counting across formats: a view counts from
+ * the first frame of playback, with no minimum watch time (#178). Dates from
+ * here onward are measured that way; earlier dates are not.
+ */
+export const VIEW_COUNTING_CHANGE_DATE = '2026-08-24';
+
+/** Last date measured under the previous, stricter definition. */
+const LAST_PRE_CHANGE_DATE = '2026-08-23';
+
+export const VIEW_COUNTING_CHANGE_URL = 'https://support.google.com/youtube/answer/2991785';
+
+/** Metrics whose meaning depends on which side of the change a date falls. */
+const VIEW_COUNTING_AFFECTED_METRICS = ['views', 'redViews'] as const;
+
+export interface ViewCountingNotice {
+  /** The change date, so callers do not hardcode it. */
+  changeDate: string;
+  /** Metrics in this query whose definition the change moved. */
+  affectedMetrics: string[];
+  /** The part of the requested range measured under the old definition. */
+  affectedRange: { startDate: string; endDate: string };
+  /** True when the range covers both definitions; false when entirely before. */
+  spansChange: boolean;
+  /** Human-readable text; the CLI prints this verbatim. */
+  message: string;
+  learnMoreUrl: string;
+}
+
+/**
+ * Build the view-counting notice for a resolved query, or undefined when the
+ * query is unaffected (#178).
+ *
+ * Two independent conditions have to hold, and both are about whether the
+ * numbers actually returned can be misread:
+ *
+ * 1. The query selects a metric the change moved. `engagedViews` keeps the
+ *    stricter definition on both sides of the date, so a query selecting only
+ *    it is consistent end to end and gets nothing.
+ * 2. The range reaches back before the change. A range starting on or after
+ *    it is measured one way throughout, so there is nothing to warn about.
+ *
+ * Deliberately not limited to ranges that *straddle* the date. A range lying
+ * entirely before it is internally consistent but is not comparable to data
+ * pulled for later dates, which is the same trap one step removed, so it gets
+ * a notice worded for that case instead.
+ */
+export function viewCountingNoticeFor(
+  startDate: string,
+  endDate: string,
+  metrics: string,
+): ViewCountingNotice | undefined {
+  const selected = splitFields(metrics);
+  const affectedMetrics = VIEW_COUNTING_AFFECTED_METRICS.filter(m => selected.includes(m));
+  if (affectedMetrics.length === 0) return undefined;
+
+  // ISO dates compare correctly as strings; no parsing needed.
+  if (startDate >= VIEW_COUNTING_CHANGE_DATE) return undefined;
+
+  const spansChange = endDate >= VIEW_COUNTING_CHANGE_DATE;
+  const affectedEnd = spansChange ? LAST_PRE_CHANGE_DATE : endDate;
+  const names = affectedMetrics.join(', ');
+
+  const message = spansChange
+    ? `Note: ${names} changes definition inside this date range. ` +
+      `${startDate} to ${affectedEnd} is counted under the previous definition; ` +
+      `${VIEW_COUNTING_CHANGE_DATE} onward counts every playback from the first frame. ` +
+      `Totals across the whole range mix the two. ` +
+      `engagedViews keeps the stricter definition throughout. ${VIEW_COUNTING_CHANGE_URL}`
+    : `Note: ${names} for ${startDate} to ${affectedEnd} is counted under the definition ` +
+      `used before ${VIEW_COUNTING_CHANGE_DATE}, so it is not comparable to ${names} for ` +
+      `dates from ${VIEW_COUNTING_CHANGE_DATE} onward, which counts every playback from ` +
+      `the first frame. engagedViews keeps the stricter definition throughout. ` +
+      `${VIEW_COUNTING_CHANGE_URL}`;
+
+  return {
+    changeDate: VIEW_COUNTING_CHANGE_DATE,
+    affectedMetrics: [...affectedMetrics],
+    affectedRange: { startDate, endDate: affectedEnd },
+    spansChange,
+    message,
+    learnMoreUrl: VIEW_COUNTING_CHANGE_URL,
+  };
+}
+
+/**
  * Metrics a custom query is ranked by when the caller does not say, in
  * preference order (#179).
  *
@@ -706,6 +794,8 @@ export interface ChannelAnalyticsResult {
   dateRange: { startDate: string; endDate: string };
   columnHeaders: { name?: string | null }[];
   rows: unknown[][];
+  /** Set when the range reaches before the view-counting change (#178). */
+  viewCountingNotice?: ViewCountingNotice;
 }
 
 /**
@@ -794,6 +884,7 @@ export async function fetchChannelAnalytics(params: ChannelAnalyticsParams): Pro
     dateRange: { startDate, endDate },
     columnHeaders: response.data.columnHeaders || [],
     rows: response.data.rows || [],
+    viewCountingNotice: viewCountingNoticeFor(startDate, endDate, metrics),
   };
 }
 

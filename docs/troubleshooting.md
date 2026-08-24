@@ -139,6 +139,44 @@ staqan-yt auth
 
 ## API Issues
 
+### Views jumped suddenly, or two runs disagree
+
+**Symptom:** View counts rose sharply with no matching change in traffic, or a
+total you stored earlier no longer matches what the CLI returns for the same
+date range. You may also see a note on stderr mentioning 2026-08-24.
+
+**Cause:** On **2026-08-24** YouTube changed how views are counted. From that
+date a view is counted from the first frame of playback, with no minimum watch
+time. Earlier dates use the previous, stricter definition. The field name did
+not change, so nothing in the numbers themselves marks the boundary.
+
+This is not a bug and not a data correction. The two numbers answer different
+questions.
+
+**Solution:** use `engagedViews`, which keeps the stricter definition on both
+sides of the date and is the metric tied to monetization:
+
+```bash
+# One consistent definition across the whole range
+staqan-yt get-channel-analytics --dimensions day --metrics engagedViews \
+  --start-date 2026-08-01 --end-date 2026-09-05
+
+# Both, to see the difference for yourself
+staqan-yt get-channel-analytics --dimensions day --metrics views,engagedViews \
+  --start-date 2026-08-01 --end-date 2026-09-05 --sort -engagedViews
+```
+
+Note that `views` and `engagedViews` already differed for the same range before
+2026-08-24, so the change date is not a clean before/after split between them.
+
+The Data API's `statistics.viewCount` (`get-video`, `get-channel`) uses the new
+definition and has no `engagedViews` equivalent; the previous definition is only
+reachable through the Analytics and Reporting APIs.
+
+**Reference:** [How YouTube counts views](https://support.google.com/youtube/answer/2991785)
+
+---
+
 ### "API quota exceeded"
 
 **Symptom:**

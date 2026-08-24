@@ -11,6 +11,9 @@ import {
   resolveCustomSort,
   SORTABLE_METRIC_PREFERENCE,
   CHANNEL_REPORT_TYPES,
+  viewCountingNoticeFor,
+  VIEW_COUNTING_CHANGE_DATE,
+  VIEW_COUNTING_CHANGE_URL,
 } from '../lib/analytics';
 
 /**
@@ -301,5 +304,81 @@ describe('custom query sort (#179)', () => {
     expect([...SORTABLE_METRIC_PREFERENCE]).toEqual([
       'views', 'engagedViews', 'estimatedMinutesWatched',
     ]);
+  });
+});
+
+/**
+ * The notice fires on the range, not on a guess about the data (#178).
+ *
+ * Live measurement on 2026-08-21, before the change: `views` and
+ * `engagedViews` already differed for the same range (channel STAQAN, country
+ * JP, 2026-05-01..2026-08-19: 1404 vs 802). So the notice deliberately does
+ * NOT claim the two series are equal before the cutoff and diverge after it.
+ * It states only what the date arithmetic supports: which dates were measured
+ * under which definition.
+ */
+describe('view-counting change notice (#178)', () => {
+  const AFTER = '2026-08-24';
+  const BEFORE_END = '2026-08-23';
+
+  it('stays silent for a range entirely on or after the change', () => {
+    expect(viewCountingNoticeFor(AFTER, '2026-09-30', 'views')).toBeUndefined();
+    expect(viewCountingNoticeFor('2026-09-01', '2026-09-30', 'views')).toBeUndefined();
+  });
+
+  it('fires on the first day that reaches back before the change', () => {
+    // Boundary: a start one day earlier is affected, the change date itself is not.
+    expect(viewCountingNoticeFor(BEFORE_END, '2026-09-30', 'views')).toBeDefined();
+    expect(viewCountingNoticeFor(AFTER, '2026-09-30', 'views')).toBeUndefined();
+  });
+
+  it('reports a straddling range as mixing two definitions', () => {
+    const n = viewCountingNoticeFor('2026-08-01', '2026-09-05', 'views');
+    expect(n?.spansChange).toBe(true);
+    // The affected slice ends the day before the change, not at the range end.
+    expect(n?.affectedRange).toEqual({ startDate: '2026-08-01', endDate: BEFORE_END });
+    expect(n?.message).toContain('mix the two');
+  });
+
+  it('reports a fully pre-change range as not comparable to later data', () => {
+    const n = viewCountingNoticeFor('2026-05-01', '2026-08-19', 'views');
+    expect(n?.spansChange).toBe(false);
+    // Nothing is truncated here: the whole requested range is affected.
+    expect(n?.affectedRange).toEqual({ startDate: '2026-05-01', endDate: '2026-08-19' });
+    expect(n?.message).toContain('not comparable');
+    expect(n?.message).not.toContain('mix the two');
+  });
+
+  it('only fires for metrics the change actually moved', () => {
+    expect(viewCountingNoticeFor('2026-05-01', '2026-09-05', 'views')).toBeDefined();
+    expect(viewCountingNoticeFor('2026-05-01', '2026-09-05', 'redViews')).toBeDefined();
+    // engagedViews keeps the stricter definition on both sides, so a query
+    // selecting only it is consistent end to end.
+    expect(viewCountingNoticeFor('2026-05-01', '2026-09-05', 'engagedViews')).toBeUndefined();
+    expect(viewCountingNoticeFor('2026-05-01', '2026-09-05', 'likes,shares')).toBeUndefined();
+    expect(viewCountingNoticeFor('2026-05-01', '2026-09-05', 'viewerPercentage')).toBeUndefined();
+  });
+
+  it('names every affected metric it found', () => {
+    const n = viewCountingNoticeFor('2026-05-01', '2026-09-05', 'views,engagedViews,redViews');
+    expect(n?.affectedMetrics).toEqual(['views', 'redViews']);
+    expect(n?.affectedMetrics).not.toContain('engagedViews');
+  });
+
+  it('does not match a metric that merely contains an affected name', () => {
+    expect(viewCountingNoticeFor('2026-05-01', '2026-09-05', 'redViewsPercentage')).toBeUndefined();
+    expect(viewCountingNoticeFor('2026-05-01', '2026-09-05', 'estimatedRedMinutesWatched')).toBeUndefined();
+  });
+
+  it('carries the date and the reference URL so callers need not hardcode them', () => {
+    const n = viewCountingNoticeFor('2026-05-01', '2026-09-05', 'views');
+    expect(n?.changeDate).toBe(VIEW_COUNTING_CHANGE_DATE);
+    expect(n?.learnMoreUrl).toBe(VIEW_COUNTING_CHANGE_URL);
+    expect(n?.message).toContain(VIEW_COUNTING_CHANGE_URL);
+    expect(n?.message).toContain('2026-08-24');
+  });
+
+  it('tolerates whitespace in the metric list', () => {
+    expect(viewCountingNoticeFor('2026-05-01', '2026-09-05', ' views , likes ')).toBeDefined();
   });
 });

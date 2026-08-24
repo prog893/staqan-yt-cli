@@ -41,6 +41,14 @@ async function getVideoAnalyticsCommand(options: AnalyticsOptions): Promise<void
 
     spinner.succeed(`Retrieved ${allRows.length} row(s) of analytics data`);
 
+    // #178: human-facing formats only, on stderr. See get-channel-analytics
+    // for the reasoning. This command is the more exposed of the two, since
+    // the default start date is the upload date, so every all-time query on a
+    // video published before the change reaches back past it.
+    if (result.viewCountingNotice && (outputFormat === 'pretty' || outputFormat === 'text')) {
+      process.stderr.write(`${result.viewCountingNotice.message}\n`);
+    }
+
     // Prepare aggregated data for structured formats
     const aggregated: { [key: string]: number } = {};
     columnHeaders.forEach((header, index) => {

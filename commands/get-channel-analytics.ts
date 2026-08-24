@@ -71,6 +71,14 @@ async function getChannelAnalyticsCommand(options: ChannelAnalyticsOptions): Pro
     const { channelId, channelTitle, reportType, dateRange, columnHeaders, rows } = result;
     const { startDate, endDate } = dateRange;
 
+    // #178: human-facing formats only. json/csv/table are what scripts read,
+    // and a note they cannot parse is noise there; the same signal reaches
+    // those callers as `viewCountingNotice` in the MCP result. stderr, not
+    // stdout, so even here it never lands in a redirected file.
+    if (result.viewCountingNotice && (outputFormat === 'pretty' || outputFormat === 'text')) {
+      process.stderr.write(`${result.viewCountingNotice.message}\n`);
+    }
+
     if (rows.length === 0) {
       console.log('');
       console.log(chalk.yellow('No analytics data available for this channel and time period.'));
