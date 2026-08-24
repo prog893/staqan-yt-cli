@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-21T01:38:25.393Z",
+  "generatedAt": "2026-08-24T09:42:00.941Z",
   "videoId": "eQICyHf3hsY",
   "dateRange": {
     "startDate": "2026-06-01",
@@ -190,6 +190,7 @@
   "dimensionMetrics": {
     "video": [
       "views",
+      "engagedViews",
       "estimatedMinutesWatched",
       "averageViewDuration",
       "averageViewPercentage",
@@ -207,6 +208,7 @@
     ],
     "day": [
       "views",
+      "engagedViews",
       "estimatedMinutesWatched",
       "averageViewDuration",
       "averageViewPercentage",
@@ -224,6 +226,7 @@
     ],
     "month": [
       "views",
+      "engagedViews",
       "estimatedMinutesWatched",
       "averageViewDuration",
       "averageViewPercentage",
@@ -241,6 +244,7 @@
     ],
     "country": [
       "views",
+      "engagedViews",
       "estimatedMinutesWatched",
       "averageViewDuration",
       "averageViewPercentage",
@@ -258,24 +262,28 @@
     ],
     "dma": [
       "views",
+      "engagedViews",
       "estimatedMinutesWatched",
       "averageViewDuration",
       "averageViewPercentage"
     ],
     "deviceType": [
       "views",
+      "engagedViews",
       "estimatedMinutesWatched",
       "averageViewDuration",
       "averageViewPercentage"
     ],
     "operatingSystem": [
       "views",
+      "engagedViews",
       "estimatedMinutesWatched",
       "averageViewDuration",
       "averageViewPercentage"
     ],
     "subscribedStatus": [
       "views",
+      "engagedViews",
       "estimatedMinutesWatched",
       "averageViewDuration",
       "averageViewPercentage",
@@ -290,6 +298,7 @@
     ],
     "youtubeProduct": [
       "views",
+      "engagedViews",
       "estimatedMinutesWatched",
       "averageViewDuration",
       "averageViewPercentage",
@@ -298,6 +307,7 @@
     ],
     "liveOrOnDemand": [
       "views",
+      "engagedViews",
       "estimatedMinutesWatched",
       "averageViewDuration",
       "redViews",
@@ -305,6 +315,7 @@
     ],
     "creatorContentType": [
       "views",
+      "engagedViews",
       "estimatedMinutesWatched",
       "averageViewDuration",
       "averageViewPercentage",
@@ -320,12 +331,14 @@
     ],
     "insightTrafficSourceType": [
       "views",
+      "engagedViews",
       "estimatedMinutesWatched",
       "averageViewDuration",
       "averageViewPercentage"
     ],
     "insightPlaybackLocationType": [
       "views",
+      "engagedViews",
       "estimatedMinutesWatched",
       "averageViewDuration",
       "averageViewPercentage"
@@ -337,5 +350,5 @@
     "failed": 0,
     "contradictions": []
   },
-  "probeCount": 296
+  "probeCount": 305
 }

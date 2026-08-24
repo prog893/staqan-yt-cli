@@ -17,11 +17,11 @@ do](#metrics-decide-more-than-dimensions-do).
 
 ## Metrics decide more than dimensions do
 
-`get-video-analytics` sends eight metrics by default:
+`get-video-analytics` sends nine metrics by default:
 
 ```text
-views, estimatedMinutesWatched, averageViewDuration, averageViewPercentage,
-likes, dislikes, comments, shares
+views, engagedViews, estimatedMinutesWatched, averageViewDuration,
+averageViewPercentage, likes, dislikes, comments, shares
 ```
 
 The four engagement metrics (`likes`, `dislikes`, `comments`, `shares`) are only
@@ -29,27 +29,31 @@ available for a few dimensions. The API rejects the **entire query** when any
 requested metric is unavailable for the requested dimensions, using the same
 opaque "query is not supported" it uses for dimension conflicts.
 
-Which of the eight default metrics each dimension permits:
+`engagedViews` (added 2026-08-24, #175) is in the same compatibility class as
+`views`: every dimension below permits both, so neither is ever the reason a
+query is rejected.
 
-| dimension | views | minutes | avgDur | avgPct | likes | dislikes | comments | shares |
-|---|---|---|---|---|---|---|---|---|
-| `video` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `day` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `month` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `country` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `creatorContentType` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `subscribedStatus` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| `dma` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `deviceType` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `operatingSystem` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `youtubeProduct` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `insightTrafficSourceType` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `insightPlaybackLocationType` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `liveOrOnDemand` | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+Which of the nine default metrics each dimension permits:
+
+| dimension | views | engaged | minutes | avgDur | avgPct | likes | dislikes | comments | shares |
+|---|---|---|---|---|---|---|---|---|---|
+| `video` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `day` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `month` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `country` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `creatorContentType` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `subscribedStatus` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| `dma` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `deviceType` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `operatingSystem` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `youtubeProduct` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `insightTrafficSourceType` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `insightPlaybackLocationType` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `liveOrOnDemand` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 For a multi-dimension query the permitted set is the **intersection** of the
-rows above. That is a measured law, not an assumption: `day` permits all eight,
-`deviceType` permits four, and `day,deviceType` permits exactly those four.
+rows above. That is a measured law, not an assumption: `day` permits all nine,
+`deviceType` permits five, and `day,deviceType` permits exactly those five.
 
 ### What the CLI does about it
 
@@ -61,8 +65,10 @@ rows above. That is a measured law, not an assumption: `day` permits all eight,
   because quietly returning different data than you asked for is worse than
   failing.
 
-So `--dimensions deviceType` now works and returns the four view and watch-time
-columns. To choose the columns yourself, pass them:
+So `--dimensions deviceType` now works and returns the five view and watch-time
+columns: `views`, `engagedViews`, `estimatedMinutesWatched`,
+`averageViewDuration` and `averageViewPercentage`. To choose the columns
+yourself, pass them:
 
 ```bash
 staqan-yt get-video-analytics --video-id VIDEO_ID \

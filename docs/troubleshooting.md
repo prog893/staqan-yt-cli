@@ -154,7 +154,7 @@ This is not a bug and not a data correction. The two numbers answer different
 questions.
 
 **Solution:** use `engagedViews`, which keeps the stricter definition on both
-sides of the date and is the metric tied to monetization:
+sides of the date and is therefore the only view metric comparable across it:
 
 ```bash
 # One consistent definition across the whole range

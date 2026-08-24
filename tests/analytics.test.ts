@@ -4,6 +4,8 @@ import {
   INVALID_DIMENSION_COMBOS,
   DIMENSION_MAX_ARITY,
   VIEW_METRICS,
+  ALL_SWEPT_METRICS,
+  DIMENSION_METRICS,
   validateVideoDimensions,
   allowedMetricsFor,
   reconcileMetrics,
@@ -389,5 +391,67 @@ describe('view-counting change notice (#178)', () => {
 
   it('tolerates whitespace in the metric list', () => {
     expect(viewCountingNoticeFor('2026-05-01', '2026-09-05', ' views , likes ')).toBeDefined();
+  });
+});
+
+/**
+ * engagedViews support (#175), from the live sweep on 2026-08-24 (the day the
+ * view-counting change took effect, which is the first day the metric could be
+ * measured post-cutoff). Snapshot: docs/analytics-compat-snapshot.json.
+ *
+ * The measured behavior that motivated widening the default set, same channel,
+ * 2026-07-13..2026-08-23:
+ *
+ *   BpesXOddpVc (short)     197 views     8 engagedViews
+ *   qC_vD4tPNqA (short)     245 views    23 engagedViews
+ *   -COxZI7L-IA (long-form) 548 views   548 engagedViews
+ *
+ * Long-form is unchanged because the minimum-watch-time rule the alignment
+ * removed only ever applied to Shorts.
+ */
+describe('engagedViews (#175)', () => {
+  it('is permitted by every dimension the sweep validated', () => {
+    // The point of widening the default: unlike likes/comments/shares, this
+    // metric never narrows a query, so it costs nothing in compatibility.
+    for (const d of Object.keys(DIMENSION_METRICS)) {
+      expect(allowedMetricsFor([d]), `dimension ${d}`).toContain('engagedViews');
+    }
+  });
+
+  it('sits in the same compatibility class as views', () => {
+    // Measured, not assumed: any dimension permitting views permits
+    // engagedViews and vice versa. A future sweep that breaks this parity
+    // should fail here rather than silently produce an asymmetric table.
+    for (const d of Object.keys(DIMENSION_METRICS)) {
+      const allowed = allowedMetricsFor([d]);
+      expect(allowed.includes('views'), `dimension ${d}`).toBe(allowed.includes('engagedViews'));
+    }
+  });
+
+  it('is carried by the swept vocabulary and the universal view set', () => {
+    expect(ALL_SWEPT_METRICS).toContain('engagedViews');
+    expect(VIEW_METRICS).toContain('engagedViews');
+  });
+
+  it('is in the default metric set, right after views', () => {
+    const defaults = DEFAULT_VIDEO_METRICS.split(',');
+    expect(defaults).toContain('engagedViews');
+    expect(defaults.indexOf('engagedViews')).toBe(defaults.indexOf('views') + 1);
+  });
+
+  it('survives reconciliation for every dimension, including restrictive ones', () => {
+    // The concern #175 raised about widening the default was that it would add
+    // failure modes. It does not: the metric is never dropped, anywhere.
+    for (const d of Object.keys(DIMENSION_METRICS)) {
+      const r = reconcileMetrics([d], DEFAULT_VIDEO_METRICS.split(','), false);
+      expect(r.metrics, `dimension ${d}`).toContain('engagedViews');
+      expect(r.dropped, `dimension ${d}`).not.toContain('engagedViews');
+    }
+  });
+
+  it('does not change which other metrics get dropped', () => {
+    // Widening the default must not disturb the existing narrowing behavior.
+    const r = reconcileMetrics(['deviceType'], DEFAULT_VIDEO_METRICS.split(','), false);
+    expect(r.dropped).toEqual(['likes', 'dislikes', 'comments', 'shares']);
   });
 });

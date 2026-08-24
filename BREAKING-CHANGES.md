@@ -1,5 +1,48 @@
 # Breaking Changes
 
+## Unreleased
+
+**`get-video-analytics` default metrics gained `engagedViews`** (#175).
+
+The default set went from eight metrics to nine, with `engagedViews` inserted
+second, immediately after `views`:
+
+| Before | After |
+|---|---|
+| `views,estimatedMinutesWatched,...` | `views,engagedViews,estimatedMinutesWatched,...` |
+
+**Who is affected:** anything parsing default `--output json`, `csv` or `table`
+by column position or column count. Callers that pass `--metrics` explicitly
+are unaffected, as are those reading columns by name.
+
+**Why:** on 2026-08-24 YouTube began counting a view from the first frame with
+no minimum watch time. `engagedViews` carries the stricter previous definition,
+which is the only way to keep one definition across the cutoff. The two diverge
+sharply on Shorts,
+measured over 2026-07-13..2026-08-23:
+
+| type | `views` | `engagedViews` |
+|---|---:|---:|
+| short | 197 | 8 |
+| short | 245 | 23 |
+| long-form | 548 | 548 |
+
+A default query on a Short reporting only `views` shows 197 where 8 is the
+engagement figure, so omitting it from the default was itself misleading.
+
+**To keep the old shape**, pass the previous set explicitly:
+
+```bash
+staqan-yt get-video-analytics --video-id ID \
+  --metrics views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares
+```
+
+Adding it costs nothing in compatibility: the live sweep measured
+`engagedViews` as permitted by all 13 valid dimensions, so unlike
+`likes`/`comments`/`shares` it is never dropped when `--dimensions` is used.
+
+---
+
 ## v2.1.0
 
 **`--tags` → `--replace`** in `update-video-tags`:

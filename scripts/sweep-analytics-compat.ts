@@ -45,6 +45,11 @@ const CARRIER_METRIC = 'views';
 /** Probed one at a time against a single dimension. */
 const CANDIDATE_METRICS = [
   'views',
+  // Added for #175. Carries the pre-2026-08-24 view definition, so its
+  // per-dimension availability had to be measured rather than assumed to
+  // match `views`: the previous sweep probed `views` only and its conclusions
+  // do not automatically transfer to a metric the API gained later.
+  'engagedViews',
   'estimatedMinutesWatched',
   'averageViewDuration',
   'averageViewPercentage',

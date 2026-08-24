@@ -19,15 +19,24 @@ import { chunkDateRange, debug, parseChannelHandle, parseDuration, toLocalYmd, v
  * nothing about it.
  */
 export const ALL_SWEPT_METRICS: readonly string[] = [
-  'views', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage',
-  'likes', 'dislikes', 'comments', 'shares', 'subscribersGained', 'subscribersLost',
-  'videosAddedToPlaylists', 'redViews', 'estimatedRedMinutesWatched',
-  'annotationClickThroughRate', 'cardClickRate',
+  'views', 'engagedViews', 'estimatedMinutesWatched', 'averageViewDuration',
+  'averageViewPercentage', 'likes', 'dislikes', 'comments', 'shares',
+  'subscribersGained', 'subscribersLost', 'videosAddedToPlaylists', 'redViews',
+  'estimatedRedMinutesWatched', 'annotationClickThroughRate', 'cardClickRate',
 ];
 
-/** The four view and watch-time metrics every valid dimension permits. */
+/**
+ * The five view and watch-time metrics every valid dimension permits.
+ *
+ * `engagedViews` was added from the 2026-08-24 sweep (#175) and sits in exactly
+ * the same compatibility class as `views`: measured against all 13 valid
+ * dimensions, every one accepts it, including the five restrictive dimensions
+ * that permit nothing else beyond this set. Its availability was measured
+ * rather than inferred from `views`, since the earlier sweep predated it.
+ */
 export const VIEW_METRICS: readonly string[] = [
-  'views', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage',
+  'views', 'engagedViews', 'estimatedMinutesWatched', 'averageViewDuration',
+  'averageViewPercentage',
 ];
 
 /**
@@ -125,22 +134,23 @@ export const DIMENSION_METRICS: Readonly<Record<string, readonly string[]>> = {
   deviceType: VIEW_METRICS,
   operatingSystem: VIEW_METRICS,
   subscribedStatus: [
-    'views', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage',
-    'likes', 'dislikes', 'shares', 'videosAddedToPlaylists', 'redViews',
-    'estimatedRedMinutesWatched', 'annotationClickThroughRate', 'cardClickRate',
+    'views', 'engagedViews', 'estimatedMinutesWatched', 'averageViewDuration',
+    'averageViewPercentage', 'likes', 'dislikes', 'shares', 'videosAddedToPlaylists',
+    'redViews', 'estimatedRedMinutesWatched', 'annotationClickThroughRate', 'cardClickRate',
   ],
   youtubeProduct: [
-    'views', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage',
-    'redViews', 'estimatedRedMinutesWatched',
+    'views', 'engagedViews', 'estimatedMinutesWatched', 'averageViewDuration',
+    'averageViewPercentage', 'redViews', 'estimatedRedMinutesWatched',
   ],
   liveOrOnDemand: [
-    'views', 'estimatedMinutesWatched', 'averageViewDuration', 'redViews',
-    'estimatedRedMinutesWatched',
+    'views', 'engagedViews', 'estimatedMinutesWatched', 'averageViewDuration',
+    'redViews', 'estimatedRedMinutesWatched',
   ],
   creatorContentType: [
-    'views', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage',
-    'likes', 'dislikes', 'comments', 'shares', 'subscribersGained', 'subscribersLost',
-    'redViews', 'estimatedRedMinutesWatched', 'cardClickRate',
+    'views', 'engagedViews', 'estimatedMinutesWatched', 'averageViewDuration',
+    'averageViewPercentage', 'likes', 'dislikes', 'comments', 'shares',
+    'subscribersGained', 'subscribersLost', 'redViews', 'estimatedRedMinutesWatched',
+    'cardClickRate',
   ],
   insightTrafficSourceType: VIEW_METRICS,
   insightPlaybackLocationType: VIEW_METRICS,
@@ -269,8 +279,28 @@ export interface VideoAnalyticsResult {
   viewCountingNotice?: ViewCountingNotice;
 }
 
+/**
+ * Default columns for a video analytics query.
+ *
+ * `engagedViews` sits second, next to `views`, because on Shorts the two answer
+ * very different questions and reading only the first is misleading. Measured
+ * on this channel over 2026-07-13..2026-08-23:
+ *
+ *   BpesXOddpVc (short)     197 views     8 engagedViews
+ *   qC_vD4tPNqA (short)     245 views    23 engagedViews
+ *   -COxZI7L-IA (long-form) 548 views   548 engagedViews
+ *
+ * Long-form is unchanged because a long-form view already counted from the
+ * start; the 2026-08-24 alignment removed the minimum-watch-time rule that
+ * only ever applied to Shorts. So the default set has to carry both, or a
+ * Shorts creator reads 197 where 8 is the engagement figure.
+ *
+ * Widening this set costs nothing in compatibility: the #175 sweep measured
+ * `engagedViews` as permitted by all 13 valid dimensions, so unlike the
+ * metrics #173 has to drop, it never narrows a query.
+ */
 export const DEFAULT_VIDEO_METRICS =
-  'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares';
+  'views,engagedViews,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares';
 
 /**
  * Fetch analytics for one video: resolves the date range from the upload
@@ -551,12 +581,15 @@ export async function fetchVideoRetention(params: { videoId: string }): Promise<
  * views,estimatedMinutesWatched pair was rejected with "not supported",
  * so the report type never worked on either surface).
  *
- * These metric sets deliberately do NOT carry engagedViews (#179). Each
- * report is a fixed output shape that existing consumers parse by column, so
- * widening one silently changes their input. engagedViews is reachable today
- * through a custom --dimensions/--metrics query, and whether it is accepted
- * for each of these dimensions has not been swept the way #173 swept the
- * rest, so adding it here would ship an unverified claim. Revisit under #175.
+ * These metric sets deliberately do NOT carry engagedViews. The original
+ * reason (#179) was that its compatibility here was unmeasured; the #175 sweep
+ * has since measured it, and every dimension these reports use does accept it.
+ *
+ * They stay as they are for the remaining reason only: each is a fixed output
+ * shape that existing consumers parse by column, and widening five reports at
+ * once is a separate decision from widening the video-analytics default, which
+ * #175 covers. engagedViews is reachable here through a custom
+ * --dimensions/--metrics query with --sort. Tracked in #185.
  */
 export const CHANNEL_REPORT_TYPES: Record<string, { dimensions: string; metrics: string; sort: string }> = {
   demographics: {
@@ -720,7 +753,7 @@ export function viewCountingNoticeFor(
  * `views` stays first so every query that sorted before this existed sorts
  * identically after it. `engagedViews` follows: it carries the pre-2026-08-24
  * view semantics, so a caller selecting it is asking the same question
- * `views` used to answer, and it is the figure tied to monetization.
+ * `views` used to answer.
  * `estimatedMinutesWatched` is the fallback for metric sets that select no
  * view metric at all.
  */
