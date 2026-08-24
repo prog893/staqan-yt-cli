@@ -584,26 +584,9 @@ export type ReportDataResult =
        * both sides and `views` keeps its name while changing its meaning.
        */
       viewCountingNotice?: ViewCountingNotice;
-      /**
-       * Set when the merged reports did not all carry the same columns, so a
-       * blank cell in the output could be either "this report had no such
-       * column" or a real empty value (#177). Undefined when they agreed,
-       * which is every case in today's archive.
-       */
-      schemaMismatch?: ReportSchemaMismatch;
       cachedReports: CacheIndexEntry[];
       fetchedReports: FetchedReportInfo[];
     };
-
-/** Columns the merged reports disagreed on. See `findSchemaMismatch`. */
-export interface ReportSchemaMismatch {
-  /** How many reports contributed rows to the merged result. */
-  totalReports: number;
-  /** Each column missing from at least one of them, alphabetical. */
-  inconsistentColumns: { column: string; presentIn: number }[];
-  /** Human-readable text; the CLI prints this verbatim after "Warning: ". */
-  message: string;
-}
 
 /**
  * Fetch Reporting API rows for a report type, merging the local cache with
@@ -849,16 +832,15 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
 
   /**
    * Header row of every report that contributed rows, cached or freshly
-   * downloaded, in contribution order (#177).
+   * downloaded (#177).
    *
-   * Both sources already parse their headers for their own reasons
-   * (`readCachedReport` validates them against the sidecar metadata,
-   * `downloadReport` returns them alongside the rows), so collecting them
-   * costs no extra reads. They drive two things below: which view metrics the
-   * result actually carries, and whether the merged reports agreed on a
-   * schema at all.
+   * Used only to decide whether the merged result carries a view column at
+   * all, which is what the view-counting notice keys on. Both sources already
+   * parse their headers for their own reasons (`readCachedReport` validates
+   * them against the sidecar metadata, `downloadReport` returns them
+   * alongside the rows), so collecting them costs no extra reads.
    */
-  const contributingColumns: { source: string; columns: string[] }[] = [];
+  const contributingColumns: string[][] = [];
 
   const overlappingCached = await findCachedReports(channelId, params.type, adjustedStart, adjustedEnd);
 
@@ -881,7 +863,7 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
     if (reportData) {
       cachedData.push(...reportData.data);
       cachedReports.push(cachedReport);
-      contributingColumns.push({ source: cachedReport.reportId, columns: reportData.headers });
+      contributingColumns.push(reportData.headers);
       debug(`Loaded from cache: ${cachedReport.reportId}`);
     }
   }
@@ -999,7 +981,7 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
     }
 
     fetchedData.push(...data);
-    contributingColumns.push({ source: report.id || 'report', columns: headers });
+    contributingColumns.push(headers);
     if (dataMinDate && dataMaxDate) {
       fetchedWindows.push({ min: dataMinDate, max: dataMaxDate });
       fetchedCoverage.push({ min: dataMinDate, max: dataMaxDate });
@@ -1084,25 +1066,12 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
   // the merge carries `views`, the merged result carries a `views` column and
   // the caveat applies to it.
   const allColumns = new Set<string>();
-  for (const c of contributingColumns) for (const col of c.columns) allColumns.add(col);
+  for (const cols of contributingColumns) for (const col of cols) allColumns.add(col);
   const viewCountingNotice = viewCountingNoticeForColumns(
     adjustedStart,
     adjustedEnd,
     [...allColumns],
   );
-
-  // Schema agreement across the merged reports (#177). Distinct from the
-  // notice above and it catches a different failure: YouTube versions a
-  // report type in its ID (`channel_basic_a3`), so a column set normally
-  // cannot change under a fixed `--type`. If it ever does, the formatters
-  // union the keys and emit a column that is populated for some dates and
-  // empty for others, with nothing to distinguish that from a genuinely empty
-  // cell. Reporting it is the only way a consumer can tell the two apart.
-  const schemaMismatch = findSchemaMismatch(contributingColumns);
-  if (schemaMismatch) {
-    // progress() routes to stderr, keeping stdout parseable.
-    progress(`Warning: ${schemaMismatch.message}`);
-  }
 
   return {
     status: 'ok',
@@ -1114,52 +1083,7 @@ export async function fetchReportData(params: ReportDataParams): Promise<ReportD
     availableRange: { startDate: effectiveMinDate, endDate: effectiveMaxDate },
     uncoveredRanges,
     viewCountingNotice,
-    schemaMismatch,
     cachedReports,
     fetchedReports: reportsToFetch,
-  };
-}
-
-/**
- * Columns that only some of the merged reports carried, or undefined when
- * they all agreed (#177).
- *
- * Measured against a 3,683-report archive spanning 2026-01 to 2026-08: every
- * report type had exactly one column set, so on today's data this returns
- * undefined every time. It is a guard against a future report-type revision,
- * not a fix for a live mismatch, and it is deliberately cheap enough to run
- * unconditionally.
- */
-export function findSchemaMismatch(
-  contributing: { source: string; columns: string[] }[],
-): ReportSchemaMismatch | undefined {
-  if (contributing.length < 2) return undefined;
-
-  const counts = new Map<string, number>();
-  for (const { columns } of contributing) {
-    // Dedupe within one report first: a duplicated header would otherwise
-    // push a column's count above the report count and hide a real gap.
-    for (const col of new Set(columns)) {
-      counts.set(col, (counts.get(col) || 0) + 1);
-    }
-  }
-
-  const total = contributing.length;
-  const inconsistent = [...counts.entries()]
-    .filter(([, n]) => n < total)
-    .map(([column, n]) => ({ column, presentIn: n }))
-    .sort((a, b) => a.column.localeCompare(b.column));
-
-  if (inconsistent.length === 0) return undefined;
-
-  const names = inconsistent.map(c => `${c.column} (in ${c.presentIn}/${total})`).join(', ');
-  return {
-    totalReports: total,
-    inconsistentColumns: inconsistent,
-    message:
-      `the ${total} reports merged for this range do not share one column set. ` +
-      `Present in only some of them: ${names}. ` +
-      `Rows from a report lacking a column have no key for it, so the output ` +
-      `shows an empty cell that is indistinguishable from a real zero-value cell.`,
   };
 }

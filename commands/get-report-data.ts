@@ -200,15 +200,6 @@ async function getReportDataCommand(options: ReportDataOptions): Promise<void> {
       process.stderr.write('\n');
     }
 
-    // Schema disagreement across the merged reports (#177). lib/reports.ts
-    // already emits this through progress(); repeated here in the command's
-    // own warning style so it sits with the other data-quality caveats rather
-    // than scrolling past inside the spinner's progress line.
-    if (result.schemaMismatch) {
-      process.stderr.write(chalk.yellow('⚠️  Inconsistent columns: ') + result.schemaMismatch.message + '\n');
-      process.stderr.write('\n');
-    }
-
     // Show expiration warning for the reports used
     const now = new Date();
     const jobCreated = new Date(result.jobCreateTime);
