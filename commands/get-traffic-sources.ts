@@ -32,12 +32,10 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
     console.log('');
 
     const outputFormat = await getOutputFormat(options.output);
-    // #178 view-counting caveat. These reports send a fixed `views` metric
-    // set the caller cannot widen, so unlike the custom-query commands there
-    // is no way to ask for `engagedViews` instead and sidestep the ambiguity.
-    // Whether they should also return `engagedViews` is #185; that decision
-    // changes the output shape, while this note does not, so it is not
-    // blocked on it.
+    // #178 view-counting caveat. This report sends a fixed metric set the
+    // caller cannot widen, so the notice is the only way the ambiguity gets
+    // flagged. Since #185 the set carries `engagedViews`, so the metric the
+    // notice points at is actually present in the output.
     //
     // Human-facing formats only, on stderr, matching get-video-analytics and
     // get-channel-analytics: json/csv/table are what scripts read and a note
@@ -67,15 +65,26 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
       'STORIES': 'Stories',
     };
 
+    // Resolve columns by name rather than position (#185 added engagedViews).
+    // json and csv pass `rows` straight through, so they pick the new column
+    // up on their own; only the derived shape below needs to know about it.
+    const col = (name: string) => columnHeaders.findIndex(h => h.name === name);
+    const idxSource = Math.max(0, col('insightTrafficSourceType'));
+    const idxViews = col('views');
+    const idxEngaged = col('engagedViews');
+
     let totalViews = 0;
+    let totalEngagedViews = 0;
     rows.forEach(row => {
-      totalViews += row[1] as number;
+      totalViews += (row[idxViews] as number) || 0;
+      if (idxEngaged >= 0) totalEngagedViews += (row[idxEngaged] as number) || 0;
     });
 
     const trafficData = rows.map(row => ({
-      source: sourceLabels[row[0] as string] || row[0] as string,
-      views: row[1] as number,
-      percentage: totalViews > 0 ? ((row[1] as number / totalViews) * 100).toFixed(2) : '0',
+      source: sourceLabels[row[idxSource] as string] || row[idxSource] as string,
+      views: (row[idxViews] as number) || 0,
+      engagedViews: idxEngaged >= 0 ? (row[idxEngaged] as number) || 0 : 0,
+      percentage: totalViews > 0 ? (((row[idxViews] as number) || 0) / totalViews * 100).toFixed(2) : '0',
     }));
 
     switch (outputFormat) {
@@ -102,7 +111,7 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
         break;
 
       case 'text':
-        await writeStdout(trafficData.map(item => [item.source, item.views, item.percentage].join('\t')).join('\n') + '\n');
+        await writeStdout(trafficData.map(item => [item.source, item.views, item.engagedViews, item.percentage].join('\t')).join('\n') + '\n');
         break;
 
       case 'pretty':
@@ -124,11 +133,13 @@ async function getTrafficSourcesCommand(options: TrafficSourcesOptions): Promise
         trafficData.forEach(item => {
           console.log(chalk.bold(`  ${item.source}:`));
           console.log(chalk.gray('    Views:      ') + chalk.cyan(formatNumber(item.views)));
+          console.log(chalk.gray('    Engaged:    ') + chalk.cyan(formatNumber(item.engagedViews)));
           console.log(chalk.gray('    Percentage: ') + chalk.yellow(`${item.percentage}%`));
           console.log('');
         });
 
         console.log(chalk.bold('Total Views: ') + chalk.cyan(formatNumber(totalViews)));
+        console.log(chalk.bold('Total Engaged Views: ') + chalk.cyan(formatNumber(totalEngagedViews)));
         console.log('');
         break;
     }

@@ -276,7 +276,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: 'youtube_get_search_terms',
-    description: 'Get YouTube search terms that led viewers to this video (top 50 by default)',
+    description: 'Get YouTube search terms that led viewers to this video (top 50 by default). Rows carry both `views` and `engagedViews`: `views` counts every playback from the first frame, `engagedViews` applies the stricter pre-2026-08-24 definition and is the one consistent across that date. Measured from this exact query shape: on long-form videos the two agree (53 views against 53 engagedViews), while on Shorts they diverge sharply (131 against 62, and 2 against 0), so report whichever the question calls for rather than assuming they agree. Rows are ranked by `views`. When the result carries `viewCountingNotice`, the range reaches back before the change and `views` is not measured consistently across it.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -296,7 +296,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: 'youtube_get_channel_search_terms',
-    description: 'Get top YouTube search keywords driving traffic to an entire channel (aggregated across all videos). Returns up to 25 terms due to API limit. Defaults to lifetime data.',
+    description: 'Get top YouTube search keywords driving traffic to an entire channel (aggregated across all videos). Returns up to 25 terms due to API limit. Defaults to lifetime data. Rows carry both `views` and `engagedViews`: `views` counts every playback from the first frame, `engagedViews` applies the stricter pre-2026-08-24 definition and is the one consistent across that date. Measured channel-wide for this report: 189 views against 115 engagedViews, so ranking terms by `views` alone overstates how much of that search traffic engaged. Rows are ranked by `views`. When the result carries `viewCountingNotice`, the range reaches back before the change and `views` is not measured consistently across it.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -329,7 +329,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: 'youtube_get_traffic_sources',
-    description: 'Get traffic source breakdown showing where viewers came from (YouTube search, suggested videos, external websites, etc.)',
+    description: 'Get traffic source breakdown showing where viewers came from (YouTube search, suggested videos, external websites, etc.). Rows carry both `views` and `engagedViews`: `views` counts every playback from the first frame, `engagedViews` applies the stricter pre-2026-08-24 definition and is the one consistent across that date. Measured from this exact per-video query shape: on long-form videos the two agree (553 views against 553 engagedViews), while on Shorts they diverge sharply (197 against 8, and 245 against 23), so the two are not interchangeable and the tool cannot know which kind of video it was pointed at. Rows are ranked by `views`. When the result carries `viewCountingNotice`, the range reaches back before the change and `views` is not measured consistently across it.',
     inputSchema: {
       type: 'object',
       properties: {

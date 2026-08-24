@@ -2,6 +2,50 @@
 
 ## Unreleased
 
+**The fixed-shape analytics reports gained `engagedViews`** (#185).
+
+Four surfaces send a metric set the caller cannot override with `--metrics`.
+All of them now carry `engagedViews`, inserted immediately after `views`:
+
+| command | before | after |
+|---|---|---|
+| `get-traffic-sources` | `insightTrafficSourceType, views` | `insightTrafficSourceType, views, engagedViews` |
+| `get-search-terms` | `insightTrafficSourceDetail, views` | `insightTrafficSourceDetail, views, engagedViews` |
+| `get-channel-analytics --report devices\|geography\|traffic-sources\|subscription-status` | `<dimension>, views, estimatedMinutesWatched` | `<dimension>, views, engagedViews, estimatedMinutesWatched` |
+| `get-channel-search-terms` | `insightTrafficSourceDetail, views, estimatedMinutesWatched` | `insightTrafficSourceDetail, views, engagedViews, estimatedMinutesWatched` |
+
+`--report demographics` is unchanged. It reports `viewerPercentage`, a share
+rather than a count, so no view metric exists there for the change to have
+moved.
+
+**Who is affected:** anything reading these outputs by column position.
+`views` keeps its index in all four, but on the two reports that also carry
+`estimatedMinutesWatched` that column **moves from index 2 to index 3**.
+Callers reading by column name are unaffected.
+
+**Row order is unchanged.** Every affected report keeps `sort: '-views'`, so
+rows rank exactly as before. Verified against the live API: row keys and
+`views` values are identical before and after for all four surfaces.
+
+**Why:** `views` and `engagedViews` are not interchangeable, and the gap is
+large. Measured channel-wide over 2026-05-01..2026-08-25:
+
+| report | `views` | `engagedViews` |
+|---|---:|---:|
+| geography | 1485 | 883 |
+| devices | 2849 | 1873 |
+| traffic-sources | 2873 | 1896 |
+| channel search terms | 189 | 115 |
+
+A breakdown reporting only `views` describes reach where the question is
+usually engagement. These four are also the queries a caller cannot fix
+themselves, since none of them accept `--metrics`.
+
+Since #190 these commands print a notice stating that `engagedViews` keeps the
+stricter definition across the 2026-08-24 counting change. Recommending a
+metric the command did not return was the remaining incoherence, and this
+closes it.
+
 **`get-video-analytics` default metrics gained `engagedViews`** (#175).
 
 The default set went from eight metrics to nine, with `engagedViews` inserted

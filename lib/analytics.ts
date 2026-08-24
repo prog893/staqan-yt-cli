@@ -413,8 +413,12 @@ export interface VideoReportResult {
   rows: unknown[][];
   /**
    * Set when the range reaches back before the 2026-08-24 view-counting
-   * change. These reports send a fixed `views` metric set, so the caveat
-   * applies to every row they return.
+   * change.
+   *
+   * These reports send `VIDEO_BREAKDOWN_METRICS` (`views,engagedViews`), a
+   * fixed set the caller cannot widen, so the caveat applies to the `views`
+   * column of every row they return. `engagedViews` is returned alongside it
+   * precisely so the caveat has an answer (#185).
    */
   viewCountingNotice?: ViewCountingNotice;
 }
@@ -465,6 +469,20 @@ async function lookupVideoSnippet(youtube: youtube_v3.Youtube, videoId: string):
  * days, the MCP tool to all-time — consolidating here must not silently
  * change either surface's documented behavior.
  */
+/**
+ * Metrics for the two per-video breakdowns (`get-traffic-sources`,
+ * `get-search-terms`), which take no `--metrics` flag (#185).
+ *
+ * `engagedViews` is included because these are exactly the queries a caller
+ * cannot widen themselves. On long-form the two agree (measured 548 against
+ * 548 for one video), but on a Short they diverge sharply (197 against 8), and
+ * the command cannot know which it is being pointed at.
+ *
+ * Declared once and passed to both the API call and `viewCountingNoticeFor`,
+ * so the notice can never describe a metric set the query did not send.
+ */
+const VIDEO_BREAKDOWN_METRICS = 'views,engagedViews';
+
 export async function fetchTrafficSources(params: {
   videoId: string;
   startDate: string;
@@ -481,7 +499,7 @@ export async function fetchTrafficSources(params: {
     ids: 'channel==MINE',
     startDate: params.startDate,
     endDate: params.endDate,
-    metrics: 'views',
+    metrics: VIDEO_BREAKDOWN_METRICS,
     dimensions: 'insightTrafficSourceType',
     filters: `video==${params.videoId}`,
     sort: '-views',
@@ -493,7 +511,7 @@ export async function fetchTrafficSources(params: {
     dateRange: { startDate: params.startDate, endDate: params.endDate },
     columnHeaders: response.data.columnHeaders || [],
     rows: response.data.rows || [],
-    viewCountingNotice: viewCountingNoticeFor(params.startDate, params.endDate, 'views'),
+    viewCountingNotice: viewCountingNoticeFor(params.startDate, params.endDate, VIDEO_BREAKDOWN_METRICS),
   };
 }
 
@@ -519,7 +537,7 @@ export async function fetchSearchTerms(params: {
     ids: 'channel==MINE',
     startDate: params.startDate,
     endDate: params.endDate,
-    metrics: 'views',
+    metrics: VIDEO_BREAKDOWN_METRICS,
     dimensions: 'insightTrafficSourceDetail',
     filters: `video==${params.videoId};insightTrafficSourceType==YT_SEARCH`,
     sort: '-views',
@@ -532,7 +550,7 @@ export async function fetchSearchTerms(params: {
     dateRange: { startDate: params.startDate, endDate: params.endDate },
     columnHeaders: response.data.columnHeaders || [],
     rows: response.data.rows || [],
-    viewCountingNotice: viewCountingNoticeFor(params.startDate, params.endDate, 'views'),
+    viewCountingNotice: viewCountingNoticeFor(params.startDate, params.endDate, VIDEO_BREAKDOWN_METRICS),
   };
 }
 
@@ -589,15 +607,20 @@ export async function fetchVideoRetention(params: { videoId: string }): Promise<
  * views,estimatedMinutesWatched pair was rejected with "not supported",
  * so the report type never worked on either surface).
  *
- * These metric sets deliberately do NOT carry engagedViews. The original
- * reason (#179) was that its compatibility here was unmeasured; the #175 sweep
- * has since measured it, and every dimension these reports use does accept it.
+ * Every report carrying a view count sends `views,engagedViews` (#185). The
+ * two are not interchangeable and the gap is large: measured channel-wide over
+ * 2026-05-01..2026-08-25, geography returned 1485 views against 883
+ * engagedViews, devices 2849 against 1873. A breakdown reporting only `views`
+ * therefore describes reach where the question is usually engagement.
  *
- * They stay as they are for the remaining reason only: each is a fixed output
- * shape that existing consumers parse by column, and widening five reports at
- * once is a separate decision from widening the video-analytics default, which
- * #175 covers. engagedViews is reachable here through a custom
- * --dimensions/--metrics query with --sort. Tracked in #185.
+ * `sort` stays `-views` rather than moving to `-engagedViews`. Row order is
+ * part of a predefined report's shape, and #179 settled the same question the
+ * same way for custom queries: a query that ranked one way before this existed
+ * ranks identically after it. Changing the axis would be a second, separate
+ * break with nothing forcing it.
+ *
+ * demographics is untouched: `viewerPercentage` is a share, not a count, so
+ * there is no view metric for the change to have moved.
  */
 export const CHANNEL_REPORT_TYPES: Record<string, { dimensions: string; metrics: string; sort: string }> = {
   demographics: {
@@ -607,22 +630,22 @@ export const CHANNEL_REPORT_TYPES: Record<string, { dimensions: string; metrics:
   },
   devices: {
     dimensions: 'deviceType,operatingSystem',
-    metrics: 'views,estimatedMinutesWatched',
+    metrics: 'views,engagedViews,estimatedMinutesWatched',
     sort: '-views',
   },
   geography: {
     dimensions: 'country',
-    metrics: 'views,estimatedMinutesWatched',
+    metrics: 'views,engagedViews,estimatedMinutesWatched',
     sort: '-views',
   },
   'traffic-sources': {
     dimensions: 'insightTrafficSourceType',
-    metrics: 'views,estimatedMinutesWatched',
+    metrics: 'views,engagedViews,estimatedMinutesWatched',
     sort: '-views',
   },
   'subscription-status': {
     dimensions: 'subscribedStatus',
-    metrics: 'views,estimatedMinutesWatched',
+    metrics: 'views,engagedViews,estimatedMinutesWatched',
     sort: '-views',
   },
 };
@@ -1159,8 +1182,13 @@ export interface ChannelSearchTermsResult {
 
 // Metrics for insightTrafficSourceDetail with insightTrafficSourceType==YT_SEARCH.
 // videoThumbnailImpressions/CTR are only valid for discovery-type sources and
-// cause a 400 when combined with YT_SEARCH. Keep only the two safe ones.
-const SEARCH_TERMS_METRICS = 'views,estimatedMinutesWatched';
+// cause a 400 when combined with YT_SEARCH, so they stay out.
+//
+// engagedViews added in #185, live-verified against this query shape. It
+// matters here in particular: measured channel-wide over 2026-05-01..2026-08-25
+// this report returned 189 views against 115 engagedViews, so ranking search
+// terms by `views` alone overstates how much of that search traffic engaged.
+const SEARCH_TERMS_METRICS = 'views,engagedViews,estimatedMinutesWatched';
 
 /**
  * YouTube-search terms that led viewers to a channel's videos. The Analytics

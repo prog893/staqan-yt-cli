@@ -45,12 +45,10 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
     console.log('');
 
     const outputFormat = await getOutputFormat(options.output);
-    // #178 view-counting caveat. These reports send a fixed `views` metric
-    // set the caller cannot widen, so unlike the custom-query commands there
-    // is no way to ask for `engagedViews` instead and sidestep the ambiguity.
-    // Whether they should also return `engagedViews` is #185; that decision
-    // changes the output shape, while this note does not, so it is not
-    // blocked on it.
+    // #178 view-counting caveat. SEARCH_TERMS_METRICS is fixed and the caller
+    // cannot widen it, so the notice is the only flag on the ambiguity. Since
+    // #185 that set carries `engagedViews`, so the metric the notice points at
+    // is present in the output.
     //
     // Human-facing formats only, on stderr, matching get-video-analytics and
     // get-channel-analytics: json/csv/table are what scripts read and a note
@@ -67,15 +65,17 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
     const colIndex = (name: string) =>
       columnHeaders.findIndex(h => h.name === name);
 
-    const idxTerm  = colIndex('insightTrafficSourceDetail');
-    const idxViews = colIndex('views');
-    const idxWatch = colIndex('estimatedMinutesWatched');
+    const idxTerm    = colIndex('insightTrafficSourceDetail');
+    const idxViews   = colIndex('views');
+    const idxEngaged = colIndex('engagedViews');
+    const idxWatch   = colIndex('estimatedMinutesWatched');
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const structuredRows = rows.map((row: any[]) => ({
       rank: 0,           // filled below
       searchTerm:        row[idxTerm]  as string,
       views:             row[idxViews] as number,
+      engagedViews:      idxEngaged >= 0 ? row[idxEngaged] as number : 0,
       watchTimeMinutes:  idxWatch >= 0 ? row[idxWatch] as number : 0,
     }));
 
@@ -112,8 +112,8 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
         // Header and rows in one write so the whole payload is flushed together.
         await writeStdout(
           [
-            ['rank', 'searchTerm', 'views', 'watchTimeMinutes'].join('\t'),
-            ...structuredRows.map(r => [r.rank, r.searchTerm, r.views, r.watchTimeMinutes].join('\t')),
+            ['rank', 'searchTerm', 'views', 'engagedViews', 'watchTimeMinutes'].join('\t'),
+            ...structuredRows.map(r => [r.rank, r.searchTerm, r.views, r.engagedViews, r.watchTimeMinutes].join('\t')),
           ].join('\n') + '\n'
         );
         break;
@@ -153,7 +153,8 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
         console.log('');
 
         let totalViews = 0;
-        structuredRows.forEach(r => { totalViews += r.views; });
+        let totalEngagedViews = 0;
+        structuredRows.forEach(r => { totalViews += r.views; totalEngagedViews += r.engagedViews; });
 
         structuredRows.forEach(r => {
           const pct = totalViews > 0 ? ((r.views / totalViews) * 100).toFixed(1) : '0.0';
@@ -163,6 +164,9 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
             chalk.gray('      Views:      ') + chalk.cyan(formatNumber(r.views)) +
             chalk.gray(` (${pct}% of search traffic)`)
           );
+          console.log(
+            chalk.gray('      Engaged:    ') + chalk.cyan(formatNumber(r.engagedViews))
+          );
           if (r.watchTimeMinutes > 0) {
             const watchHours = (r.watchTimeMinutes / 60).toFixed(0);
             console.log(chalk.gray('      Watch time:  ') + chalk.cyan(`${formatNumber(parseInt(watchHours, 10))}h`));
@@ -170,7 +174,10 @@ async function getChannelSearchTermsCommand(options: ChannelSearchTermsOptions):
           console.log('');
         });
 
-        console.log(chalk.bold('Total views from search: ') + chalk.cyan(formatNumber(totalViews)));
+        // Scoped to the returned terms. The API caps this report at
+        // CHANNEL_SEARCH_TERMS_MAX_RESULTS, so these are not channel totals.
+        console.log(chalk.bold(`Views from these ${structuredRows.length} terms: `) + chalk.cyan(formatNumber(totalViews)));
+        console.log(chalk.bold(`Engaged views from these ${structuredRows.length} terms: `) + chalk.cyan(formatNumber(totalEngagedViews)));
         console.log('');
         break;
       }

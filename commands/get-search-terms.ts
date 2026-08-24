@@ -33,22 +33,27 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
     console.log('');
 
     const outputFormat = await getOutputFormat(options.output);
-    // #178 view-counting caveat. These reports send a fixed `views` metric
-    // set the caller cannot widen, so unlike the custom-query commands there
-    // is no way to ask for `engagedViews` instead and sidestep the ambiguity.
-    // Whether they should also return `engagedViews` is #185; that decision
-    // changes the output shape, while this note does not, so it is not
-    // blocked on it.
+    // #178 view-counting caveat. This report sends a fixed metric set the
+    // caller cannot widen, so the notice is the only way the ambiguity gets
+    // flagged. Since #185 the set carries `engagedViews`, so the metric the
+    // notice points at is actually present in the output.
     //
     // Human-facing formats only, on stderr, matching get-video-analytics and
     // get-channel-analytics: json/csv/table are what scripts read and a note
     // they cannot parse is noise there. MCP callers read `viewCountingNotice`
     // off the result instead.
     emitViewCountingNotice(result.viewCountingNotice, outputFormat);
+    // Columns resolved by name, not position (#185 added engagedViews).
+    const col = (name: string) => result.columnHeaders.findIndex(h => h.name === name);
+    const idxTerm = Math.max(0, col('insightTrafficSourceDetail'));
+    const idxViews = col('views');
+    const idxEngaged = col('engagedViews');
+
     const searchTermsData = rows.map((row, index) => ({
       rank: index + 1,
-      searchTerm: row[0] as string,
-      views: row[1] as number,
+      searchTerm: row[idxTerm] as string,
+      views: (row[idxViews] as number) || 0,
+      engagedViews: idxEngaged >= 0 ? (row[idxEngaged] as number) || 0 : 0,
     }));
 
     switch (outputFormat) {
@@ -67,7 +72,7 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
         break;
 
       case 'text':
-        await writeStdout(searchTermsData.map(item => [item.rank, item.searchTerm, item.views].join('\t')).join('\n') + '\n');
+        await writeStdout(searchTermsData.map(item => [item.rank, item.searchTerm, item.views, item.engagedViews].join('\t')).join('\n') + '\n');
         break;
 
       case 'csv':
@@ -80,7 +85,7 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
         break;
 
       case 'pretty':
-      default:
+      default: {
         console.log(chalk.bold.cyan(title));
         console.log(chalk.gray('Video ID: ') + chalk.yellow(parsedId));
         console.log(chalk.gray('Date Range: ') + `${startDate} to ${endDate}`);
@@ -99,20 +104,25 @@ async function getSearchTermsCommand(options: SearchTermsOptions): Promise<void>
         console.log('');
 
         let totalViews = 0;
+        let totalEngagedViews = 0;
 
-        rows.forEach((row, index) => {
-          const searchTerm = row[0] as string;
-          const views = row[1] as number;
-          totalViews += views;
+        searchTermsData.forEach(item => {
+          totalViews += item.views;
+          totalEngagedViews += item.engagedViews;
 
-          console.log(chalk.gray(`  ${index + 1}.`) + ` ${searchTerm}`);
-          console.log(chalk.gray('      ') + chalk.cyan(`${formatNumber(views)} views`));
+          console.log(chalk.gray(`  ${item.rank}.`) + ` ${item.searchTerm}`);
+          console.log(chalk.gray('      ') + chalk.cyan(`${formatNumber(item.views)} views`) +
+            chalk.gray('  ') + chalk.cyan(`${formatNumber(item.engagedViews)} engaged`));
         });
 
         console.log('');
-        console.log(chalk.bold('Total views from search: ') + chalk.cyan(formatNumber(totalViews)));
+        // Scoped to the returned terms, not all search traffic: the query is
+        // capped by --limit, so these sums cover only the rows above.
+        console.log(chalk.bold(`Views from these ${searchTermsData.length} terms: `) + chalk.cyan(formatNumber(totalViews)));
+        console.log(chalk.bold(`Engaged views from these ${searchTermsData.length} terms: `) + chalk.cyan(formatNumber(totalEngagedViews)));
         console.log('');
         break;
+      }
     }
   });
 }
