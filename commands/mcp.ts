@@ -678,11 +678,19 @@ async function handleToolCall(name: string, args: any) {
       });
 
       if (result.rows.length === 0) {
+        // The notice describes the requested date range, not the rows, so it
+        // still applies when nothing came back: a caller comparing this empty
+        // result against pre-cutoff archived data needs the same caveat. The
+        // CLI already emits its notice before its own empty-rows branch, and
+        // dropping it here was the one place the two surfaces disagreed.
+        const noData = 'No analytics data available for this channel and time period.';
         return {
           content: [
             {
               type: 'text',
-              text: 'No analytics data available for this channel and time period.',
+              text: result.viewCountingNotice
+                ? `${noData}\n\n${JSON.stringify({ viewCountingNotice: result.viewCountingNotice }, null, 2)}`
+                : noData,
             },
           ],
         };
