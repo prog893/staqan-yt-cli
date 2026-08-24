@@ -16,8 +16,9 @@ by column position or column count. Callers that pass `--metrics` explicitly
 are unaffected, as are those reading columns by name.
 
 **Why:** on 2026-08-24 YouTube began counting a view from the first frame with
-no minimum watch time. `engagedViews` carries the stricter previous definition
-and is the figure tied to monetization. The two diverge sharply on Shorts,
+no minimum watch time. `engagedViews` carries the stricter previous definition,
+which is the only way to keep one definition across the cutoff. The two diverge
+sharply on Shorts,
 measured over 2026-07-13..2026-08-23:
 
 | type | `views` | `engagedViews` |

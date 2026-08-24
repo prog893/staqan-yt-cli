@@ -9,8 +9,13 @@ Commands for retrieving YouTube Analytics data and performance metrics.
 On **2026-08-24** YouTube aligned view counting across formats: a view is
 counted from the first frame of playback, with no minimum watch time. Dates
 from that day onward are measured that way, earlier dates are not. The stricter
-previous definition survives as **`engagedViews`**, which is also the metric
-tied to monetization and YPP eligibility.
+previous definition survives as **`engagedViews`**.
+
+YouTube's monetization programme uses its own separate metrics (engaged Shorts
+views and engaged watch hours for earnings, qualified views and qualified watch
+hours for YPP eligibility). Those are not the same thing as this Analytics
+metric, so do not read `engagedViews` as a payout or eligibility figure. See
+[How YouTube counts views](https://support.google.com/youtube/answer/2991785).
 
 What this means in practice:
 
@@ -132,7 +137,7 @@ is ever dropped. See [Dimension Compatibility Guide](../dimension-compatibility.
 
 Common metrics:
 - `views` - Every playback, counted from the first frame
-- `engagedViews` - Views under the stricter pre-2026-08-24 definition; the figure tied to monetization
+- `engagedViews` - Views under the stricter pre-2026-08-24 definition
 - `estimatedMinutesWatched` - Total watch time (minutes)
 - `averageViewDuration` - Average view duration (seconds)
 - `subscribersGained` / `subscribersLost` - Subscriber changes
@@ -156,8 +161,9 @@ Long-form is identical because a long-form view already counted from the
 start. The 2026-08-24 alignment removed a minimum-watch-time rule that only
 ever applied to Shorts, so that is where the two diverge.
 
-Read `views` for reach and `engagedViews` for engagement and monetization.
-Both are accepted by every valid dimension.
+Read `views` for reach and `engagedViews` for engagement. Both are accepted by
+every valid dimension. Neither is YouTube's monetization metric; see the note
+at the top of this page.
 
 Full list: [YouTube Analytics Metrics](https://developers.google.com/youtube/analytics/v3/dimsmets/mets)
 
@@ -186,7 +192,7 @@ Supported dimensions for video-level queries:
 
 Combine multiple dimensions with commas (e.g. `--dimensions day,deviceType`). The CLI rejects unknown dimensions and known-bad combinations (e.g. `country + day`) with a clear error before any API call.
 
-**Most dimensions need `--metrics` narrowed.** The default metric set includes `likes`, `dislikes`, `comments` and `shares`, which the API only offers for a few dimensions, so `--dimensions deviceType` fails until you pass something like `--metrics views`. This is the most common cause of `The query is not supported`.
+**Most dimensions permit only some of the default metrics.** `likes`, `dislikes`, `comments` and `shares` are offered for only a few dimensions. When you pass `--dimensions` without `--metrics`, the CLI drops the unsupported defaults automatically and reports which ones on stderr, so `--dimensions deviceType` runs and returns the five view and watch-time columns (`views`, `engagedViews`, `estimatedMinutesWatched`, `averageViewDuration`, `averageViewPercentage`). An **explicit** `--metrics` list is never narrowed: naming an unavailable metric is an error rather than a silent substitution, and that is the most common cause of `The query is not supported`.
 
 **→ See [Dimension Compatibility Guide](../dimension-compatibility.md)** for the measured dimension/metric matrix, the rejected combinations, and the `month` date rule.
 

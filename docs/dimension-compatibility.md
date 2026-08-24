@@ -65,8 +65,10 @@ rows above. That is a measured law, not an assumption: `day` permits all nine,
   because quietly returning different data than you asked for is worse than
   failing.
 
-So `--dimensions deviceType` now works and returns the four view and watch-time
-columns. To choose the columns yourself, pass them:
+So `--dimensions deviceType` now works and returns the five view and watch-time
+columns: `views`, `engagedViews`, `estimatedMinutesWatched`,
+`averageViewDuration` and `averageViewPercentage`. To choose the columns
+yourself, pass them:
 
 ```bash
 staqan-yt get-video-analytics --video-id VIDEO_ID \

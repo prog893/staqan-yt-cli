@@ -753,7 +753,7 @@ export function viewCountingNoticeFor(
  * `views` stays first so every query that sorted before this existed sorts
  * identically after it. `engagedViews` follows: it carries the pre-2026-08-24
  * view semantics, so a caller selecting it is asking the same question
- * `views` used to answer, and it is the figure tied to monetization.
+ * `views` used to answer.
  * `estimatedMinutesWatched` is the fallback for metric sets that select no
  * view metric at all.
  */
