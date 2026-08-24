@@ -295,6 +295,10 @@ _staqa_nyt_completion() {
       ;;
     --privacy)
       COMPREPLY=( \$(compgen -W "public private unlisted" -- "\${cur}") ); return ;;
+    --report)
+      # Mirrors the zsh _arguments spec for get-channel-analytics, which has
+      # always enumerated these; bash had no arm at all (#182).
+      COMPREPLY=( \$(compgen -W "demographics devices geography traffic-sources subscription-status" -- "\${cur}") ); return ;;
     --sort|-s)
       # Scoped to the command, like --type above: "top"/"new" are list-comments
       # values. get-channel-analytics --sort takes a field the query itself
@@ -410,8 +414,17 @@ _staqa_nyt_completion() {
       ;;
   esac
 
-  # Default completion for options
-  if [[ "\${cur}" == -* ]]; then
+  # Default completion for options (#182).
+  #
+  # Only fills in when nothing above matched. The per-command arms in the
+  # \`case\` above set COMPREPLY and fall through without returning, so an
+  # unconditional assignment here overwrote every one of them: since a flag
+  # name being completed always starts with "-", this branch always ran, and
+  # all 34 commands offered only the three global options.
+  #
+  # Guarding on emptiness rather than adding \`return\` to each arm keeps a
+  # future arm from reintroducing the bug by forgetting one.
+  if [[ "\${cur}" == -* && \${#COMPREPLY[@]} -eq 0 ]]; then
     COMPREPLY=( \$(compgen -W "\${global_options}" -- "\${cur}") )
   fi
 }
