@@ -45,29 +45,28 @@ async function ensureConfigDir(): Promise<void> {
 
 /**
  * Load raw configuration from file without merging defaults.
- * Returns null if the file doesn't exist or is invalid.
+ * Returns null if the file does not exist. Throws if it exists and is damaged.
  */
 async function loadRawConfig(): Promise<Config | null> {
   await ensureConfigDir();
-  // Damaged config throws rather than reading as "no config set" (#195). That
-  // silent fallback was the worst of the six: a stray comma from a hand-edit
-  // made default.channel and default.output stop applying, with the CLI
-  // behaving exactly as though they had never been set.
+  // Damaged config throws rather than reading as "no config set" (#195). Only
+  // `config list` and `config get` call this, so the report reaches whoever is
+  // inspecting the file, which is the person able to fix it.
   return loadJsonIfPresent<Config>(CONFIG_PATH, 'config');
 }
 
 /**
- * Load configuration from file
- * Returns default config if file doesn't exist
+ * Load configuration from file.
+ * Returns default config if the file does not exist. Throws if it is damaged.
  */
 export async function loadConfig(): Promise<Config> {
   await ensureConfigDir();
 
-  // Throws on a damaged config rather than returning defaults (#195). This is
-  // the function that decides what every command actually does, so the old
-  // catch-all was the most consequential of the six: a malformed config.json
-  // made default.channel and default.output stop applying with no message,
-  // which looks exactly like never having set them.
+  // Throws on a damaged config rather than returning defaults (#195). Of the
+  // eight loaders this is the one every command actually calls, so the old
+  // catch-all was the most consequential: a stray comma from a hand-edit made
+  // default.channel and default.output stop applying with no message, which
+  // looks exactly like never having set them.
   const config = await loadJsonIfPresent<Config>(CONFIG_PATH, 'config');
   if (!config) return { ...DEFAULT_CONFIG };
 
