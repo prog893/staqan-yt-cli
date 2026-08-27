@@ -12,7 +12,7 @@ import { getChannelVideos, listChannelPlaylists, getChannelId } from '../lib/you
 import { getConfigValue } from '../lib/config';
 import { getAuthenticatedClient } from '../lib/auth';
 import { acquireLock, getLockPath } from '../lib/lock';
-import { CACHE_DIR, debug } from '../lib/utils';
+import { CACHE_DIR, debug, loadJsonIfPresent } from '../lib/utils';
 import { CompletionType, CompletionCache } from '../types';
 
 const TTL: Record<CompletionType, number> = {
@@ -29,9 +29,14 @@ function getChannelCachePath(channelId: string): string {
 }
 
 async function loadCache(cachePath: string): Promise<CompletionCache> {
+  // Runs in the interactive shell on every Tab, so this must stay quiet on
+  // stdout and stderr: a warning would print into the middle of the prompt.
+  // The error goes to debug(), so `-v` can still explain a cache that never
+  // seems to hit.
   try {
-    return JSON.parse(await fs.readFile(cachePath, 'utf-8'));
-  } catch {
+    return (await loadJsonIfPresent<CompletionCache>(cachePath, 'completion cache')) || {};
+  } catch (err) {
+    debug(`Ignoring unreadable completion cache: ${(err as Error).message}`);
     return {};
   }
 }

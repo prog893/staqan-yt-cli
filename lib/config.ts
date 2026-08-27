@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { Config, ConfigKey, OutputFormat } from '../types';
-import { CONFIG_DIR, warning } from './utils';
+import { CONFIG_DIR, warning, loadJsonIfPresent } from './utils';
 
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 
@@ -45,47 +45,38 @@ async function ensureConfigDir(): Promise<void> {
 
 /**
  * Load raw configuration from file without merging defaults.
- * Returns null if the file doesn't exist or is invalid.
+ * Returns null if the file does not exist. Throws if it exists and is damaged.
  */
 async function loadRawConfig(): Promise<Config | null> {
-  try {
-    await ensureConfigDir();
-    const data = await fs.readFile(CONFIG_PATH, 'utf-8');
-    return JSON.parse(data) as Config;
-  } catch {
-    return null;
-  }
+  await ensureConfigDir();
+  return loadJsonIfPresent<Config>(CONFIG_PATH, 'config');
 }
 
 /**
- * Load configuration from file
- * Returns default config if file doesn't exist
+ * Load configuration from file.
+ * Returns default config if the file does not exist. Throws if it is damaged.
  */
 export async function loadConfig(): Promise<Config> {
-  try {
-    await ensureConfigDir();
-    const data = await fs.readFile(CONFIG_PATH, 'utf-8');
-    const config = JSON.parse(data) as Config;
+  await ensureConfigDir();
 
-    // Merge with defaults to ensure all keys exist
-    return {
-      cache: {
-        ...DEFAULT_CONFIG.cache,
-        ...config.cache,
-      },
-      default: {
-        ...DEFAULT_CONFIG.default,
-        ...config.default,
-      },
-      lock: {
-        ...DEFAULT_CONFIG.lock,
-        ...config.lock,
-      },
-    };
-  } catch {
-    // File doesn't exist or is invalid - return defaults
-    return { ...DEFAULT_CONFIG };
-  }
+  const config = await loadJsonIfPresent<Config>(CONFIG_PATH, 'config');
+  if (!config) return { ...DEFAULT_CONFIG };
+
+  // Merge with defaults to ensure all keys exist
+  return {
+    cache: {
+      ...DEFAULT_CONFIG.cache,
+      ...config.cache,
+    },
+    default: {
+      ...DEFAULT_CONFIG.default,
+      ...config.default,
+    },
+    lock: {
+      ...DEFAULT_CONFIG.lock,
+      ...config.lock,
+    },
+  };
 }
 
 /**

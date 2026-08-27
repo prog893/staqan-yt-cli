@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { CONFIG_DIR, debug, warning } from './utils';
+import { CONFIG_DIR, debug, warning, loadJsonIfPresent } from './utils';
 import { CacheIndex, CacheIndexEntry, ReportMetadata, CacheCoverage } from '../types';
 
 // Base data directory
@@ -47,41 +47,78 @@ export async function ensureCacheDir(channelId: string): Promise<void> {
 // ─── Cache index ──────────────────────────────────────────────────────────────
 
 /**
+ * Whether a parsed index member carries the fields consumers read off it.
+ *
+ * Only the required fields are checked. `createTime` and `row_count` are
+ * optional by design, and `fileSize` is not read on any path that a damaged
+ * index would reach first.
+ */
+function isCacheIndexEntry(entry: unknown): entry is CacheIndexEntry {
+  if (typeof entry !== 'object' || entry === null) return false;
+  const e = entry as Record<string, unknown>;
+  return (
+    typeof e.reportId === 'string' &&
+    typeof e.reportTypeId === 'string' &&
+    typeof e.channelId === 'string' &&
+    typeof e.startTime === 'string' &&
+    typeof e.endTime === 'string' &&
+    typeof e.downloadedAt === 'string' &&
+    typeof e.expiresAt === 'string'
+  );
+}
+
+/**
  * Load per-channel cache index
  */
 export async function loadCacheIndex(channelId: string, channelHandle?: string): Promise<CacheIndex> {
+  await ensureCacheDir(channelId);
+
+  const indexPath = getChannelCacheIndexPath(channelId);
+  const channelArg = channelHandle ?? channelId;
+  const freshIndex = (): CacheIndex => ({
+    version: CACHE_INDEX_VERSION,
+    lastUpdated: new Date().toISOString(),
+    entries: [],
+  });
+
+  // Absence is the normal first run for a channel and stays silent. Damage
+  // warns: the archive files remain on disk, but an empty index hides them, so
+  // the next fetch re-downloads reports already held locally.
+  let index: CacheIndex | null;
   try {
-    await ensureCacheDir(channelId);
-    const data = await fs.readFile(getChannelCacheIndexPath(channelId), 'utf-8');
-    const index = JSON.parse(data) as CacheIndex;
-
-    if (!index.version || !Array.isArray(index.entries)) {
-      throw new Error('Invalid cache index structure');
-    }
-
-    // Validate version matches expected format
-    if (index.version !== CACHE_INDEX_VERSION) {
-      const indexPath = getChannelCacheIndexPath(channelId);
-      const channelArg = channelHandle ?? channelId;
-      warning(`Cache index is outdated (v${index.version} → v${CACHE_INDEX_VERSION}). Cached report data cleared.`);
-      warning(`  To rebuild: staqan-yt fetch-reports --channel ${channelArg}`);
-      warning(`  To delete:  ${indexPath}`);
-      return {
-        version: CACHE_INDEX_VERSION,
-        lastUpdated: new Date().toISOString(),
-        entries: [],
-      };
-    }
-
-    return index;
-  } catch {
-    debug(`Cache index not found or invalid for channel ${channelId}, creating new one`);
-    return {
-      version: CACHE_INDEX_VERSION,
-      lastUpdated: new Date().toISOString(),
-      entries: [],
-    };
+    index = await loadJsonIfPresent<CacheIndex>(indexPath, 'cache index');
+  } catch (err) {
+    warning(`Cache index unreadable, treating the archive as empty: ${(err as Error).message}`);
+    warning(`  To rebuild: staqan-yt fetch-reports --channel ${channelArg}`);
+    warning(`  Index file: ${indexPath}`);
+    return freshIndex();
   }
+
+  if (!index) {
+    debug(`No cache index for channel ${channelId}, starting a new one`);
+    return freshIndex();
+  }
+
+  // Parsed, but not the shape an index has. Same class as a parse failure:
+  // the file exists and cannot be used, so it is reported the same way.
+  // Entries are checked individually, not just the array: consumers read
+  // fields off each one, so a single malformed member would otherwise get past
+  // here and throw somewhere with no mention of the index at all.
+  if (!index.version || !Array.isArray(index.entries) || !index.entries.every(isCacheIndexEntry)) {
+    warning(`Cache index has an unexpected structure, treating the archive as empty.`);
+    warning(`  To rebuild: staqan-yt fetch-reports --channel ${channelArg}`);
+    warning(`  Index file: ${indexPath}`);
+    return freshIndex();
+  }
+
+  if (index.version !== CACHE_INDEX_VERSION) {
+    warning(`Cache index is outdated (v${index.version} → v${CACHE_INDEX_VERSION}). Cached report data cleared.`);
+    warning(`  To rebuild: staqan-yt fetch-reports --channel ${channelArg}`);
+    warning(`  To delete:  ${indexPath}`);
+    return freshIndex();
+  }
+
+  return index;
 }
 
 /**
@@ -277,10 +314,12 @@ export async function loadReportMetadata(
 ): Promise<ReportMetadata | null> {
   const { metadata: metadataPath } = getReportPaths(channelId, reportId, reportTypeId);
 
+  // Damage warns, absence does not. Both return null: the caller recovers the
+  // same way either way.
   try {
-    const data = await fs.readFile(metadataPath, 'utf-8');
-    return JSON.parse(data) as ReportMetadata;
-  } catch {
+    return await loadJsonIfPresent<ReportMetadata>(metadataPath, 'report metadata');
+  } catch (err) {
+    warning(`Ignoring unreadable report metadata: ${(err as Error).message}`);
     return null;
   }
 }

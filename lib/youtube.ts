@@ -5,16 +5,20 @@ import { getAuthenticatedClient } from './auth';
 import { normalizeLanguage, getLanguageName, getAliasedLanguages } from './language';
 import { acquireLock, getLockPath } from './lock';
 import { VideoInfo, VideoListItem, VideoLocalization, VideoType, PrivacyStatus, PlaylistInfo, PlaylistListItem, CommentInfo, ChannelInfo, CaptionInfo, CaptionFormat, CaptionTrackStatus, CaptionAudioTrackType } from '../types';
-import { debug, warning, CACHE_DIR } from './utils';
+import { debug, warning, CACHE_DIR, loadJsonIfPresent } from './utils';
 
 // ─── Handle → channel ID cache ────────────────────────────────────────────────
 
 const HANDLE_CACHE_PATH = path.join(CACHE_DIR, 'handle-to-channel-id.json');
 
 async function loadHandleCache(): Promise<Record<string, string>> {
+  // A damaged cache must not abort the command the way a damaged config does,
+  // but it is still reported: running cold silently costs an extra API call
+  // per handle for as long as the file stays broken.
   try {
-    return JSON.parse(await fs.readFile(HANDLE_CACHE_PATH, 'utf-8'));
-  } catch {
+    return (await loadJsonIfPresent<Record<string, string>>(HANDLE_CACHE_PATH, 'handle cache')) || {};
+  } catch (err) {
+    warning(`Ignoring unreadable handle cache: ${(err as Error).message}`);
     return {};
   }
 }

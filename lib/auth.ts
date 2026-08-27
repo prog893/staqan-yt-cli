@@ -10,6 +10,7 @@ import {
   TOKEN_PATH,
   ensureConfigDir,
   info,
+  loadJsonIfPresent,
 } from './utils';
 import { OAuth2Credentials, OAuth2Token } from '../types';
 
@@ -21,27 +22,21 @@ const SCOPES = [
 ];
 
 /**
- * Load OAuth2 credentials from file
+ * Load OAuth2 credentials from file.
+ * Null if absent, so the caller prints setup guidance. Throws if damaged,
+ * since re-running auth does not repair a malformed credentials.json.
  */
 async function loadCredentials(): Promise<OAuth2Credentials | null> {
-  try {
-    const content = await fs.readFile(CREDENTIALS_PATH, 'utf-8');
-    return JSON.parse(content) as OAuth2Credentials;
-  } catch {
-    return null;
-  }
+  return loadJsonIfPresent<OAuth2Credentials>(CREDENTIALS_PATH, 'OAuth credentials');
 }
 
 /**
- * Load saved token from file
+ * Load saved token from file.
+ * Null if absent, which triggers the sign-in prompt. Throws if damaged, so a
+ * corrupt token is not answered with a silent full re-auth.
  */
 async function loadToken(): Promise<OAuth2Token | null> {
-  try {
-    const content = await fs.readFile(TOKEN_PATH, 'utf-8');
-    return JSON.parse(content) as OAuth2Token;
-  } catch {
-    return null;
-  }
+  return loadJsonIfPresent<OAuth2Token>(TOKEN_PATH, 'auth token');
 }
 
 /**

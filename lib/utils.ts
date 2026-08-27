@@ -30,6 +30,39 @@ async function ensureConfigDir(): Promise<void> {
 }
 
 /**
+ * Read and parse a JSON file that is allowed not to exist.
+ *
+ * Returns `null` only when the file is absent (`ENOENT`). A permissions error,
+ * an I/O error or a JSON syntax error all throw instead: the file is there and
+ * unusable, which is not the same as never having been written. Callers read
+ * `null` as "not configured yet", so the two must not collapse into one answer.
+ *
+ * `label` names the file in the thrown message, since the caller knows what
+ * the file is for and this helper does not.
+ */
+export async function loadJsonIfPresent<T>(filePath: string, label: string): Promise<T | null> {
+  let raw: string;
+  try {
+    raw = await fs.readFile(filePath, 'utf-8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw new Error(
+      `Cannot read ${label} (${filePath}): ${(err as Error).message}. ` +
+      `Check that the path is a readable file and fix its permissions.`
+    );
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch (err) {
+    throw new Error(
+      `${label} (${filePath}) is not valid JSON: ${(err as Error).message}. ` +
+      `Fix the file, or delete it to start over.`
+    );
+  }
+}
+
+/**
  * Classify channel input (handle, ID, or URL) as a handle or a channel ID.
  * Throws on legacy /c/ and /user/ URLs — their path segment is neither a
  * handle nor a channel ID, so no downstream lookup could succeed (issue #123).
