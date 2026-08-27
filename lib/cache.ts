@@ -47,6 +47,27 @@ export async function ensureCacheDir(channelId: string): Promise<void> {
 // ─── Cache index ──────────────────────────────────────────────────────────────
 
 /**
+ * Whether a parsed index member carries the fields consumers read off it.
+ *
+ * Only the required fields are checked. `createTime` and `row_count` are
+ * optional by design, and `fileSize` is not read on any path that a damaged
+ * index would reach first.
+ */
+function isCacheIndexEntry(entry: unknown): entry is CacheIndexEntry {
+  if (typeof entry !== 'object' || entry === null) return false;
+  const e = entry as Record<string, unknown>;
+  return (
+    typeof e.reportId === 'string' &&
+    typeof e.reportTypeId === 'string' &&
+    typeof e.channelId === 'string' &&
+    typeof e.startTime === 'string' &&
+    typeof e.endTime === 'string' &&
+    typeof e.downloadedAt === 'string' &&
+    typeof e.expiresAt === 'string'
+  );
+}
+
+/**
  * Load per-channel cache index
  */
 export async function loadCacheIndex(channelId: string, channelHandle?: string): Promise<CacheIndex> {
@@ -80,7 +101,10 @@ export async function loadCacheIndex(channelId: string, channelHandle?: string):
 
   // Parsed, but not the shape an index has. Same class as a parse failure:
   // the file exists and cannot be used, so it is reported the same way.
-  if (!index.version || !Array.isArray(index.entries)) {
+  // Entries are checked individually, not just the array: consumers read
+  // fields off each one, so a single malformed member would otherwise get past
+  // here and throw somewhere with no mention of the index at all.
+  if (!index.version || !Array.isArray(index.entries) || !index.entries.every(isCacheIndexEntry)) {
     warning(`Cache index has an unexpected structure, treating the archive as empty.`);
     warning(`  To rebuild: staqan-yt fetch-reports --channel ${channelArg}`);
     warning(`  Index file: ${indexPath}`);

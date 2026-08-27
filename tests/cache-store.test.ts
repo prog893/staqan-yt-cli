@@ -430,4 +430,64 @@ describe('loadCacheIndex: absent vs damaged (#195)', () => {
     const err = await captureWarnings(() => loadCacheIndex(channel));
     expect(err).toContain('unexpected structure');
   });
+
+  it('warns when the index is well-formed but an entry is not', async () => {
+    // The shape check passes on the envelope: version is set and entries is an
+    // array. Consumers then read fields off each member, so an unusable entry
+    // that got past here surfaced as "null is not an object (evaluating
+    // 'entry.channelId')" from a call site that never mentions the index.
+    const channel = 'UCnullentry0000000000';
+    const dir = path.join(tmpRoot, channel, 'reports');
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(
+      path.join(dir, 'cache-index.json'),
+      '{"version":"2.0","lastUpdated":"2026-01-01T00:00:00Z","entries":[null]}',
+      'utf-8',
+    );
+
+    const err = await captureWarnings(() => loadCacheIndex(channel));
+    expect(err).toContain('unexpected structure');
+    const index = await loadCacheIndex(channel);
+    expect(index.entries).toEqual([]);
+  });
+
+  it('warns when an entry is an object but is missing required fields', async () => {
+    // Same class as the null member: partial entries reach the same consumers.
+    const channel = 'UCpartialentry000000';
+    const dir = path.join(tmpRoot, channel, 'reports');
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(
+      path.join(dir, 'cache-index.json'),
+      '{"version":"2.0","lastUpdated":"2026-01-01T00:00:00Z","entries":[{"reportId":"r1"}]}',
+      'utf-8',
+    );
+
+    const err = await captureWarnings(() => loadCacheIndex(channel));
+    expect(err).toContain('unexpected structure');
+  });
+
+  it('accepts an index whose entries are complete', async () => {
+    // The guard must not reject valid data. createTime and row_count are
+    // deliberately absent here, since both are optional.
+    const channel = 'UCgoodentry000000000';
+    const dir = path.join(tmpRoot, channel, 'reports');
+    await fs.mkdir(dir, { recursive: true });
+    const entry = {
+      reportId: 'r1', reportTypeId: 'channel_basic_a3', channelId: channel,
+      startTime: '2026-01-01', endTime: '2026-01-02',
+      downloadedAt: '2026-01-03T00:00:00Z', expiresAt: '2026-07-03T00:00:00Z',
+      fileSize: 10,
+    };
+    await fs.writeFile(
+      path.join(dir, 'cache-index.json'),
+      JSON.stringify({ version: '2.0', lastUpdated: '2026-01-01T00:00:00Z', entries: [entry] }),
+      'utf-8',
+    );
+
+    const err = await captureWarnings(() => loadCacheIndex(channel));
+    expect(err).toBe('');
+    const index = await loadCacheIndex(channel);
+    expect(index.entries).toHaveLength(1);
+    expect(index.entries[0].reportId).toBe('r1');
+  });
 });

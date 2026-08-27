@@ -47,7 +47,8 @@ export async function loadJsonIfPresent<T>(filePath: string, label: string): Pro
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw new Error(
-      `Cannot read ${label} (${filePath}): ${(err as Error).message}`
+      `Cannot read ${label} (${filePath}): ${(err as Error).message}. ` +
+      `Check that the path is a readable file and fix its permissions.`
     );
   }
 

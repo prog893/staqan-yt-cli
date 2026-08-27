@@ -75,6 +75,15 @@ describe('loadJsonIfPresent (#195)', () => {
     await expect(loadJsonIfPresent(p, 'thing')).rejects.toThrow(/Cannot read thing/);
   });
 
+  it('tells the reader how to recover from a read error too', async () => {
+    // The parse branch carries remediation, so the read branch has to as well.
+    // Asserting on our own guidance rather than the errno text, since the
+    // wording of the underlying message is platform-dependent.
+    const p = path.join(dir, 'adirectory2.json');
+    await fs.mkdir(p);
+    await expect(loadJsonIfPresent(p, 'thing')).rejects.toThrow(/readable file and fix its permissions/);
+  });
+
   it('treats an empty file as damaged, not absent', async () => {
     // A truncated write leaves a zero-byte file. It exists, so it is not
     // absent, and it does not parse, so it is damaged.
