@@ -50,48 +50,53 @@ export async function ensureCacheDir(channelId: string): Promise<void> {
  * Load per-channel cache index
  */
 export async function loadCacheIndex(channelId: string, channelHandle?: string): Promise<CacheIndex> {
+  await ensureCacheDir(channelId);
+
+  const indexPath = getChannelCacheIndexPath(channelId);
+  const channelArg = channelHandle ?? channelId;
+  const freshIndex = (): CacheIndex => ({
+    version: CACHE_INDEX_VERSION,
+    lastUpdated: new Date().toISOString(),
+    entries: [],
+  });
+
+  // A damaged index is not the same as no index (#195). Absence is the normal
+  // first run for a channel and must stay silent. Damage is expensive and must
+  // not: the archive files stay on disk, but an empty index makes every one of
+  // them invisible, so the next fetch re-downloads work already held locally
+  // and then writes an index that no longer references the old files.
+  let index: CacheIndex | null;
   try {
-    await ensureCacheDir(channelId);
-    const data = await fs.readFile(getChannelCacheIndexPath(channelId), 'utf-8');
-    const index = JSON.parse(data) as CacheIndex;
-
-    if (!index.version || !Array.isArray(index.entries)) {
-      throw new Error('Invalid cache index structure');
-    }
-
-    // Validate version matches expected format
-    if (index.version !== CACHE_INDEX_VERSION) {
-      const indexPath = getChannelCacheIndexPath(channelId);
-      const channelArg = channelHandle ?? channelId;
-      warning(`Cache index is outdated (v${index.version} → v${CACHE_INDEX_VERSION}). Cached report data cleared.`);
-      warning(`  To rebuild: staqan-yt fetch-reports --channel ${channelArg}`);
-      warning(`  To delete:  ${indexPath}`);
-      return {
-        version: CACHE_INDEX_VERSION,
-        lastUpdated: new Date().toISOString(),
-        entries: [],
-      };
-    }
-
-    return index;
+    index = await loadJsonIfPresent<CacheIndex>(indexPath, 'cache index');
   } catch (err) {
-    // A damaged index is not the same as no index (#195), and the difference
-    // is expensive here: the archive files stay on disk, but an empty index
-    // makes every one of them invisible, so the next fetch re-downloads work
-    // already held locally and then writes an index that no longer references
-    // the old files. Reported with the same recovery guidance the version
-    // mismatch above uses, rather than a debug line nobody sees.
-    const indexPath = getChannelCacheIndexPath(channelId);
-    const channelArg = channelHandle ?? channelId;
     warning(`Cache index unreadable, treating the archive as empty: ${(err as Error).message}`);
     warning(`  To rebuild: staqan-yt fetch-reports --channel ${channelArg}`);
     warning(`  Index file: ${indexPath}`);
-    return {
-      version: CACHE_INDEX_VERSION,
-      lastUpdated: new Date().toISOString(),
-      entries: [],
-    };
+    return freshIndex();
   }
+
+  if (!index) {
+    debug(`No cache index for channel ${channelId}, starting a new one`);
+    return freshIndex();
+  }
+
+  // Parsed, but not the shape an index has. Same class as a parse failure:
+  // the file exists and cannot be used, so it is reported the same way.
+  if (!index.version || !Array.isArray(index.entries)) {
+    warning(`Cache index has an unexpected structure, treating the archive as empty.`);
+    warning(`  To rebuild: staqan-yt fetch-reports --channel ${channelArg}`);
+    warning(`  Index file: ${indexPath}`);
+    return freshIndex();
+  }
+
+  if (index.version !== CACHE_INDEX_VERSION) {
+    warning(`Cache index is outdated (v${index.version} → v${CACHE_INDEX_VERSION}). Cached report data cleared.`);
+    warning(`  To rebuild: staqan-yt fetch-reports --channel ${channelArg}`);
+    warning(`  To delete:  ${indexPath}`);
+    return freshIndex();
+  }
+
+  return index;
 }
 
 /**

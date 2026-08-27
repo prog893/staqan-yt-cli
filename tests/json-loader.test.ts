@@ -1,7 +1,7 @@
 /**
  * `loadJsonIfPresent`: absent versus damaged (#195).
  *
- * Six loaders across the codebase shared one shape, `readFile` then
+ * Eight loaders across the codebase shared one shape, `readFile` then
  * `JSON.parse` inside a `try` whose `catch` returned a neutral value. That
  * collapsed two situations callers treat very differently:
  *
@@ -11,7 +11,7 @@
  * A corrupt `credentials.json` produced "run staqan-yt auth" for a file that
  * already existed. A stray comma in `config.json` made every setting silently
  * revert to its default. These tests pin the distinction itself, which is the
- * only thing the six call sites rely on.
+ * only thing the eight call sites rely on.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { promises as fs } from 'fs';
@@ -41,7 +41,7 @@ describe('loadJsonIfPresent (#195)', () => {
   it('parses a valid file', async () => {
     const p = path.join(dir, 'ok.json');
     await fs.writeFile(p, JSON.stringify({ a: 1, nested: { b: 'two' } }));
-    expect(await loadJsonIfPresent(p, 'thing')).toEqual({ a: 1, nested: { b: 'two' } });
+    expect(await loadJsonIfPresent<Record<string, unknown>>(p, 'thing')).toEqual({ a: 1, nested: { b: 'two' } });
   });
 
   it('throws on malformed JSON instead of reporting the file as absent', async () => {

@@ -15,6 +15,7 @@ import {
   compareInstants,
   findCachedReports,
   getDataDir,
+  loadCacheIndex,
   pickNewestPerWindow,
   readCachedReport,
   saveReportToCache,
@@ -361,5 +362,72 @@ describe('findCachedReports', () => {
     await store(metadataFor({ reportId: 'mine' }), csvFor(['20260301'], '5'));
     const found = await findCachedReports(CHANNEL, 'channel_basic_a3', '2026-03-01', '2026-03-07');
     expect(found).toEqual([]);
+  });
+});
+
+/**
+ * Absence versus damage for the cache index (#195).
+ *
+ * A missing index is the normal first run for a channel and must stay silent.
+ * A damaged one must not, because the archive files remain on disk while an
+ * empty index hides every one of them: the next fetch re-downloads work
+ * already held locally, then writes an index that no longer references the
+ * old files.
+ *
+ * These assert on the returned value and on stderr, because the regression
+ * this guards against was purely a stderr one. The index came back empty in
+ * both cases; only the noise differed.
+ */
+describe('loadCacheIndex: absent vs damaged (#195)', () => {
+  // `warning()` goes through console.warn, not process.stderr.write, so the
+  // capture has to patch console.warn. Patching the stream instead silently
+  // captures nothing and every assertion below passes vacuously.
+  const captureWarnings = async (fn: () => Promise<unknown>) => {
+    const written: string[] = [];
+    const orig = console.warn;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    console.warn = (...args: any[]) => { written.push(args.map(String).join(' ')); };
+    try {
+      await fn();
+    } finally {
+      console.warn = orig;
+    }
+    return written.join('\n');
+  };
+
+  it('is silent when no index exists yet', async () => {
+    // The cold-start path. Every channel hits this once, so a warning here
+    // would fire for everyone on first use.
+    const err = await captureWarnings(() => loadCacheIndex('UCcoldstart0000000000'));
+    expect(err).toBe('');
+  });
+
+  it('returns a fresh empty index when none exists', async () => {
+    const index = await loadCacheIndex('UCcoldstart0000000001');
+    expect(index.entries).toEqual([]);
+    expect(index.version).toBeTruthy();
+  });
+
+  it('warns when the index exists but does not parse', async () => {
+    const channel = 'UCdamaged00000000000';
+    const dir = path.join(tmpRoot, channel, 'reports');
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, 'cache-index.json'), 'not json{', 'utf-8');
+
+    const err = await captureWarnings(() => loadCacheIndex(channel));
+    expect(err).toContain('unreadable');
+    expect(err).toContain('To rebuild');
+  });
+
+  it('warns when the index parses but has the wrong shape', async () => {
+    // Valid JSON, not an index. The file exists and cannot be used, which is
+    // the same situation as a parse failure and is reported the same way.
+    const channel = 'UCwrongshape000000000';
+    const dir = path.join(tmpRoot, channel, 'reports');
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, 'cache-index.json'), '{"nope":true}', 'utf-8');
+
+    const err = await captureWarnings(() => loadCacheIndex(channel));
+    expect(err).toContain('unexpected structure');
   });
 });
