@@ -22,22 +22,20 @@ const SCOPES = [
 ];
 
 /**
- * Load OAuth2 credentials from file
+ * Load OAuth2 credentials from file.
+ * Null if absent, so the caller prints setup guidance. Throws if damaged,
+ * since re-running auth does not repair a malformed credentials.json.
  */
 async function loadCredentials(): Promise<OAuth2Credentials | null> {
-  // Absent means "not set up yet" and the caller prints setup guidance.
-  // Damaged throws, because that guidance is wrong for a file that exists:
-  // re-running auth does not repair a malformed credentials.json (#195).
   return loadJsonIfPresent<OAuth2Credentials>(CREDENTIALS_PATH, 'OAuth credentials');
 }
 
 /**
- * Load saved token from file
+ * Load saved token from file.
+ * Null if absent, which triggers the sign-in prompt. Throws if damaged, so a
+ * corrupt token is not answered with a silent full re-auth.
  */
 async function loadToken(): Promise<OAuth2Token | null> {
-  // Same split as loadCredentials: absent triggers the sign-in prompt, damaged
-  // is reported so a corrupt token is not silently mistaken for a missing one
-  // and answered with a full re-auth (#195).
   return loadJsonIfPresent<OAuth2Token>(TOKEN_PATH, 'auth token');
 }
 

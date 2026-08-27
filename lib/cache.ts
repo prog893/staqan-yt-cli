@@ -60,11 +60,9 @@ export async function loadCacheIndex(channelId: string, channelHandle?: string):
     entries: [],
   });
 
-  // A damaged index is not the same as no index (#195). Absence is the normal
-  // first run for a channel and must stay silent. Damage is expensive and must
-  // not: the archive files stay on disk, but an empty index makes every one of
-  // them invisible, so the next fetch re-downloads work already held locally
-  // and then writes an index that no longer references the old files.
+  // Absence is the normal first run for a channel and stays silent. Damage
+  // warns: the archive files remain on disk, but an empty index hides them, so
+  // the next fetch re-downloads reports already held locally.
   let index: CacheIndex | null;
   try {
     index = await loadJsonIfPresent<CacheIndex>(indexPath, 'cache index');
@@ -292,11 +290,8 @@ export async function loadReportMetadata(
 ): Promise<ReportMetadata | null> {
   const { metadata: metadataPath } = getReportPaths(channelId, reportId, reportTypeId);
 
-  // A damaged sidecar is reported, not silently treated as absent (#195).
-  // Both still return null here, because the caller's recovery is the same
-  // either way today, but the two are no longer indistinguishable in the
-  // output. Rebuilding a damaged sidecar from the index is #192, and it
-  // depends on exactly this split existing.
+  // Damage warns, absence does not. Both return null: the caller recovers the
+  // same way either way.
   try {
     return await loadJsonIfPresent<ReportMetadata>(metadataPath, 'report metadata');
   } catch (err) {

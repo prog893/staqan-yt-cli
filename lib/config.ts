@@ -49,9 +49,6 @@ async function ensureConfigDir(): Promise<void> {
  */
 async function loadRawConfig(): Promise<Config | null> {
   await ensureConfigDir();
-  // Damaged config throws rather than reading as "no config set" (#195). Only
-  // `config list` and `config get` call this, so the report reaches whoever is
-  // inspecting the file, which is the person able to fix it.
   return loadJsonIfPresent<Config>(CONFIG_PATH, 'config');
 }
 
@@ -62,11 +59,6 @@ async function loadRawConfig(): Promise<Config | null> {
 export async function loadConfig(): Promise<Config> {
   await ensureConfigDir();
 
-  // Throws on a damaged config rather than returning defaults (#195). Of the
-  // eight loaders this is the one every command actually calls, so the old
-  // catch-all was the most consequential: a stray comma from a hand-edit made
-  // default.channel and default.output stop applying with no message, which
-  // looks exactly like never having set them.
   const config = await loadJsonIfPresent<Config>(CONFIG_PATH, 'config');
   if (!config) return { ...DEFAULT_CONFIG };
 

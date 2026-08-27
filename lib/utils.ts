@@ -32,16 +32,10 @@ async function ensureConfigDir(): Promise<void> {
 /**
  * Read and parse a JSON file that is allowed not to exist.
  *
- * Returns `null` **only** when the file is absent (`ENOENT`). Every other
- * failure throws: a permissions error, an I/O error, or a JSON syntax error
- * all mean the file is there and unusable, which is a different situation from
- * it never having been written (#195).
- *
- * That distinction is the whole point. Callers uniformly read `null` as "not
- * configured yet" and print guidance to match, so a corrupt file that reports
- * as absent sends the reader to fix the wrong problem. `credentials.json`
- * produced "run staqan-yt auth" for a file that already existed; a stray comma
- * in `config.json` made every setting silently revert to its default.
+ * Returns `null` only when the file is absent (`ENOENT`). A permissions error,
+ * an I/O error or a JSON syntax error all throw instead: the file is there and
+ * unusable, which is not the same as never having been written. Callers read
+ * `null` as "not configured yet", so the two must not collapse into one answer.
  *
  * `label` names the file in the thrown message, since the caller knows what
  * the file is for and this helper does not.

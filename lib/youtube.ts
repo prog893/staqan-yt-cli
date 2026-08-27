@@ -12,10 +12,9 @@ import { debug, warning, CACHE_DIR, loadJsonIfPresent } from './utils';
 const HANDLE_CACHE_PATH = path.join(CACHE_DIR, 'handle-to-channel-id.json');
 
 async function loadHandleCache(): Promise<Record<string, string>> {
-  // A cache is optional by definition, so a damaged one must not abort the
-  // command the way a damaged config does. It is still reported rather than
-  // swallowed: silently running cold turns a one-off corruption into a
-  // permanent extra API call per handle, with nothing to point at (#195).
+  // A damaged cache must not abort the command the way a damaged config does,
+  // but it is still reported: running cold silently costs an extra API call
+  // per handle for as long as the file stays broken.
   try {
     return (await loadJsonIfPresent<Record<string, string>>(HANDLE_CACHE_PATH, 'handle cache')) || {};
   } catch (err) {
