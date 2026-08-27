@@ -311,6 +311,7 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
       const index = await loadCacheIndex(channelId);
       let verified = 0;
       let corrupted = 0;
+      let rebuilt = 0;
 
       for (const entry of index.entries) {
         const metadata = await loadReportMetadata(channelId, entry.reportId, entry.reportTypeId);
@@ -321,16 +322,25 @@ async function fetchReportsCommand(options: FetchReportsOptions): Promise<void> 
           continue;
         }
 
-        if (!metadata.isComplete) {
+        if (metadata.isComplete === false) {
           warning(`Incomplete file: ${entry.reportId}`);
           corrupted++;
+          continue;
+        }
+
+        // A rebuilt sidecar is not an issue, but it is not a clean bill of
+        // health either: its completeness was never recorded, so --verify
+        // counts it separately rather than folding it into either total.
+        if (metadata.rebuiltAt) {
+          rebuilt++;
           continue;
         }
 
         verified++;
       }
 
-      spinner.succeed(`Verification complete: ${verified} OK, ${corrupted} issues`);
+      const rebuiltNote = rebuilt > 0 ? `, ${rebuilt} rebuilt (completeness unverifiable)` : '';
+      spinner.succeed(`Verification complete: ${verified} OK, ${corrupted} issues${rebuiltNote}`);
       console.log('');
     }
 

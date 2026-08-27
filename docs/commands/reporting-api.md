@@ -432,6 +432,24 @@ Use `--verify` to check cached files:
 staqan-yt fetch-reports --verify
 ```
 
+Each cached report has a `<reportId>.metadata.json` sidecar recording what the
+report was at download time, including its column list and a completeness flag.
+`--verify` reads those sidecars, so the counts it prints describe them:
+
+```text
+Verification complete: 3755 OK, 0 issues, 2 rebuilt (completeness unverifiable)
+```
+
+A **rebuilt** sidecar is one that was found damaged and reconstructed from the
+cache index and the report CSV on disk. The reconstruction recovers the
+identity, window and column fields, and re-measures the actual date range from
+the CSV. It cannot recover the job ID, the download URL, or the completeness
+flag, because those came from an API response that is no longer available, and
+it does not invent them. Such a report is still served normally; it is counted
+separately because its completeness can no longer be confirmed.
+
+To restore a full sidecar, re-download that report with `--force`.
+
 ### Cache Location
 
 ```
