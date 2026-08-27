@@ -305,23 +305,128 @@ function getReportPaths(channelId: string, reportId: string, reportTypeId: strin
 // ─── Metadata ────────────────────────────────────────────────────────────────
 
 /**
- * Load report metadata
+ * Why a sidecar could not be returned as-is.
+ *
+ * `absent` is an older or interrupted write and implies nothing is wrong with
+ * the report. `damaged` implies the opposite, and the two need different
+ * responses, so they are not collapsed into a single null.
+ */
+export type ReportMetadataLoad =
+  | { status: 'ok'; metadata: ReportMetadata }
+  | { status: 'absent' }
+  | { status: 'damaged'; error: Error };
+
+/**
+ * Load report metadata, reporting absence and damage separately.
+ */
+export async function loadReportMetadataResult(
+  channelId: string,
+  reportId: string,
+  reportTypeId: string
+): Promise<ReportMetadataLoad> {
+  const { metadata: metadataPath } = getReportPaths(channelId, reportId, reportTypeId);
+
+  try {
+    const metadata = await loadJsonIfPresent<ReportMetadata>(metadataPath, 'report metadata');
+    return metadata ? { status: 'ok', metadata } : { status: 'absent' };
+  } catch (err) {
+    return { status: 'damaged', error: err as Error };
+  }
+}
+
+/**
+ * Reconstruct a sidecar for a report whose own sidecar is unreadable.
+ *
+ * Two sources, both trustworthy, and nothing else:
+ *
+ * - the **index entry**, which is authoritative for the identity and window
+ *   fields and is already held in memory during any query;
+ * - the **CSV on disk**, re-measured for `columns` and the actual date range,
+ *   rather than inferred from anything.
+ *
+ * `jobId`, `downloadUrl` and `isComplete` came from an API response that is
+ * gone, so they are left absent. Returns null when the rebuild cannot be
+ * grounded in both sources, which keeps the caller's fallback explicit instead
+ * of handing back a half-populated record.
+ *
+ * Re-measuring `columns` makes the header check tautological for this one
+ * report, which is the honest outcome: the check compares a file against a
+ * record of what it was at download time, and once that record is lost it
+ * cannot be resurrected, only the current schema recorded afresh.
+ */
+export async function rebuildReportMetadata(
+  channelId: string,
+  reportId: string,
+  reportTypeId: string
+): Promise<ReportMetadata | null> {
+  const index = await loadCacheIndex(channelId);
+  const entry = index.entries.find(
+    (e) => e.reportId === reportId && e.reportTypeId === reportTypeId
+  );
+  if (!entry) {
+    debug(`Cannot rebuild metadata for ${reportId}: no index entry`);
+    return null;
+  }
+
+  const { csv: csvPath } = getReportPaths(channelId, reportId, reportTypeId);
+  let parsed: ReturnType<typeof parseCsvAndExtractRange>;
+  try {
+    parsed = parseCsvAndExtractRange(await fs.readFile(csvPath, 'utf-8'));
+  } catch (err) {
+    debug(`Cannot rebuild metadata for ${reportId}: ${(err as Error).message}`);
+    return null;
+  }
+
+  const rebuilt: ReportMetadata = {
+    reportId: entry.reportId,
+    reportTypeId: entry.reportTypeId,
+    channelId: entry.channelId,
+    startTime: entry.startTime,
+    endTime: entry.endTime,
+    createTime: entry.createTime,
+    downloadedAt: entry.downloadedAt,
+    expiresAt: entry.expiresAt,
+    fileSize: entry.fileSize,
+    row_count: entry.row_count,
+    columns: parsed.headers,
+    startTimeActual: parsed.minDate,
+    endTimeActual: parsed.maxDate,
+    rebuiltAt: new Date().toISOString(),
+  };
+
+  await saveReportMetadata(channelId, rebuilt);
+  return rebuilt;
+}
+
+/**
+ * Load report metadata, rebuilding it if the file on disk is damaged.
+ *
+ * Absence stays silent and returns null, which every caller already treats as
+ * "no record". Damage is reported and repaired where possible, because the
+ * alternative is what #192 describes: the sidecar is the only thing standing
+ * between a corrupted CSV and its consumer, and returning null for a damaged
+ * one disables that check exactly when a second corruption has occurred.
  */
 export async function loadReportMetadata(
   channelId: string,
   reportId: string,
   reportTypeId: string
 ): Promise<ReportMetadata | null> {
-  const { metadata: metadataPath } = getReportPaths(channelId, reportId, reportTypeId);
+  const result = await loadReportMetadataResult(channelId, reportId, reportTypeId);
 
-  // Damage warns, absence does not. Both return null: the caller recovers the
-  // same way either way.
-  try {
-    return await loadJsonIfPresent<ReportMetadata>(metadataPath, 'report metadata');
-  } catch (err) {
-    warning(`Ignoring unreadable report metadata: ${(err as Error).message}`);
+  if (result.status === 'ok') return result.metadata;
+  if (result.status === 'absent') return null;
+
+  warning(`Report metadata unreadable, rebuilding it: ${result.error.message}`);
+  const rebuilt = await rebuildReportMetadata(channelId, reportId, reportTypeId);
+  if (!rebuilt) {
+    warning(`  Rebuild failed for ${reportId}. Its cached CSV cannot be validated.`);
     return null;
   }
+
+  warning(`  Rebuilt ${reportId} from the cache index and the CSV on disk.`);
+  warning(`  Completeness was not recorded at download time and is not inferred.`);
+  return rebuilt;
 }
 
 /**
@@ -428,7 +533,10 @@ export async function readCachedReport(
         return null;
       }
 
-      if (!metadata.isComplete) {
+      // `=== false`, not falsiness: absent means completeness was never
+      // recorded, which is the state of a rebuilt sidecar, and rejecting it
+      // would discard a CSV that is almost certainly fine.
+      if (metadata.isComplete === false) {
         debug(`Report ${reportId} marked as incomplete`);
         return null;
       }

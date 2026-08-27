@@ -16,6 +16,7 @@ import {
   findCachedReports,
   getDataDir,
   loadCacheIndex,
+  loadReportMetadata,
   pickNewestPerWindow,
   readCachedReport,
   saveReportToCache,
@@ -445,10 +446,12 @@ describe('loadCacheIndex: absent vs damaged (#195)', () => {
       'utf-8',
     );
 
-    const err = await captureWarnings(() => loadCacheIndex(channel));
+    let index: Awaited<ReturnType<typeof loadCacheIndex>> | null = null;
+    const err = await captureWarnings(async () => {
+      index = await loadCacheIndex(channel);
+    });
     expect(err).toContain('unexpected structure');
-    const index = await loadCacheIndex(channel);
-    expect(index.entries).toEqual([]);
+    expect(index!.entries).toEqual([]);
   });
 
   it('warns when an entry is an object but is missing required fields', async () => {
@@ -489,5 +492,167 @@ describe('loadCacheIndex: absent vs damaged (#195)', () => {
     const index = await loadCacheIndex(channel);
     expect(index.entries).toHaveLength(1);
     expect(index.entries[0].reportId).toBe('r1');
+  });
+});
+
+/**
+ * Rebuilding a damaged sidecar (#192).
+ *
+ * The sidecar is the only thing standing between a corrupted cached CSV and
+ * its consumer: `readCachedReport` checks the CSV header against
+ * `metadata.columns` and refuses an incomplete report. Returning null for a
+ * damaged sidecar disabled both checks precisely when a second corruption had
+ * occurred, and said nothing.
+ *
+ * The rebuild draws only on the index entry (authoritative) and the CSV on
+ * disk (re-measured). What came from the API response at download time is left
+ * absent, so these assert on that absence as much as on the values.
+ */
+describe('rebuildReportMetadata (#192)', () => {
+  const captureWarnings = async (fn: () => Promise<unknown>) => {
+    const written: string[] = [];
+    const orig = console.warn;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    console.warn = (...args: any[]) => { written.push(args.map(String).join(' ')); };
+    try {
+      await fn();
+    } finally {
+      console.warn = orig;
+    }
+    return written.join('\n');
+  };
+
+  const damageSidecar = async (reportId: string) => {
+    const p = path.join(tmpRoot, CHANNEL, 'reports', TYPE, `${reportId}.metadata.json`);
+    await fs.writeFile(p, '{"reportId": "trunc', 'utf-8');
+  };
+
+  it('rebuilds from the index entry and the CSV when the sidecar is damaged', async () => {
+    await store(metadataFor({ reportId: 'rb1' }), csvFor(['20260301', '20260302'], '10'));
+    await damageSidecar('rb1');
+
+    let meta: ReportMetadata | null = null;
+    await captureWarnings(async () => {
+      meta = await loadReportMetadata(CHANNEL, 'rb1', TYPE);
+    });
+
+    expect(meta).not.toBeNull();
+    expect(meta!.reportId).toBe('rb1');
+    expect(meta!.channelId).toBe(CHANNEL);
+    expect(meta!.rebuiltAt).toBeTruthy();
+  });
+
+  it('re-measures columns and the actual date range from the CSV', async () => {
+    await store(metadataFor({ reportId: 'rb2' }), csvFor(['20260305', '20260307'], '10'));
+    await damageSidecar('rb2');
+
+    let meta: ReportMetadata | null = null;
+    await captureWarnings(async () => {
+      meta = await loadReportMetadata(CHANNEL, 'rb2', TYPE);
+    });
+    // Measured from the file on disk, not copied from the damaged record.
+    expect(meta!.columns).toEqual(['date', 'channel_id', 'video_id', 'video_thumbnail_impressions']);
+    expect(meta!.startTimeActual).toBe('20260305');
+    expect(meta!.endTimeActual).toBe('20260307');
+  });
+
+  it('leaves jobId, downloadUrl and isComplete absent rather than inventing them', async () => {
+    // The constraint that shapes the whole design: a plausible-looking value
+    // here would turn a detectable gap into an undetectable lie.
+    await store(metadataFor({ reportId: 'rb3' }), csvFor(['20260301'], '10'));
+    await damageSidecar('rb3');
+
+    let meta: ReportMetadata | null = null;
+    await captureWarnings(async () => {
+      meta = await loadReportMetadata(CHANNEL, 'rb3', TYPE);
+    });
+    expect(meta!.jobId).toBeUndefined();
+    expect(meta!.downloadUrl).toBeUndefined();
+    expect(meta!.isComplete).toBeUndefined();
+  });
+
+  it('persists the rebuilt sidecar so the next read is clean', async () => {
+    await store(metadataFor({ reportId: 'rb4' }), csvFor(['20260301'], '10'));
+    await damageSidecar('rb4');
+
+    const first = await captureWarnings(() => loadReportMetadata(CHANNEL, 'rb4', TYPE));
+    expect(first).toContain('rebuilding it');
+
+    // Second read finds a valid file and must not warn again.
+    const second = await captureWarnings(() => loadReportMetadata(CHANNEL, 'rb4', TYPE));
+    expect(second).toBe('');
+  });
+
+  it('reports a damaged sidecar rather than passing it off as absent', async () => {
+    await store(metadataFor({ reportId: 'rb5' }), csvFor(['20260301'], '10'));
+    await damageSidecar('rb5');
+
+    const err = await captureWarnings(() => loadReportMetadata(CHANNEL, 'rb5', TYPE));
+    expect(err).toContain('unreadable');
+    expect(err).toContain('not recorded at download time');
+  });
+
+  it('stays silent and returns null when the sidecar is merely absent', async () => {
+    // The ordinary case for an older or interrupted write. Nothing is wrong,
+    // so nothing is said and no rebuild is attempted.
+    await store(metadataFor({ reportId: 'rb6' }), csvFor(['20260301'], '10'));
+    await fs.rm(path.join(tmpRoot, CHANNEL, 'reports', TYPE, 'rb6.metadata.json'));
+
+    let meta: ReportMetadata | null = null;
+    const err = await captureWarnings(async () => {
+      meta = await loadReportMetadata(CHANNEL, 'rb6', TYPE);
+    });
+    expect(err).toBe('');
+    expect(meta).toBeNull();
+  });
+
+  it('gives up when the report has no index entry to rebuild from', async () => {
+    // A stray CSV and sidecar with nothing authoritative behind them. Half a
+    // record would be worse than none.
+    const dir = path.join(tmpRoot, CHANNEL, 'reports', TYPE);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, 'orphan.csv'), csvFor(['20260301'], '10'), 'utf-8');
+    await fs.writeFile(path.join(dir, 'orphan.metadata.json'), '{"broken', 'utf-8');
+
+    let meta: ReportMetadata | null = {} as ReportMetadata;
+    const err = await captureWarnings(async () => {
+      meta = await loadReportMetadata(CHANNEL, 'orphan', TYPE);
+    });
+    expect(meta).toBeNull();
+    expect(err).toContain('Rebuild failed');
+  });
+
+  it('gives up when the CSV itself is gone', async () => {
+    await store(metadataFor({ reportId: 'rb7' }), csvFor(['20260301'], '10'));
+    await damageSidecar('rb7');
+    await fs.rm(path.join(tmpRoot, CHANNEL, 'reports', TYPE, 'rb7.csv'));
+
+    let meta: ReportMetadata | null = {} as ReportMetadata;
+    await captureWarnings(async () => {
+      meta = await loadReportMetadata(CHANNEL, 'rb7', TYPE);
+    });
+    expect(meta).toBeNull();
+  });
+
+  it('still serves the CSV through readCachedReport after a rebuild', async () => {
+    // The regression this could easily introduce: isComplete is absent on a
+    // rebuilt record, and a falsiness check would discard the report.
+    await store(metadataFor({ reportId: 'rb8' }), csvFor(['20260301', '20260302'], '42'));
+    await damageSidecar('rb8');
+
+    let report: Awaited<ReturnType<typeof readCachedReport>> = null;
+    await captureWarnings(async () => {
+      report = await readCachedReport(CHANNEL, 'rb8', TYPE);
+    });
+    expect(report).not.toBeNull();
+    expect(report!.data).toHaveLength(2);
+    expect(report!.data[0].video_thumbnail_impressions).toBe('42');
+  });
+
+  it('still refuses a report recorded as incomplete', async () => {
+    // `=== false` must keep rejecting, or the rebuild change would quietly
+    // widen what counts as servable.
+    await store(metadataFor({ reportId: 'rb9', isComplete: false }), csvFor(['20260301'], '10'));
+    expect(await readCachedReport(CHANNEL, 'rb9', TYPE)).toBeNull();
   });
 });

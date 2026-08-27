@@ -461,7 +461,6 @@ export interface ReportMetadata {
   reportId: string;
   reportTypeId: string;
   channelId: string;          // Channel this report belongs to
-  jobId: string;
   startTime: string;          // From YouTube API
   endTime: string;            // From YouTube API
   createTime?: string;        // Report createTime from the API; orders reissues of the same window
@@ -469,11 +468,30 @@ export interface ReportMetadata {
   endTimeActual: string;      // Actual data range in CSV (parsed)
   downloadedAt: string;       // ISO 8601 timestamp
   expiresAt: string;          // ISO 8601 timestamp
-  downloadUrl: string;        // Original download URL
   columns: string[];          // CSV column names
-  isComplete: boolean;        // Completeness flag
   fileSize: number;
   row_count?: number;
+
+  /**
+   * The three fields below came from the API response at download time and
+   * cannot be recovered from anything on disk. They are optional so that a
+   * sidecar rebuilt by `rebuildReportMetadata` can leave them readably absent
+   * rather than defaulted: a plausible-looking value here would turn a
+   * detectable gap into an undetectable lie.
+   *
+   * Note `isComplete` in particular. Absent means "never recorded", which is
+   * not the same as `false` ("recorded as incomplete"), and consumers must
+   * test it with `=== false` rather than for falsiness.
+   */
+  jobId?: string;
+  downloadUrl?: string;       // Original download URL
+  isComplete?: boolean;       // Completeness flag
+
+  /**
+   * Set only on a sidecar reconstructed after the original was found damaged.
+   * Its absence means the record came from the API response at download time.
+   */
+  rebuiltAt?: string;         // ISO 8601 timestamp
 }
 
 /**
