@@ -436,7 +436,7 @@ Each cached report has a `<reportId>.metadata.json` sidecar recording what the
 report was at download time, including its column list and a completeness flag.
 `--verify` reads those sidecars, so the counts it prints describe them:
 
-```
+```text
 Verification complete: 3755 OK, 0 issues, 2 rebuilt (completeness unverifiable)
 ```
 

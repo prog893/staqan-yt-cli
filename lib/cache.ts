@@ -317,7 +317,41 @@ export type ReportMetadataLoad =
   | { status: 'damaged'; error: Error };
 
 /**
+ * Whether a parsed sidecar carries the fields its consumers read off it.
+ *
+ * Syntax is not shape. `{}` is valid JSON, and accepting it hands
+ * `readCachedReport` a record whose `columns` is undefined: it throws on
+ * `.join()`, the surrounding catch turns that into null, and the report drops
+ * out of every query with its sidecar left broken. Checking the shape here is
+ * what routes that file to the rebuild instead.
+ */
+function isReportMetadata(value: unknown): value is ReportMetadata {
+  if (typeof value !== 'object' || value === null) return false;
+  const m = value as Record<string, unknown>;
+
+  const requiredStrings = [
+    'reportId', 'reportTypeId', 'channelId', 'startTime', 'endTime',
+    'startTimeActual', 'endTimeActual', 'downloadedAt', 'expiresAt',
+  ];
+  if (!requiredStrings.every((k) => typeof m[k] === 'string')) return false;
+  if (!Array.isArray(m.columns) || !m.columns.every((c) => typeof c === 'string')) return false;
+  if (typeof m.fileSize !== 'number') return false;
+
+  // Optional fields are absent or correctly typed, never junk. A rebuilt
+  // sidecar legitimately omits jobId, downloadUrl and isComplete.
+  const optional: [string, string][] = [
+    ['createTime', 'string'], ['jobId', 'string'], ['downloadUrl', 'string'],
+    ['isComplete', 'boolean'], ['rebuiltAt', 'string'], ['row_count', 'number'],
+  ];
+  return optional.every(([k, t]) => m[k] === undefined || typeof m[k] === t);
+}
+
+/**
  * Load report metadata, reporting absence and damage separately.
+ *
+ * A file that parses but is not a metadata record counts as damaged, not ok:
+ * it exists and cannot be used, which is the same situation as a syntax error
+ * and gets the same repair.
  */
 export async function loadReportMetadataResult(
   channelId: string,
@@ -326,12 +360,24 @@ export async function loadReportMetadataResult(
 ): Promise<ReportMetadataLoad> {
   const { metadata: metadataPath } = getReportPaths(channelId, reportId, reportTypeId);
 
+  let parsed: unknown;
   try {
-    const metadata = await loadJsonIfPresent<ReportMetadata>(metadataPath, 'report metadata');
-    return metadata ? { status: 'ok', metadata } : { status: 'absent' };
+    parsed = await loadJsonIfPresent<unknown>(metadataPath, 'report metadata');
   } catch (err) {
     return { status: 'damaged', error: err as Error };
   }
+
+  if (parsed === null) return { status: 'absent' };
+  if (!isReportMetadata(parsed)) {
+    return {
+      status: 'damaged',
+      error: new Error(
+        `report metadata (${metadataPath}) parsed but is not a metadata record. ` +
+        `Fix the file, or delete it to start over.`
+      ),
+    };
+  }
+  return { status: 'ok', metadata: parsed };
 }
 
 /**

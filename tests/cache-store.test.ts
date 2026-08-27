@@ -649,6 +649,69 @@ describe('rebuildReportMetadata (#192)', () => {
     expect(report!.data[0].video_thumbnail_impressions).toBe('42');
   });
 
+  it('treats a sidecar that parses but is not a metadata record as damaged', async () => {
+    // `{}` is valid JSON. Accepting it handed readCachedReport a record whose
+    // columns is undefined: it threw on .join(), the surrounding catch turned
+    // that into null, and the report dropped out of every query with its
+    // sidecar left broken. Shape failure has to reach the same repair as a
+    // syntax failure.
+    await store(metadataFor({ reportId: 'sh1' }), csvFor(['20260301'], '10'));
+    const p = path.join(tmpRoot, CHANNEL, 'reports', TYPE, 'sh1.metadata.json');
+    await fs.writeFile(p, '{}', 'utf-8');
+
+    let meta: ReportMetadata | null = null;
+    const err = await captureWarnings(async () => {
+      meta = await loadReportMetadata(CHANNEL, 'sh1', TYPE);
+    });
+    expect(err).toContain('not a metadata record');
+    expect(meta).not.toBeNull();
+    expect(meta!.rebuiltAt).toBeTruthy();
+  });
+
+  it('rebuilds rather than losing the report when the shape is wrong', async () => {
+    // The consequence that made this worth fixing: the CSV is intact and must
+    // still be served.
+    await store(metadataFor({ reportId: 'sh2' }), csvFor(['20260301', '20260302'], '77'));
+    await fs.writeFile(
+      path.join(tmpRoot, CHANNEL, 'reports', TYPE, 'sh2.metadata.json'),
+      '{"reportId":"sh2"}',
+      'utf-8',
+    );
+
+    let report: Awaited<ReturnType<typeof readCachedReport>> = null;
+    await captureWarnings(async () => {
+      report = await readCachedReport(CHANNEL, 'sh2', TYPE);
+    });
+    expect(report).not.toBeNull();
+    expect(report!.data).toHaveLength(2);
+    expect(report!.data[0].video_thumbnail_impressions).toBe('77');
+  });
+
+  it('rejects a sidecar whose optional fields carry the wrong type', async () => {
+    await store(metadataFor({ reportId: 'sh3' }), csvFor(['20260301'], '10'));
+    const p = path.join(tmpRoot, CHANNEL, 'reports', TYPE, 'sh3.metadata.json');
+    const good = JSON.parse(await fs.readFile(p, 'utf-8'));
+    await fs.writeFile(p, JSON.stringify({ ...good, isComplete: 'yes' }), 'utf-8');
+
+    const err = await captureWarnings(() => loadReportMetadata(CHANNEL, 'sh3', TYPE));
+    expect(err).toContain('not a metadata record');
+  });
+
+  it('accepts a well-formed sidecar untouched', async () => {
+    // The guard must not reject valid records, including a rebuilt one whose
+    // jobId, downloadUrl and isComplete are legitimately absent.
+    await store(metadataFor({ reportId: 'sh4' }), csvFor(['20260301'], '10'));
+    const err = await captureWarnings(() => loadReportMetadata(CHANNEL, 'sh4', TYPE));
+    expect(err).toBe('');
+
+    await damageSidecar('sh4');
+    await captureWarnings(() => loadReportMetadata(CHANNEL, 'sh4', TYPE));
+    // Second read of the rebuilt record: it must pass the guard despite the
+    // three absent fields.
+    const second = await captureWarnings(() => loadReportMetadata(CHANNEL, 'sh4', TYPE));
+    expect(second).toBe('');
+  });
+
   it('still refuses a report recorded as incomplete', async () => {
     // `=== false` must keep rejecting, or the rebuild change would quietly
     // widen what counts as servable.
