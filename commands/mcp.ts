@@ -22,7 +22,7 @@ import {
 } from '../lib/youtube';
 import { getAuthenticatedClient } from '../lib/auth';
 import { google } from 'googleapis';
-import { parseVideoId, initCommand, toLocalYmd, validateDateOption } from '../lib/utils';
+import { parseVideoId, initCommand, toLocalYmd, validateDateOption, debug } from '../lib/utils';
 import { fetchVideoAnalytics, fetchTrafficSources, fetchSearchTerms, fetchVideoRetention, fetchChannelAnalytics, fetchChannelSearchTerms, ALL_TIME_START_DATE } from '../lib/analytics';
 import { fetchReportTypes, fetchReportJobs, fetchReportData } from '../lib/reports';
 import { requireChannel } from '../lib/config';
@@ -1023,7 +1023,13 @@ async function handleToolCall(name: string, args: any) {
           await writeFile(tempDest, imageBytes);
           await rename(tempDest, dest);
         } catch (err) {
-          await unlink(tempDest).catch(() => {});
+          // Roll back the partial file, then rethrow the original error. The
+          // cleanup must not mask what actually went wrong, so its own failure
+          // is recorded at debug level rather than thrown (issue #196).
+          await unlink(tempDest).catch((unlinkErr: NodeJS.ErrnoException) => {
+            if (unlinkErr.code === 'ENOENT') return;
+            debug(`Could not remove partial thumbnail ${tempDest}: ${unlinkErr.message}`);
+          });
           throw err;
         }
         const note = resolvedQuality !== requestedQuality

@@ -33,14 +33,16 @@ const DEFAULT_CONFIG: Config = {
 };
 
 /**
- * Ensure config directory exists
+ * Ensure config directory exists.
+ *
+ * Note: mkdir with { recursive: true } is idempotent: it succeeds if the
+ * directory already exists, so we call it directly without an access probe.
+ * This avoids the TOCTOU window and is more efficient. Matches `ensureCacheDir`
+ * in lib/cache.ts. A real failure (EACCES, ENOTDIR) propagates, which is what
+ * `saveConfig` needs before it writes.
  */
 async function ensureConfigDir(): Promise<void> {
-  try {
-    await fs.access(CONFIG_DIR);
-  } catch {
-    await fs.mkdir(CONFIG_DIR, { recursive: true });
-  }
+  await fs.mkdir(CONFIG_DIR, { recursive: true });
 }
 
 /**

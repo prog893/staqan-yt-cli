@@ -116,6 +116,21 @@ export function safeReportPath(tmpDir: string, reportId: string | null | undefin
 }
 
 /**
+ * Record a temp-download cleanup that did not happen.
+ *
+ * Deliberately does not throw. Every caller is either already unwinding a
+ * failure (so throwing here would replace the real error with a temp-file
+ * complaint) or has the payload safely in memory (so throwing would discard a
+ * completed download). `ENOENT` is the expected case and stays quiet; anything
+ * else means a temp file leaked into the data directory, which is otherwise
+ * invisible. See issue #196.
+ */
+function noteTempCleanupFailure(tmpPath: string, err: unknown): void {
+  if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
+  debug(`Could not remove temp download ${tmpPath}: ${(err as Error).message}`);
+}
+
+/**
  * Single-attempt HTTPS GET that streams the response body into `dest`.
  * Resolves with the final HTTP status code (200 = success). Caller decides
  * whether to retry based on the status.
@@ -154,7 +169,7 @@ export function downloadOnce(
         // retry loop can decide. Drain the body so the socket closes cleanly.
         if (response.statusCode === 429) {
           response.resume();
-          unlink(dest).catch(() => {});
+          unlink(dest).catch(err => noteTempCleanupFailure(dest, err));
           resolve({
             statusCode: 429,
             retryAfterSec: Number(response.headers['retry-after']) || 0,
@@ -164,7 +179,7 @@ export function downloadOnce(
 
         if (response.statusCode !== 200) {
           response.resume();
-          unlink(dest).catch(() => {});
+          unlink(dest).catch(err => noteTempCleanupFailure(dest, err));
           // Carry the status on the error so the caller can tell a retriable
           // 5xx from a permanent 4xx. Without it every non-200 looked alike
           // and a transient 500 aborted the whole report.
@@ -184,7 +199,7 @@ export function downloadOnce(
         pipeline(response, file).then(
           () => resolve({ statusCode: 200, retryAfterSec: 0 }),
           (err) => {
-            unlink(dest).catch(() => {});
+            unlink(dest).catch(err => noteTempCleanupFailure(dest, err));
             reject(err);
           },
         );
@@ -200,7 +215,7 @@ export function downloadOnce(
         req.destroy(timeoutErr);
       })
       .on('error', (err) => {
-        unlink(dest).catch(() => {});
+        unlink(dest).catch(err => noteTempCleanupFailure(dest, err));
         reject(err);
       });
   });
@@ -306,11 +321,13 @@ export async function downloadReport(
   const csvData = await fs.readFile(tmpPath, 'utf-8');
   const parsed = parseCsvAndExtractRange(csvData);
 
-  // Cleanup
+  // Cleanup. The CSV has already been read and parsed into memory above, so a
+  // failure here costs a leaked temp file and nothing else. Throwing would
+  // discard a report that downloaded and parsed successfully.
   try {
     await unlink(tmpPath);
-  } catch {
-    // Ignore cleanup errors
+  } catch (err) {
+    noteTempCleanupFailure(tmpPath, err);
   }
 
   return {

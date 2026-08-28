@@ -7,7 +7,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import { execSync } from 'child_process';
-import { success, error } from './utils';
+import { success, error, debug } from './utils';
 
 export type ShellType = 'bash' | 'zsh' | 'auto';
 
@@ -188,8 +188,10 @@ export function getCompletionPath(shell: 'bash' | 'zsh'): string {
     if (!brewPrefix) {
       try {
         brewPrefix = execSync('brew --prefix', { encoding: 'utf-8' }).trim();
-      } catch {
-        // Homebrew not found, use user directory
+      } catch (err) {
+        // Homebrew not installed, or `brew` not on PATH. Expected on a plain
+        // zsh install; the user-directory fallback below is the right answer.
+        debug(`brew --prefix unavailable, using the user completion directory: ${(err as Error).message}`);
       }
     }
 

@@ -19,13 +19,37 @@ let isVerboseEnabled = false;
 let isQuietEnabled = false;
 
 /**
- * Ensure config directory exists
+ * Ensure config directory exists.
+ *
+ * Note: mkdir with { recursive: true } is idempotent: it succeeds if the
+ * directory already exists, so we call it directly without an access probe.
+ * This avoids the TOCTOU window and is more efficient. Matches `ensureCacheDir`
+ * in lib/cache.ts. A real failure (EACCES, ENOTDIR) propagates, which is what
+ * the callers that write into this directory need.
  */
 async function ensureConfigDir(): Promise<void> {
+  await fs.mkdir(CONFIG_DIR, { recursive: true });
+}
+
+/**
+ * Delete a file that is allowed not to exist.
+ *
+ * Swallows `ENOENT` only: the file being already gone is the outcome we wanted.
+ * Anything else (`EACCES`, `EPERM`, `EBUSY`, `EROFS`, `EIO`) means the file is
+ * still on disk, so it throws rather than letting the caller report a deletion
+ * that did not happen.
+ *
+ * Use this wherever a failed delete would make a subsequent claim untrue. For
+ * cleanup on a path that is already failing (rolling back a partial download
+ * before rethrowing the original error), swallowing is correct and a `debug()`
+ * line is the right amount of noise. Do not use this helper there.
+ */
+export async function unlinkIfPresent(filePath: string): Promise<void> {
   try {
-    await fs.access(CONFIG_DIR);
-  } catch {
-    await fs.mkdir(CONFIG_DIR, { recursive: true });
+    await fs.unlink(filePath);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
+    throw err;
   }
 }
 

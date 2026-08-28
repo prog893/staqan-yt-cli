@@ -9,6 +9,7 @@ import {
   CREDENTIALS_PATH,
   TOKEN_PATH,
   ensureConfigDir,
+  debug,
   info,
   loadJsonIfPresent,
   isTransportFailure,
@@ -188,8 +189,12 @@ function getRedirectHost(credentials: OAuth2Credentials | null): string {
       if (hostname === '127.0.0.1' || hostname === 'localhost') {
         return hostname;
       }
-    } catch {
-      // Ignore malformed redirect URI entries.
+    } catch (err) {
+      // A redirect_uris entry that does not parse is skipped rather than fatal:
+      // a later entry may still be usable, and the 'localhost' default below is
+      // correct for the common single-entry case. Record which entry was bad so
+      // a misconfigured credentials.json is diagnosable under --verbose.
+      debug(`Ignoring malformed redirect URI ${JSON.stringify(uri)}: ${(err as Error).message}`);
     }
   }
   return 'localhost';
