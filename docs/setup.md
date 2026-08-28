@@ -256,11 +256,17 @@ Access tokens expire after 1 hour. The CLI automatically:
 - Uses the refresh token to get a new access token
 - Updates `~/.staqan-yt-cli/token.json` automatically
 
-If you see authentication errors, simply re-run:
+If a refresh fails, read the message before acting. Only `invalid_grant` means
+the saved credentials are dead and need a new sign-in:
 
 ```bash
 staqan-yt auth
 ```
+
+A "Could not reach Google" message is a network problem, and `invalid_client`
+points at `~/.staqan-yt-cli/credentials.json` rather than the session. Neither
+is fixed by re-authenticating. See
+[Token refresh failures](troubleshooting.md#token-refresh-failures).
 
 ## Verification
 

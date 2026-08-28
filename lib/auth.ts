@@ -150,10 +150,18 @@ async function getAuthenticatedClient(): Promise<OAuth2Client> {
         );
       }
 
+      // Still not a reason to prescribe a re-auth. Google reports a dead
+      // refresh token as invalid_grant, handled above, so anything reaching
+      // here left the saved session intact. invalid_client in particular is
+      // about the OAuth client in credentials.json, which re-running auth
+      // cannot repair.
+      const hint = oauthError === 'invalid_client'
+        ? ` The OAuth client in ${CREDENTIALS_PATH} was rejected, and re-authenticating will not repair that.`
+        : ' The saved refresh token was not rejected, so re-authenticating is unlikely to help.';
+
       throw new Error(
         `Failed to refresh the access token: ${detail}` +
-        (oauthError ? ` (${oauthError})` : '') +
-        '. If this persists, re-authenticate: staqan-yt auth'
+        (oauthError ? ` (${oauthError})` : '') + '.' + hint
       );
     }
   }
