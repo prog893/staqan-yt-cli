@@ -32,7 +32,7 @@ export function getVersion(): string {
       if ((err as NodeJS.ErrnoException).code !== 'MODULE_NOT_FOUND') {
         process.emitWarning(
           `Ignoring unreadable ${rel}: ${(err as Error).message}`,
-          'StaqanVersionWarning'
+          { type: 'StaqanVersionWarning' }
         );
       }
     }

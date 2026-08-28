@@ -387,6 +387,7 @@ staqan-yt auth
 credentials valid, so re-authenticating would discard a working session.
 
 **Solution:** for `invalid_grant` only:
+
 ```bash
 staqan-yt auth
 ```

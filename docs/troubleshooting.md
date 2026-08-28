@@ -113,9 +113,10 @@ re-authenticating.
 **Refresh token rejected (`invalid_grant`).** The credentials really are dead:
 revoked, expired, or invalidated by an account password change.
 
-```
+```text
 ✗ Refresh token rejected by Google (invalid_grant): ...
 ```
+
 ```bash
 staqan-yt auth
 ```
@@ -123,7 +124,7 @@ staqan-yt auth
 **Could not reach Google.** A dropped connection, a proxy, or a Google 5xx. The
 saved credentials are untouched and still valid.
 
-```
+```text
 ✗ Could not reach Google to refresh the access token: ...
   The saved credentials are still valid, so this does not need a re-authentication.
 ```
@@ -134,7 +135,7 @@ connectivity and retry.
 **Anything else.** The underlying error is quoted, along with the OAuth error
 code when the token endpoint supplied one.
 
-```
+```text
 ✗ Failed to refresh the access token: <detail> (<oauth_error>)
 ```
 
