@@ -318,25 +318,30 @@ export async function downloadReport(
     throw new Error(`Download failed for ${report.id} after ${maxRetries} attempts`);
   }
 
-  const csvData = await fs.readFile(tmpPath, 'utf-8');
-  const parsed = parseCsvAndExtractRange(csvData);
-
-  // Cleanup. The CSV has already been read and parsed into memory above, so a
-  // failure here costs a leaked temp file and nothing else. Throwing would
-  // discard a report that downloaded and parsed successfully.
+  // The read and the parse are inside the try so the temp file is removed even
+  // when one of them throws. Previously they ran ahead of the cleanup, so a
+  // malformed CSV leaked the download it failed on.
   try {
-    await unlink(tmpPath);
-  } catch (err) {
-    noteTempCleanupFailure(tmpPath, err);
-  }
+    const csvData = await fs.readFile(tmpPath, 'utf-8');
+    const parsed = parseCsvAndExtractRange(csvData);
 
-  return {
-    csvData,
-    headers: parsed.headers,
-    data: parsed.data,
-    minDate: parsed.minDate,
-    maxDate: parsed.maxDate,
-  };
+    return {
+      csvData,
+      headers: parsed.headers,
+      data: parsed.data,
+      minDate: parsed.minDate,
+      maxDate: parsed.maxDate,
+    };
+  } finally {
+    // Best effort on both paths. On success the payload is already in memory;
+    // on failure the read or parse error is the one worth surfacing. Either
+    // way a cleanup complaint must not replace it.
+    try {
+      await unlink(tmpPath);
+    } catch (err) {
+      noteTempCleanupFailure(tmpPath, err);
+    }
+  }
 }
 
 // ─── Reporting API queries (report types, jobs, report data) — #102 phase 4 ──
