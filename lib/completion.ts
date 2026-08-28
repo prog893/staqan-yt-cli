@@ -161,15 +161,14 @@ export function detectShell(): ShellType {
     if (shell.includes('bash')) return 'bash';
   }
 
-  // Try to detect using ps
-  try {
-    const psOutput = execSync('ps -p $$ -o comm=', { encoding: 'utf-8' }).trim();
-    if (psOutput.includes('zsh')) return 'zsh';
-    if (psOutput.includes('bash')) return 'bash';
-  } catch {
-    // Ignore error
-  }
-
+  // A `ps -p $$ -o comm=` probe used to sit here. It could never work:
+  // execSync runs the command through /bin/sh, so `$$` expanded to that
+  // subshell rather than the invoking shell and the output was always "ps".
+  // Neither branch could match, so the probe was dead code that always fell
+  // through to the default below (#197). Detecting the real parent process
+  // would need process.ppid, which is a different change; removing the
+  // pretence is behaviour-identical and honest about what is known.
+  //
   // Default to zsh (default on macOS since Catalina)
   return 'zsh';
 }

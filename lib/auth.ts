@@ -11,6 +11,8 @@ import {
   ensureConfigDir,
   info,
   loadJsonIfPresent,
+  isTransportFailure,
+  getOAuthErrorCode,
 } from './utils';
 import { OAuth2Credentials, OAuth2Token } from '../types';
 
@@ -125,8 +127,42 @@ async function getAuthenticatedClient(): Promise<OAuth2Client> {
       const { credentials } = await oauth2Client.refreshAccessToken();
       await saveToken(credentials as OAuth2Token);
       oauth2Client.setCredentials(credentials);
-    } catch {
-      throw new Error('Failed to refresh token. Please re-authenticate: staqan-yt auth');
+    } catch (err) {
+      // Only `invalid_grant` means the saved credentials are actually dead.
+      // A bare catch here prescribed a full re-auth for a dropped connection
+      // or a Google 5xx as well, which throws away a working session in
+      // response to a network blip (#197).
+      const oauthError = getOAuthErrorCode(err);
+      const detail = (err as Error).message;
+
+      if (oauthError === 'invalid_grant') {
+        throw new Error(
+          'Refresh token rejected by Google (invalid_grant): it has been revoked, ' +
+          'expired, or the account password changed. Please re-authenticate: staqan-yt auth'
+        );
+      }
+
+      if (isTransportFailure(err)) {
+        throw new Error(
+          `Could not reach Google to refresh the access token: ${detail}. ` +
+          'The saved credentials are still valid, so this does not need a re-authentication. ' +
+          'Retry once connectivity is restored.'
+        );
+      }
+
+      // Still not a reason to prescribe a re-auth. Google reports a dead
+      // refresh token as invalid_grant, handled above, so anything reaching
+      // here left the saved session intact. invalid_client in particular is
+      // about the OAuth client in credentials.json, which re-running auth
+      // cannot repair.
+      const hint = oauthError === 'invalid_client'
+        ? ` The OAuth client in ${CREDENTIALS_PATH} was rejected, and re-authenticating will not repair that.`
+        : ' The saved refresh token was not rejected, so re-authenticating is unlikely to help.';
+
+      throw new Error(
+        `Failed to refresh the access token: ${detail}` +
+        (oauthError ? ` (${oauthError})` : '') + '.' + hint
+      );
     }
   }
 

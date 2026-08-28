@@ -17,6 +17,8 @@ import {
   retryPolicyFor,
   withRateLimitRetry,
   getRetryAfterMs,
+  isTransportFailure,
+  getOAuthErrorCode,
 } from '../lib/utils';
 
 describe('parseVideoId', () => {
@@ -399,5 +401,98 @@ describe('retryPolicyFor', () => {
 
   it('matches the constants the download path now shares', () => {
     expect(retryPolicyFor('transient')).toMatchObject({ baseDelayMs: 2_000, maxDelayMs: 60_000 });
+  });
+});
+
+/**
+ * Telling a transport failure apart from a verdict (#197).
+ *
+ * These back the token-refresh catch in lib/auth.ts, which used to answer a
+ * dropped connection and a revoked refresh token with the same instruction to
+ * re-authenticate. Acting on that advice discards a working session because
+ * the network blipped, so the classification has to be exact in both
+ * directions: a real credential failure must still say so.
+ */
+describe('isTransportFailure', () => {
+  it('recognises the network errno codes', () => {
+    for (const code of ['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ECONNREFUSED', 'ESOCKETTIMEDOUT', 'EPIPE']) {
+      expect(isTransportFailure(Object.assign(new Error('boom'), { code }))).toBe(true);
+    }
+  });
+
+  it('recognises server-side statuses in the shapes googleapis uses', () => {
+    expect(isTransportFailure({ status: 503 })).toBe(true);
+    expect(isTransportFailure({ response: { status: 500 } })).toBe(true);
+    expect(isTransportFailure({ statusCode: 502 })).toBe(true);
+    expect(isTransportFailure({ status: 408 })).toBe(true);
+  });
+
+  it('does not claim client-side verdicts as transport failures', () => {
+    // The distinction that matters: these are answers, not failures to reach
+    // an answer, so they must not be reported as "retry when the network is
+    // back".
+    expect(isTransportFailure({ status: 400 })).toBe(false);
+    expect(isTransportFailure({ status: 401 })).toBe(false);
+    expect(isTransportFailure({ status: 403 })).toBe(false);
+    expect(isTransportFailure({ status: 404 })).toBe(false);
+    expect(isTransportFailure({ status: 429 })).toBe(false);
+  });
+
+  it('recognises a connection failure whose errno name is runtime-specific', () => {
+    // Measured: Bun reports `ConnectionRefused` where Node reports
+    // `ECONNREFUSED`, so the set of names cannot be the only signal. What
+    // holds either way is that no response arrived.
+    // `config` present with no `response` is the shape gaxios produces for a
+    // request that was sent and never answered.
+    expect(isTransportFailure({ code: 'ConnectionRefused', config: {}, response: undefined })).toBe(true);
+    expect(isTransportFailure({ code: 'ConnectionClosed', config: {} })).toBe(true);
+    expect(isTransportFailure({ code: 'SomeFutureBunName', config: {} })).toBe(true);
+  });
+
+  it('does not claim a coded error that never made a request', () => {
+    // No gaxios config, so nothing was sent. A filesystem errno reaching this
+    // helper must not be reported as a network problem.
+    expect(isTransportFailure({ code: 'ConnectionRefused' })).toBe(false);
+    expect(isTransportFailure(Object.assign(new Error('x'), { code: 'ENOENT' }))).toBe(false);
+  });
+
+  it('does not treat a server verdict as transport just because the code is a string', () => {
+    // A response arrived, so the server answered. googleapis puts the status
+    // in `code` here, which must not be read as an errno.
+    expect(isTransportFailure({ code: 'x', response: { status: 401, data: {} } })).toBe(false);
+    expect(isTransportFailure({ code: 401, response: { status: 401 } })).toBe(false);
+  });
+
+  it('is safe on values that are not errors', () => {
+    expect(isTransportFailure(undefined)).toBe(false);
+    expect(isTransportFailure(null)).toBe(false);
+    expect(isTransportFailure('ECONNRESET')).toBe(false);
+    expect(isTransportFailure(new Error('no code'))).toBe(false);
+  });
+
+  it('does not treat an unrelated errno as transport', () => {
+    expect(isTransportFailure(Object.assign(new Error('x'), { code: 'ENOENT' }))).toBe(false);
+  });
+});
+
+describe('getOAuthErrorCode', () => {
+  it('reads the token endpoint error code', () => {
+    expect(getOAuthErrorCode({ response: { data: { error: 'invalid_grant' } } })).toBe('invalid_grant');
+    expect(getOAuthErrorCode({ response: { data: { error: 'invalid_client' } } })).toBe('invalid_client');
+  });
+
+  it('returns undefined when there is no OAuth verdict to read', () => {
+    // A network failure carries no response body, which is exactly the case
+    // that must not be mistaken for a dead refresh token.
+    expect(getOAuthErrorCode(Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }))).toBeUndefined();
+    expect(getOAuthErrorCode({ response: {} })).toBeUndefined();
+    expect(getOAuthErrorCode({})).toBeUndefined();
+    expect(getOAuthErrorCode(null)).toBeUndefined();
+  });
+
+  it('ignores a non-string error field', () => {
+    // The Data API nests an object under `error`; only the OAuth token
+    // endpoint puts a bare string there.
+    expect(getOAuthErrorCode({ response: { data: { error: { message: 'nope' } } } })).toBeUndefined();
   });
 });

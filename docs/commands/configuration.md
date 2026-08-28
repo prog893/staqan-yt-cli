@@ -47,7 +47,10 @@ The CLI requires these scopes:
 - Access tokens expire after 1 hour
 - Refresh tokens are long-lived
 - CLI automatically refreshes expired tokens
-- If refresh fails, re-run `staqan-yt auth`
+- If refresh fails, read the message before acting: only `invalid_grant` means
+  the credentials are dead and need `staqan-yt auth`. A "Could not reach
+  Google" message is a network problem, and the saved credentials are still
+  valid.
 
 ### Authentication Issues
 
@@ -61,9 +64,10 @@ mkdir -p ~/.staqan-yt-cli
 cp ~/Downloads/client_secret_*.json ~/.staqan-yt-cli/credentials.json
 ```
 
-**"Failed to refresh token":**
+**Token refresh failures:** re-authenticate only when the message says
+`invalid_grant`. A "Could not reach Google" message is a network problem and
+the saved credentials are still valid.
 ```bash
-# Re-authenticate
 staqan-yt auth
 ```
 
