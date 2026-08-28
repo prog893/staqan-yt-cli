@@ -647,6 +647,48 @@ function getErrorReasons(err: unknown): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Whether a failure is transport-level: the request never got a verdict.
+ *
+ * A dropped connection, a DNS failure or a server-side 5xx says nothing about
+ * the request that was made, so a caller must not report it as a problem with
+ * the request's contents. Reuses the same sets `classifyRetryableError` uses,
+ * so the two cannot drift.
+ */
+export function isTransportFailure(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+
+  // A response arrived, so the server reached a verdict. Only its own 5xx
+  // class counts as transport; 401/403/429 are answers about the request.
+  const status = getErrorStatus(err);
+  if (status !== undefined) return TRANSIENT_STATUSES.has(status);
+
+  const code = (err as NodeJS.ErrnoException).code;
+  if (typeof code !== 'string') return false;
+  if (RETRIABLE_NETWORK_CODES.has(code)) return true;
+
+  // The errno names are runtime-specific: measured, Bun reports
+  // `ConnectionRefused` where Node reports `ECONNREFUSED`, so enumerating them
+  // would silently rot. What holds either way is that a request carrying a
+  // gaxios `config` but no `response` was sent and never got a verdict.
+  // Requiring `config` keeps unrelated coded errors, an ENOENT off the
+  // filesystem for instance, from being reported as a network problem.
+  const e = err as { config?: unknown; response?: unknown };
+  return e.config !== undefined && e.response === undefined;
+}
+
+/**
+ * The OAuth token endpoint's machine-readable error code, if the failure came
+ * from one. `invalid_grant` is the only verdict that actually means the saved
+ * credentials are dead; everything else leaves them usable.
+ */
+export function getOAuthErrorCode(err: unknown): string | undefined {
+  const data = (err as { response?: { data?: unknown } } | undefined)?.response?.data;
+  if (!data || typeof data !== 'object') return undefined;
+  const code = (data as { error?: unknown }).error;
+  return typeof code === 'string' ? code : undefined;
+}
+
 /** Collect every message string an API error might carry. */
 function collectErrorMessages(err: unknown): string[] {
   if (!err || typeof err !== 'object') return [];
@@ -879,8 +921,12 @@ async function withRateLimitRetry<T>(
 function getLocalTimeZone(): string {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
-  } catch {
-    // Fallback to UTC if timezone detection fails
+  } catch (err) {
+    // Near-theoretical: a runtime without full ICU resolves timeZone to "UTC"
+    // rather than throwing, so UTC is the right answer either way. Named under
+    // -v so a surprising timezone in the output has something to point at,
+    // instead of every timestamp silently shifting (#197).
+    debug(`Timezone detection failed, using UTC: ${(err as Error).message}`);
     return 'UTC';
   }
 }

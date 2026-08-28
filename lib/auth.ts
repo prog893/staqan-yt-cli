@@ -11,6 +11,8 @@ import {
   ensureConfigDir,
   info,
   loadJsonIfPresent,
+  isTransportFailure,
+  getOAuthErrorCode,
 } from './utils';
 import { OAuth2Credentials, OAuth2Token } from '../types';
 
@@ -125,8 +127,34 @@ async function getAuthenticatedClient(): Promise<OAuth2Client> {
       const { credentials } = await oauth2Client.refreshAccessToken();
       await saveToken(credentials as OAuth2Token);
       oauth2Client.setCredentials(credentials);
-    } catch {
-      throw new Error('Failed to refresh token. Please re-authenticate: staqan-yt auth');
+    } catch (err) {
+      // Only `invalid_grant` means the saved credentials are actually dead.
+      // A bare catch here prescribed a full re-auth for a dropped connection
+      // or a Google 5xx as well, which throws away a working session in
+      // response to a network blip (#197).
+      const oauthError = getOAuthErrorCode(err);
+      const detail = (err as Error).message;
+
+      if (oauthError === 'invalid_grant') {
+        throw new Error(
+          'Refresh token rejected by Google (invalid_grant): it has been revoked, ' +
+          'expired, or the account password changed. Please re-authenticate: staqan-yt auth'
+        );
+      }
+
+      if (isTransportFailure(err)) {
+        throw new Error(
+          `Could not reach Google to refresh the access token: ${detail}. ` +
+          'The saved credentials are still valid, so this does not need a re-authentication. ' +
+          'Retry once connectivity is restored.'
+        );
+      }
+
+      throw new Error(
+        `Failed to refresh the access token: ${detail}` +
+        (oauthError ? ` (${oauthError})` : '') +
+        '. If this persists, re-authenticate: staqan-yt auth'
+      );
     }
   }
 

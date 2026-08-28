@@ -61,9 +61,10 @@ mkdir -p ~/.staqan-yt-cli
 cp ~/Downloads/client_secret_*.json ~/.staqan-yt-cli/credentials.json
 ```
 
-**"Failed to refresh token":**
+**Token refresh failures:** re-authenticate only when the message says
+`invalid_grant`. A "Could not reach Google" message is a network problem and
+the saved credentials are still valid.
 ```bash
-# Re-authenticate
 staqan-yt auth
 ```
 

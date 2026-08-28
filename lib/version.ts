@@ -23,8 +23,18 @@ export function getVersion(): string {
       if (packageJson?.name === 'staqan-yt-cli' && packageJson.version) {
         return packageJson.version;
       }
-    } catch {
-      // try next layout
+    } catch (err) {
+      // MODULE_NOT_FOUND is the expected miss: exactly one candidate resolves
+      // per layout and the other cannot exist. Anything else means the file is
+      // there and unusable, such as a syntax error in the correct
+      // package.json, which would otherwise be indistinguishable from the
+      // wrong layout and silently yield FALLBACK_VERSION (#197).
+      if ((err as NodeJS.ErrnoException).code !== 'MODULE_NOT_FOUND') {
+        process.emitWarning(
+          `Ignoring unreadable ${rel}: ${(err as Error).message}`,
+          'StaqanVersionWarning'
+        );
+      }
     }
   }
   return FALLBACK_VERSION;

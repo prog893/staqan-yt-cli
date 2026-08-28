@@ -380,15 +380,18 @@ cp ~/Downloads/client_secret_*.json ~/.staqan-yt-cli/credentials.json
 staqan-yt auth
 ```
 
-### "Failed to refresh token" Error
+### Token refresh failures
 
-**Problem:** Your refresh token has expired.
+**Problem:** Only `invalid_grant` means the refresh token is actually dead. A
+"Could not reach Google" message is a network problem and leaves the saved
+credentials valid, so re-authenticating would discard a working session.
 
-**Solution:**
+**Solution:** for `invalid_grant` only:
 ```bash
-# Re-authenticate
 staqan-yt auth
 ```
+
+See [Troubleshooting](troubleshooting.md#token-refresh-failures).
 
 ### Browser doesn't open
 

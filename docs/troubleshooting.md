@@ -105,19 +105,37 @@ staqan-yt auth
 
 ---
 
-### "Failed to refresh token"
+### Token refresh failures
 
-**Symptom:**
+The message distinguishes three causes, because only one of them is fixed by
+re-authenticating.
+
+**Refresh token rejected (`invalid_grant`).** The credentials really are dead:
+revoked, expired, or invalidated by an account password change.
+
 ```
-Error: Failed to refresh access token
+✗ Refresh token rejected by Google (invalid_grant): ...
 ```
-
-**Cause:** Refresh token has expired or is invalid.
-
-**Solution:**
 ```bash
-# Re-authenticate
 staqan-yt auth
+```
+
+**Could not reach Google.** A dropped connection, a proxy, or a Google 5xx. The
+saved credentials are untouched and still valid.
+
+```
+✗ Could not reach Google to refresh the access token: ...
+  The saved credentials are still valid, so this does not need a re-authentication.
+```
+
+Re-authenticating here would discard a working session for no reason. Check
+connectivity and retry.
+
+**Anything else.** The underlying error is quoted, along with the OAuth error
+code when the token endpoint supplied one.
+
+```
+✗ Failed to refresh the access token: <detail> (<oauth_error>)
 ```
 
 ---
@@ -629,7 +647,8 @@ curl https://www.googleapis.com/youtube/v3/search?key=YOUR_API_KEY&q=test
 | `Channel not found` | Invalid channel handle/ID | Verify channel exists and is public |
 | `Video not found` | Invalid video ID | Verify video ID (11 characters) |
 | `Invalid credentials` | Wrong OAuth credentials | Re-create credentials file |
-| `Failed to refresh token` | Token expired | Run `staqan-yt auth` |
+| `Refresh token rejected ... (invalid_grant)` | Credentials revoked or expired | Run `staqan-yt auth` |
+| `Could not reach Google to refresh ...` | Network or Google 5xx | Retry; credentials are still valid |
 | `Invalid output format` | Wrong format specified | Use: json, csv, table, text, pretty |
 
 ---

@@ -207,30 +207,35 @@ async function getChannelId(handleOrId: string): Promise<string> {
       debug(`Found channel ID: ${channelId}`);
     }
   } else {
-    // Try to get channel directly by ID
-    try {
-      const response = await youtube.channels.list({
-        part: ['id'],
-        id: [handleOrId],
-      });
+    // Try to get channel directly by ID.
+    //
+    // Deliberately uncaught. The miss this lookup is allowed to have is "that
+    // string is not a channel ID", and the API expresses that as HTTP 200 with
+    // an empty `items`, not as an exception: measured, `channels.list({ id })`
+    // returns 200 for garbage input such as `not an id!!`. The empty-items
+    // check below already handles it. So a throw here is a 401, 403, 429 or a
+    // network failure, none of which say anything about the identifier, and
+    // swallowing them spent an extra quota unit on a `forUsername` lookup that
+    // was always going to fail too (#197).
+    const idResponse = await youtube.channels.list({
+      part: ['id'],
+      id: [handleOrId],
+    });
 
-      if (response.data.items && response.data.items.length > 0) {
-        channelId = response.data.items[0].id!;
-      }
-    } catch {
-      // Continue to legacy username lookup
+    if (idResponse.data.items && idResponse.data.items.length > 0) {
+      channelId = idResponse.data.items[0].id!;
     }
 
     // Fall back to legacy YouTube username (youtube.com/user/<name>) —
     // also an exact 1-unit lookup, unlike the search.list fallback it replaces
     if (!channelId) {
-      const response = await youtube.channels.list({
+      const usernameResponse = await youtube.channels.list({
         part: ['id'],
         forUsername: handleOrId,
       });
 
-      if (response.data.items && response.data.items.length > 0) {
-        channelId = response.data.items[0].id!;
+      if (usernameResponse.data.items && usernameResponse.data.items.length > 0) {
+        channelId = usernameResponse.data.items[0].id!;
       }
     }
   }
