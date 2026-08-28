@@ -54,7 +54,13 @@ async function downloadFile(url: string, destPath: string): Promise<void> {
 
     await rename(tempPath, destPath);
   } catch (err) {
-    await unlink(tempPath).catch(() => {});
+    // Roll back the partial file, then rethrow the original error. The cleanup
+    // must not mask what actually went wrong, so its own failure is recorded
+    // at debug level rather than thrown (issue #196).
+    await unlink(tempPath).catch((unlinkErr: NodeJS.ErrnoException) => {
+      if (unlinkErr.code === 'ENOENT') return;
+      debug(`Could not remove partial thumbnail ${tempPath}: ${unlinkErr.message}`);
+    });
     throw err;
   }
 }

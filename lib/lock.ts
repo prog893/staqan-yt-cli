@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { debug, CACHE_DIR } from './utils';
+import { debug, warning, CACHE_DIR } from './utils';
 import { getDataDir } from './cache';
 
 export interface LockOptions {
@@ -50,7 +50,20 @@ export async function acquireLock(
           await fs.unlink(lockPath);
           debug(`Released lock: ${lockPath}`);
         } catch (err) {
-          debug(`Failed to release lock ${lockPath}:`, (err as Error).message);
+          // Already gone means someone reaped it as stale. The lock is
+          // released either way, so this is not worth reporting.
+          if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+            debug(`Lock ${lockPath} was already removed`);
+            return;
+          }
+          // Anything else leaves the file in place, so the next invocation
+          // blocks for its full timeout and then fails to acquire, with
+          // nothing pointing back here. Say so rather than throw: the work
+          // this lock guarded has already completed.
+          warning(
+            `Could not release lock ${lockPath}: ${(err as Error).message}. ` +
+            `Other staqan-yt runs may block until it is removed by hand or ages out.`
+          );
         }
       };
     } catch (err) {
@@ -66,7 +79,12 @@ export async function acquireLock(
             await fs.unlink(lockPath);
             continue; // Try to acquire again
           } catch (unlinkErr) {
-            debug(`Failed to remove stale lock:`, (unlinkErr as Error).message);
+            // ENOENT means another process reaped the same stale lock first,
+            // which is the outcome we wanted. Fall through either way: the
+            // wait-and-retry below re-attempts acquisition.
+            if ((unlinkErr as NodeJS.ErrnoException).code !== 'ENOENT') {
+              debug(`Failed to remove stale lock ${lockPath}:`, (unlinkErr as Error).message);
+            }
           }
         }
 

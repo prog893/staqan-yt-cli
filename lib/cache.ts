@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { CONFIG_DIR, debug, warning, loadJsonIfPresent } from './utils';
+import { CONFIG_DIR, debug, warning, loadJsonIfPresent, unlinkIfPresent } from './utils';
 import { CacheIndex, CacheIndexEntry, ReportMetadata, CacheCoverage } from '../types';
 
 // Base data directory
@@ -641,17 +641,12 @@ export async function deleteReportFromCache(
 ): Promise<void> {
   const { csv: csvPath, metadata: metadataPath } = getReportPaths(channelId, reportId, reportTypeId);
 
-  try {
-    await fs.unlink(csvPath);
-  } catch {
-    // Ignore if file doesn't exist
-  }
-
-  try {
-    await fs.unlink(metadataPath);
-  } catch {
-    // Ignore if file doesn't exist
-  }
+  // Either file already being gone is fine. Anything else leaves the payload on
+  // disk, and dropping the index entry below would orphan it: the archive would
+  // still hold the bytes while nothing could find or re-download them. Throw
+  // before the index is touched so the two stay consistent.
+  await unlinkIfPresent(csvPath);
+  await unlinkIfPresent(metadataPath);
 
   await removeCacheEntry(channelId, reportId);
   debug(`Deleted report from cache: ${reportId}`);

@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { getConfig, getConfigValue, setConfigValue, getOutputFormat, DEFAULT_LOCK_TIMEOUT_MS } from '../lib/config';
-import { success, info, CACHE_DIR, writeStdout } from '../lib/utils';
+import { success, info, warning, CACHE_DIR, writeStdout, unlinkIfPresent } from '../lib/utils';
 import { formatData } from '../lib/formatters';
 import { ConfigKey, CONFIG_KEYS, CONFIG_KEY_HELP, OutputFormat } from '../types';
 import { installCompletion, detectShell } from '../lib/completion';
@@ -14,16 +14,38 @@ function availableConfigKeysHelp(): string {
 async function invalidateChannelCache(): Promise<void> {
   // Per-channel completion caches (video-id, playlist-id) are channel-specific.
   // When the default channel changes, wipe them all so stale IDs aren't suggested.
+  //
+  // This runs after the new channel has already been written, so a failure here
+  // must not be reported as the setting having failed. It also must not be
+  // silent: the surviving cache will keep offering the previous channel's IDs
+  // until it is removed by hand.
+  const failures: string[] = [];
+
   try {
     const entries = await fs.readdir(CACHE_DIR, { withFileTypes: true });
     for (const entry of entries) {
       if (entry.isDirectory()) {
         const cachePath = path.join(CACHE_DIR, entry.name, 'completion_cache.json');
-        await fs.unlink(cachePath).catch(() => {});
+        try {
+          await unlinkIfPresent(cachePath);
+        } catch (err) {
+          failures.push(`${cachePath}: ${(err as Error).message}`);
+        }
       }
     }
-  } catch {
-    // cache/ may not exist yet — ignore
+  } catch (err) {
+    // ENOENT means cache/ was never created, so there is nothing to invalidate.
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      failures.push(`${CACHE_DIR}: cannot list per-channel caches: ${(err as Error).message}`);
+    }
+  }
+
+  if (failures.length > 0) {
+    warning(
+      `Default channel updated, but ${failures.length} stale completion cache(s) could not be removed:\n` +
+      failures.map(f => `  ${f}`).join('\n') +
+      `\nTab completion may suggest the previous channel's IDs until you run: staqan-yt cache clean`
+    );
   }
 }
 
