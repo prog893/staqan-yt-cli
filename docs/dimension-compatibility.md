@@ -238,6 +238,7 @@ staqan-yt get-video-analytics --video-id VIDEO_ID --dimensions day
 | `Invalid --dimensions value: "x"` | Not in the allowlist. | Check the supported list above. |
 | `Invalid --dimensions combination: a + b` | Known-bad pair, refused locally. | Split into separate queries. |
 | `The query is not supported` | Usually the metric set, not the dimensions. | Retry with `--metrics views`. |
+| `The query is not supported` from `get-channel-analytics --dimensions video` | Not the metrics. That report needs `maxResults`, which the command does not send, so no metric set works. | Use `get-video-analytics` per video. See [analytics.md](commands/analytics.md#--dimensions-video-is-not-supported-here). |
 | `does not align to chosen date dimension` | `month` with dates that are not the 1st. | Use first-of-month for both dates. |
 | `Unknown identifier (x)` | Not a real dimension. | Check spelling against the supported list. |
 
