@@ -58,8 +58,15 @@ function runSafetyChecks(): void {
       console.error('Please commit or stash changes first');
       process.exit(1);
     }
-  } catch {
-    // git status --porcelain returns empty string if clean
+  } catch (err) {
+    // `git` throws when the command itself fails: not a repository, git not on
+    // PATH, an index.lock left by another process. The old comment here
+    // described the success case ("returns empty string if clean") and the
+    // catch swallowed the failure, so an unverifiable tree printed
+    // "Working directory is clean" and the release continued from it.
+    console.error('❌ Could not determine whether the working directory is clean');
+    console.error(`   git status failed: ${(err as Error).message}`);
+    process.exit(1);
   }
   console.log('  ✓ Working directory is clean');
 

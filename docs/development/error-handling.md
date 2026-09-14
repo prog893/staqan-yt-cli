@@ -103,6 +103,97 @@ async function writeData() {
 }
 ```
 
+## When Swallowing an Error Is Acceptable
+
+> **Swallow an error only when it is retryable, or an expected control-flow
+> outcome. In the second case, name the error you expect and re-throw or
+> `debug()` anything else.**
+
+This is enforced mechanically as far as lint can reach. `eslint.config.mjs`
+bans a statement-free `catch` via `no-restricted-syntax`:
+
+```js
+selector: 'CatchClause > BlockStatement[body.length=0]'
+```
+
+Note this is deliberately **not** `no-empty` with `allowEmptyCatch: false`.
+That rule treats a block holding only a comment as non-empty, so
+`catch { // ignore }` passes it, and that was the shape of most of the sites
+issue #196 had to remove. Matching on `body.length === 0` tests the AST, where
+comments are not body nodes.
+
+### The distinction that matters
+
+**Absent is not damaged.** A missing file is an expected outcome and `null` is a
+fine answer. A file that exists and cannot be read or parsed is a failure, and
+reporting it as absent sends the reader to fix the wrong thing.
+
+```typescript
+// ✅ Names the expected errno, re-throws the rest.
+try {
+  await fs.unlink(filePath);
+} catch (err) {
+  if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+}
+
+// ❌ The comment says ENOENT. The code says everything, including EACCES,
+//    EPERM, EBUSY and EROFS, each of which leaves the file on disk.
+try {
+  await fs.unlink(filePath);
+} catch {
+  // Ignore if file doesn't exist
+}
+```
+
+The exemplar in the codebase is `isProcessAlive` in `lib/lock.ts`, which types
+the rejection and branches on the one code it expects:
+
+```typescript
+} catch (err) {
+  const error = err as NodeJS.ErrnoException;
+  // ESRCH = no such process
+  return error.code !== 'ESRCH';
+}
+```
+
+### What lint cannot express
+
+A catch that logs nothing but returns a neutral value passes the rule and is
+still usually wrong:
+
+```typescript
+} catch {
+  return null;   // lint is satisfied; the caller now cannot tell why
+}
+```
+
+Use the shared helpers rather than re-deriving this per call site:
+
+| helper | in | swallows |
+|---|---|---|
+| `loadJsonIfPresent(filePath, label)` | `lib/utils.ts` | `ENOENT` only; a read or parse failure throws |
+| `unlinkIfPresent(filePath)` | `lib/utils.ts` | `ENOENT` only; anything else throws |
+| `withRateLimitRetry(fn, opts)` | `lib/utils.ts` | the genuinely retryable class |
+
+### Best-effort cleanup is the real exception
+
+Cleanup running on a path that is already failing must not throw, because it
+would replace the real error with a complaint about a temp file. Record it and
+carry on:
+
+```typescript
+} catch (err) {
+  // Rolling back a partial download. The original error is the one worth
+  // surfacing, so this is recorded rather than thrown.
+  if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+    debug(`Could not remove ${tmpPath}: ${(err as Error).message}`);
+  }
+}
+```
+
+The same applies after the payload is safely in memory: throwing there would
+discard work that actually succeeded.
+
 ## Error Message Best Practices
 
 ### DO ✅
