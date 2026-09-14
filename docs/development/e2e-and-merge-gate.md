@@ -49,7 +49,8 @@ A follow-up review that lands as `COMMENTED` does **not** supersede an earlier
 
 What does not reliably work:
 
-- A bare `@coderabbitai review` after pushing fixes. Often a no-op.
+- A bare `@coderabbitai review` after pushing fixes. Often a no-op, and
+  redundant anyway: the push already triggered an incremental review.
 - Repeating the kick. Each attempt can consume the quota window.
 
 What works: **ask for an explicit verdict**, listing each finding and its
@@ -149,8 +150,8 @@ One kick after `available_at`, not a poll loop before it.
 | No acknowledgement at all | **Ambiguous.** Most often quota, whose notice does not always post, but auth, bot configuration and GitHub outages look identical. | Diagnose before waiting (below). |
 | "Review limit reached" comment | Quota, explicitly. | Compute the window, then one kick. |
 | "Repository access failed during verification" | GitHub API incident. | Ask it to retry once the API recovers. |
-| "Action not completed / Review rate limited" with no countdown | Incremental no-op: the commits are already marked reviewed. | `@coderabbitai full review`. |
-| `Reviews resumed` but still no review | `resume` un-pauses; it does not re-examine seen commits. | `@coderabbitai full review`. |
+| "Action not completed / Review rate limited" with no countdown | Incremental no-op: the commits are already marked reviewed. | `@coderabbitai resume`. Escalate to `full review` only if that produces nothing. |
+| `Reviews resumed` but still no review | `resume` did not break the incremental state. This is the stuck case. | `@coderabbitai full review`. |
 | Posts `COMMENTED`, verdict unchanged | Stale verdict. | Ask for an explicit verdict, as above. |
 
 Silence is not proof of quota. Rule it out before waiting an hour on a guess:
@@ -167,18 +168,30 @@ A GitHub incident is the common non-quota cause, and it shows up as scattered
 
 ### Which command to use
 
-The three are not interchangeable, and picking the wrong one wastes a cycle:
+**Prefer the least forceful option that fits. Most of the time that is no
+command at all.**
 
-| command | what it does | use when |
-|---|---|---|
-| `@coderabbitai review` | Incremental. Skips commits it has already seen. | New commits were pushed since the last review. |
-| `@coderabbitai resume` | Un-pauses automatic reviews. | Reviews were paused. |
-| `@coderabbitai full review` | Re-examines everything, ignoring incremental state. | `review` no-ops, or a failed attempt marked commits as seen without producing a review. |
+| situation | action |
+|---|---|
+| You just pushed commits | **Nothing.** Pushing triggers an incremental review automatically. |
+| The previous attempt was rate limited, and you want attention | `@coderabbitai resume` |
+| Reviews are paused | `@coderabbitai resume` |
+| Completely stuck: `resume` produced nothing | `@coderabbitai full review` |
 
-A rate-limited first attempt marks the commits reviewed, so `review` afterwards
-answers "does not re-review already reviewed commits" and `resume` reports
-success while changing nothing. `full review` is what actually produces the
-review in that state.
+| command | what it does |
+|---|---|
+| `@coderabbitai review` | Incremental. Skips commits it has already seen. Rarely needed, since a push does this for you. |
+| `@coderabbitai resume` | Un-pauses automatic reviews. The default kick. |
+| `@coderabbitai full review` | Re-examines the entire diff, ignoring incremental state. Last resort. |
+
+`full review` re-reads everything and spends a quota slot doing work that a
+push or a `resume` would have done for free, so reaching for it first is
+expensive rather than thorough. Escalate to it only after `resume` has failed
+to produce a review.
+
+Do not push a trivial commit to nudge the diff either. If the reply alone is
+meant to clear a stale verdict, ask for an explicit verdict (above) rather than
+manufacturing a commit.
 
 ---
 

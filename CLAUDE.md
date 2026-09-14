@@ -372,9 +372,12 @@ staqan-yt-cli/
   convention. It verifies and withdraws findings that do not hold up.
 - **A `COMMENTED` follow-up does not clear a `CHANGES_REQUESTED`.** Bare
   re-kicks usually no-op; ask for an explicit verdict listing each finding.
-- **Pick the right command**: `review` is incremental and skips seen commits,
-  `resume` only un-pauses, `full review` forces a re-examination. A rate-limited
-  first attempt marks commits as seen, so only `full review` recovers it.
+- **Prefer the least forceful kick, and usually none at all.** Pushing commits
+  triggers an incremental review automatically, so do not follow a push with a
+  command. When the previous attempt was rate limited and you want attention,
+  `@coderabbitai resume` is sufficient. Reserve `@coderabbitai full review` for
+  being completely stuck, after `resume` produced nothing: it re-reads the whole
+  diff and spends a quota slot doing what a push or `resume` does for free.
 - **Total silence means quota**, not a stuck review.
 - **Never kick a rate-limited PR on a guess.** Compute
   `available_at = <rate-limit comment>.updated_at + N minutes` (the value is
