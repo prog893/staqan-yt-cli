@@ -374,10 +374,13 @@ staqan-yt-cli/
   re-kicks usually no-op; ask for an explicit verdict listing each finding.
 - **Prefer the least forceful kick, and usually none at all.** Pushing commits
   triggers an incremental review automatically, so do not follow a push with a
-  command. When the previous attempt was rate limited and you want attention,
-  `@coderabbitai resume` is sufficient. Reserve `@coderabbitai full review` for
+  command. Once `available_at` has passed (see the next bullet), a single
+  `@coderabbitai resume` is sufficient to get attention back on a PR whose
+  previous attempt was rate limited. Reserve `@coderabbitai full review` for
   being completely stuck, after `resume` produced nothing: it re-reads the whole
   diff and spends a quota slot doing what a push or `resume` does for free.
+  This chooses **which** command to send once the window is open; it never
+  licenses sending one sooner.
 - **Total silence means quota**, not a stuck review.
 - **Never kick a rate-limited PR on a guess.** Compute
   `available_at = <rate-limit comment>.updated_at + N minutes` (the value is

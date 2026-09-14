@@ -174,9 +174,14 @@ command at all.**
 | situation | action |
 |---|---|
 | You just pushed commits | **Nothing.** Pushing triggers an incremental review automatically. |
-| The previous attempt was rate limited, and you want attention | `@coderabbitai resume` |
+| Rate limited, and `available_at` has **not** passed | **Nothing.** Wait. See "Never kick a rate-limited PR on a guess" above. |
+| Rate limited, `available_at` has passed, and you want attention | `@coderabbitai resume`, once |
 | Reviews are paused | `@coderabbitai resume` |
 | Completely stuck: `resume` produced nothing | `@coderabbitai full review` |
+
+`resume` is a kick like any other, so the wait-for-the-window rule applies to it
+too. Preferring the least forceful command is about which one to send *once the
+window is open*, not a licence to send it sooner.
 
 | command | what it does |
 |---|---|
