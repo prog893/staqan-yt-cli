@@ -296,6 +296,47 @@ describe('classifyRetryableError', () => {
     }
   });
 
+  it('classifies a transport failure as transient whatever the runtime calls the errno (#206)', () => {
+    // The errno NAMES are runtime-specific: measured against gaxios 7.1.5 on a
+    // closed port, Bun reports `ConnectionRefused` where Node reports
+    // `ECONNREFUSED`. The Homebrew build is a Bun executable, so a POSIX-only
+    // list left a real connection failure unretried in production.
+    //
+    // The runtime-independent signal is a gaxios `config` present with
+    // `response` undefined: the request was sent and never got a verdict.
+    expect(classifyRetryableError({ code: 'ConnectionRefused', config: {} })).toBe('transient');
+    // Any unrecognised code in that shape, not just the one name measured, so
+    // a future runtime spelling does not need this list updated again.
+    expect(classifyRetryableError({ code: 'SomeFutureRuntimeErrno', config: {} })).toBe('transient');
+  });
+
+  it('does not treat a coded error without a request as a transport failure (#206)', () => {
+    // Requiring `config` is what stops a filesystem error being retried as a
+    // network problem. Without this the fallback would swallow the distinction.
+    expect(classifyRetryableError({ code: 'ENOENT' })).toBeNull();
+    expect(classifyRetryableError({ code: 'EACCES' })).toBeNull();
+    // A response means the server reached a verdict, so it is not transport.
+    expect(classifyRetryableError({ code: 'ConnectionRefused', config: {}, response: { status: 404 } })).toBeNull();
+  });
+
+  it('agrees with isTransportFailure, so the two cannot drift (#206)', () => {
+    // classifyRetryableError delegates its last branch to isTransportFailure.
+    // Anything the latter calls transport must be retryable by the former.
+    // Both helpers require a string `code`. gaxios sets one on every runtime
+    // measured (ECONNREFUSED on Node, ConnectionRefused on Bun), and API calls
+    // go through gaxios rather than bare fetch, so a codeless transport error
+    // is not reachable from the retry path and is deliberately not covered.
+    const cases = [
+      { code: 'ConnectionRefused', config: {} },
+      { code: 'ECONNRESET', config: {} },
+      { code: 'SomeFutureRuntimeErrno', config: {} },
+    ];
+    for (const c of cases) {
+      expect(isTransportFailure(c)).toBe(true);
+      expect(classifyRetryableError(c)).toBe('transient');
+    }
+  });
+
   it('uses googleapis reason fields when the message says nothing', () => {
     const withReason = (reason: string) => ({
       response: { data: { error: { errors: [{ reason }] } } },
