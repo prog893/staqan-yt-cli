@@ -766,6 +766,21 @@ function classifyRetryableError(err: unknown): RetryKind | null {
   if (status === 429) return 'rpm';
   if (status !== undefined && TRANSIENT_STATUSES.has(status)) return 'transient';
 
+  // Nothing above matched, so no status and no errno this list knows. The
+  // errno NAMES are runtime-specific and enumerating them silently rots:
+  // measured against gaxios 7.1.5 on the same closed port, Bun reports
+  // `ConnectionRefused` where Node reports `ECONNREFUSED`. The Homebrew build
+  // is a Bun executable, so the POSIX-only list left a real connection failure
+  // unretried in production (issue #206).
+  //
+  // `isTransportFailure` carries the runtime-independent signal instead: a
+  // gaxios `config` present with `response` undefined means the request was
+  // sent and never got a verdict. Reused rather than reimplemented so the two
+  // cannot drift, and requiring `config` is what keeps an unrelated coded
+  // error (an ENOENT off the filesystem) from being retried as a network
+  // problem.
+  if (isTransportFailure(err)) return 'transient';
+
   return null;
 }
 
